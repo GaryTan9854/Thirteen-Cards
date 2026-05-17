@@ -7,7 +7,7 @@ import os
 
 from game.game import play_one_game
 
-APP_VERSION = "1.2"
+APP_VERSION = "1.3"
 
 app = FastAPI(title="ThirteenCards", version=APP_VERSION)
 
