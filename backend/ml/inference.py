@@ -10,8 +10,13 @@ Usage:
 """
 
 import os
-import torch
-from .model import ThirteenCardsNet, predict_arrangement, card_to_idx
+try:
+    import torch
+    from .model import ThirteenCardsNet, predict_arrangement, card_to_idx
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+
 from ..hands import Hand13, Hand3, Hand5
 
 
@@ -22,6 +27,8 @@ class AIArranger:
     _instance = None   # singleton
 
     def __init__(self, model_path: str = MODEL_PATH):
+        if not TORCH_AVAILABLE:
+            raise RuntimeError("PyTorch not installed. Run: pip install torch")
         self.device = "cpu"
         self.model = ThirteenCardsNet().to(self.device)
         self.model.load_state_dict(torch.load(model_path, map_location=self.device))

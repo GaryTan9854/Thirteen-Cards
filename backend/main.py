@@ -9,7 +9,7 @@ import os
 from game.game import play_one_game
 from game.hands import Hand13
 
-APP_VERSION = "1.6"
+APP_VERSION = "1.7"
 
 app = FastAPI(title="ThirteenCards", version=APP_VERSION)
 
@@ -74,8 +74,12 @@ def arrange_hand(req: ArrangeRequest):
         result = best_arrangement_mc(req.hand, top_k=20, n_sims=150)
         arr = result["arrangement"]
     elif strategy == "ai_model":
-        from ml.inference import AIArranger
-        ai = AIArranger.get()
+        try:
+            from ml.inference import AIArranger, TORCH_AVAILABLE
+        except ImportError:
+            TORCH_AVAILABLE = False
+            AIArranger = None
+        ai = AIArranger.get() if (AIArranger and TORCH_AVAILABLE) else None
         if ai is None:
             # No model trained yet → fall back to brute force
             strategy = "brute_force"
@@ -152,10 +156,14 @@ def get_duel_result(task_id: str):
 @app.get("/api/eval/strategies")
 def list_strategies():
     """List available strategies and whether AI model is ready."""
-    from ml.inference import AIArranger
+    try:
+        from ml.inference import AIArranger, TORCH_AVAILABLE
+        ai_ready = TORCH_AVAILABLE and AIArranger.model_exists()
+    except Exception:
+        ai_ready = False
     return {
         "strategies": ["brute_force", "monte_carlo", "ai_model", "random"],
-        "ai_model_ready": AIArranger.model_exists(),
+        "ai_model_ready": ai_ready,
         "descriptions": {
             "brute_force":  "枚舉 72,072 種排列，取啟發式分數最高者",
             "monte_carlo":  "對前 20 名候選排列各跑 150 次模擬，取期望得分最高者",
