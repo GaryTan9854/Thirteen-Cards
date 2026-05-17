@@ -34,7 +34,7 @@ export default function DuelPage() {
   const [stratA, setStratA] = useState('brute_force')
   const [stratB, setStratB] = useState('random')
   const [nHands, setNHands] = useState(200)
-  const [taskId, setTaskId] = useState<string | null>(null)
+  const [_taskId, setTaskId] = useState<string | null>(null)
   const [result, setResult] = useState<DuelResult | null>(null)
   const [running, setRunning] = useState(false)
   const [mlStatus, setMlStatus] = useState<MLStatus | null>(null)
@@ -73,7 +73,6 @@ export default function DuelPage() {
     }, 2000)
   }
 
-  const eloAbs = result?.elo_diff ? Math.abs(result.elo_diff) : 0
   const aWins = result?.elo_diff !== undefined && result.elo_diff > 20
   const bWins = result?.elo_diff !== undefined && result.elo_diff < -20
 
