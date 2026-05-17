@@ -33,6 +33,7 @@ interface DuelResult {
   win_rate_a?: number
   elo_diff?: number
   verdict?: string
+  elapsed_sec?: number
   message?: string
   progress?: Progress
 }
@@ -284,6 +285,14 @@ export default function DuelPage() {
                 A: {result.a_wins}W {result.b_wins}L {result.draws}D
               </div>
               <div className="text-xs text-gray-400 mt-1">共 {result.n_hands} 對手牌</div>
+              {result.elapsed_sec !== undefined && (
+                <div className="text-xs text-gray-400 mt-0.5">
+                  歷時 {result.elapsed_sec < 60
+                    ? `${result.elapsed_sec.toFixed(0)}s`
+                    : `${(result.elapsed_sec / 60).toFixed(1)}min`}
+                  　·　{(result.n_hands! / result.elapsed_sec * 60).toFixed(0)} 對/min
+                </div>
+              )}
             </div>
           </div>
 

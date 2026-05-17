@@ -249,6 +249,7 @@ def duel(strategy_a: str, strategy_b: str, n_hands: int = 500,
         "verdict": f"{strategy_a} wins" if elo_diff > 20
                    else f"{strategy_b} wins" if elo_diff < -20
                    else "too close to call",
+        "elapsed_sec": round(time.time() - start, 1),
     }
 
     if verbose:
