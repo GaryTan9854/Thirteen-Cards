@@ -1,15 +1,23 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
 import os
 
 from game.game import play_one_game
 
-APP_VERSION = "1.3"
+APP_VERSION = "1.4"
 
 app = FastAPI(title="ThirteenCards", version=APP_VERSION)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/api/health")
