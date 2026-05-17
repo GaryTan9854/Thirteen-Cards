@@ -91,7 +91,7 @@ ssh $SSH_OPTS $REMOTE_USER@$REMOTE_HOST "
 
   if [ \"$QUICK\" = false ]; then
     echo \"   → pip install…\"
-    venv/bin/pip install -r requirements.txt -q
+    venv/bin/pip install -r requirements.txt -q -i https://pypi.tuna.tsinghua.edu.cn/simple
   fi
 
   pm2 restart thirteencards 2>/dev/null || \
