@@ -165,7 +165,13 @@ def duel(strategy_a: str, strategy_b: str, n_hands: int = 500,
     """
     arr_a = get_arranger_fn(strategy_a, ai_model_path)
     arr_b = get_arranger_fn(strategy_b, ai_model_path)
-    arr_other = arrange_random  # neutral third players (random is fast + fair)
+    # Neutral players: use AI if available (fast + consistent), else random
+    try:
+        from ml.inference import AIArranger
+        _ai = AIArranger.get()
+        arr_other = (lambda cards: arrange_ai_model(cards, _ai)) if _ai else arrange_random
+    except Exception:
+        arr_other = arrange_random
 
     total_a = 0.0
     total_b = 0.0
