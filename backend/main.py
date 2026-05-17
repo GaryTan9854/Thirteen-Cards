@@ -9,7 +9,7 @@ import os
 from game.game import play_one_game
 from game.hands import Hand13
 
-APP_VERSION = "1.11"
+APP_VERSION = "1.12"
 
 app = FastAPI(title="ThirteenCards", version=APP_VERSION)
 
@@ -74,12 +74,8 @@ def arrange_hand(req: ArrangeRequest):
         result = best_arrangement_mc(req.hand, top_k=20, n_sims=150)
         arr = result["arrangement"]
     elif strategy == "ai_model":
-        try:
-            from ml.inference import AIArranger, TORCH_AVAILABLE
-        except ImportError:
-            TORCH_AVAILABLE = False
-            AIArranger = None
-        ai = AIArranger.get() if (AIArranger and TORCH_AVAILABLE) else None
+        from ml.inference import AIArranger
+        ai = AIArranger.get()
         if ai is None:
             # No model trained yet → fall back to brute force
             strategy = "brute_force"
@@ -162,8 +158,8 @@ def get_duel_result(task_id: str):
 def list_strategies():
     """List available strategies and whether AI model is ready."""
     try:
-        from ml.inference import AIArranger, TORCH_AVAILABLE
-        ai_ready = TORCH_AVAILABLE and AIArranger.model_exists()
+        from ml.inference import AIArranger
+        ai_ready = AIArranger.model_exists()
     except Exception:
         ai_ready = False
     return {
@@ -183,7 +179,7 @@ def list_strategies():
 def ml_status():
     """Check training data and model status."""
     data_path = os.path.join(os.path.dirname(__file__), "data", "dataset.jsonl")
-    model_path = os.path.join(os.path.dirname(__file__), "data", "model.pt")
+    model_path = os.path.join(os.path.dirname(__file__), "data", "model_weights.npz")
 
     n_samples = 0
     if os.path.exists(data_path):
