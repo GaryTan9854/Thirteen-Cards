@@ -9,7 +9,7 @@ import os
 from game.game import play_one_game
 from game.hands import Hand13
 
-APP_VERSION = "1.8"
+APP_VERSION = "1.9"
 
 app = FastAPI(title="ThirteenCards", version=APP_VERSION)
 
@@ -137,8 +137,13 @@ def start_duel(req: DuelRequest, background_tasks: BackgroundTasks):
     def run_duel(tid):
         try:
             from eval_duel import duel
+
+            def on_progress(prog):
+                _duel_status[tid].update({"status": "running", "progress": prog})
+
             result = duel(req.strategy_a, req.strategy_b,
-                          n_hands=req.n_hands, verbose=False)
+                          n_hands=req.n_hands, verbose=False,
+                          progress_callback=on_progress)
             _duel_status[tid] = {"status": "done", **result}
         except Exception as e:
             _duel_status[tid] = {"status": "error", "message": str(e)}

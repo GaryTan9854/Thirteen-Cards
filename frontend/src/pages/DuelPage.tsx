@@ -8,6 +8,18 @@ const LABELS: Record<string, string> = {
   random: '隨機（基準線）',
 }
 
+interface Progress {
+  hands_done: number
+  n_hands: number
+  a_wins: number
+  b_wins: number
+  draws: number
+  avg_score_a: number
+  avg_score_b: number
+  rate: number
+  elapsed: number
+}
+
 interface DuelResult {
   status: string
   strategy_a?: string
@@ -22,6 +34,7 @@ interface DuelResult {
   elo_diff?: number
   verdict?: string
   message?: string
+  progress?: Progress
 }
 
 interface MLStatus {
@@ -36,6 +49,7 @@ export default function DuelPage() {
   const [nHands, setNHands] = useState(200)
   const [_taskId, setTaskId] = useState<string | null>(null)
   const [result, setResult] = useState<DuelResult | null>(null)
+  const [liveData, setLiveData] = useState<DuelResult | null>(null)
   const [running, setRunning] = useState(false)
   const [mlStatus, setMlStatus] = useState<MLStatus | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -51,6 +65,7 @@ export default function DuelPage() {
   async function startDuel() {
     setRunning(true)
     setResult(null)
+    setLiveData(null)
     setTaskId(null)
 
     const res = await fetch('/api/eval/duel', {
@@ -68,7 +83,10 @@ export default function DuelPage() {
       if (d.status === 'done' || d.status === 'error') {
         clearInterval(pollRef.current!)
         setResult(d)
+        setLiveData(null)
         setRunning(false)
+      } else if (d.status === 'running') {
+        setLiveData(d)
       }
     }, 2000)
   }
@@ -161,14 +179,68 @@ export default function DuelPage() {
         </button>
       </div>
 
-      {/* Running indicator */}
-      {running && (
-        <div className="bg-green-900 rounded-2xl p-6 text-center text-green-300 animate-pulse">
-          <div className="text-3xl mb-2">⚔️</div>
-          <p>正在進行 {nHands} 對手牌的 Duplicate 對決…</p>
-          <p className="text-xs text-green-500 mt-1">每對手牌會互換兩次，消除發牌運氣</p>
-        </div>
-      )}
+      {/* Running indicator with live progress */}
+      {running && (() => {
+        const p = liveData?.progress
+        const done = p?.hands_done ?? 0
+        const total = p?.n_hands ?? nHands
+        const pct = total > 0 ? done / total : 0
+        const eta = p ? Math.max(0, (total - done) / (p.rate / 60)) : null
+
+        return (
+          <div className="bg-green-900 rounded-2xl p-5 flex flex-col gap-3">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <span className="text-green-300 font-semibold">⚔️ 對決進行中…</span>
+              <span className="text-green-400 text-sm">
+                {done > 0 ? `${done} / ${total} 對` : `共 ${total} 對手牌`}
+              </span>
+            </div>
+
+            {/* Progress bar */}
+            <div className="h-3 bg-green-950 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-yellow-400 transition-all duration-500"
+                style={{ width: `${pct * 100}%` }}
+              />
+            </div>
+
+            {/* Stats row */}
+            {p ? (
+              <div className="grid grid-cols-4 gap-2 text-center text-sm">
+                <div className="bg-green-800/60 rounded-lg p-2">
+                  <div className="text-xs text-green-400 mb-0.5">A 勝</div>
+                  <div className="font-bold text-white">{p.a_wins}</div>
+                </div>
+                <div className="bg-green-800/60 rounded-lg p-2">
+                  <div className="text-xs text-green-400 mb-0.5">B 勝</div>
+                  <div className="font-bold text-white">{p.b_wins}</div>
+                </div>
+                <div className="bg-green-800/60 rounded-lg p-2">
+                  <div className="text-xs text-green-400 mb-0.5">A 均分</div>
+                  <div className={`font-bold ${p.avg_score_a >= 0 ? 'text-yellow-300' : 'text-red-400'}`}>
+                    {p.avg_score_a > 0 ? '+' : ''}{p.avg_score_a.toFixed(1)}
+                  </div>
+                </div>
+                <div className="bg-green-800/60 rounded-lg p-2">
+                  <div className="text-xs text-green-400 mb-0.5">速度</div>
+                  <div className="font-bold text-white">{p.rate.toFixed(0)}/min</div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-green-400 text-sm text-center animate-pulse">準備中…</p>
+            )}
+
+            {/* ETA */}
+            {eta !== null && (
+              <p className="text-xs text-green-500 text-center">
+                預計還需 {eta < 60 ? `${Math.ceil(eta)} 秒` : `${(eta / 60).toFixed(1)} 分鐘`}
+                　·　每對手牌互換兩次，消除發牌運氣
+              </p>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Results */}
       {result && result.status === 'done' && (

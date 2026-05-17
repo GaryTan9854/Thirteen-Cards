@@ -147,7 +147,8 @@ def _play_hand(arr_a, arr_b, arr_c, arr_d, hand_a, hand_b, hand_c, hand_d) -> tu
 
 def duel(strategy_a: str, strategy_b: str, n_hands: int = 500,
          mc_top_k: int = 20, mc_sims: int = 100,
-         ai_model_path: str = None, verbose: bool = True) -> dict:
+         ai_model_path: str = None, verbose: bool = True,
+         progress_callback=None) -> dict:
     """
     Duplicate duel between strategy_a and strategy_b.
 
@@ -197,12 +198,25 @@ def duel(strategy_a: str, strategy_b: str, n_hands: int = 500,
         else:
             draws += 1
 
-        if verbose and (i + 1) % 50 == 0:
+        if (i + 1) % 10 == 0:
             elapsed = time.time() - start
             rate = (i + 1) / elapsed * 60
-            print(f"  [{i+1:4d}/{n_hands}]  "
-                  f"A_avg={total_a/(i+1):+.2f}  B_avg={total_b/(i+1):+.2f}  "
-                  f"A_wins={a_wins}  B_wins={b_wins}  ({rate:.0f} hands/min)")
+            if verbose:
+                print(f"  [{i+1:4d}/{n_hands}]  "
+                      f"A_avg={total_a/(i+1):+.2f}  B_avg={total_b/(i+1):+.2f}  "
+                      f"A_wins={a_wins}  B_wins={b_wins}  ({rate:.0f} hands/min)")
+            if progress_callback:
+                progress_callback({
+                    "hands_done": i + 1,
+                    "n_hands": n_hands,
+                    "a_wins": a_wins,
+                    "b_wins": b_wins,
+                    "draws": draws,
+                    "avg_score_a": round(total_a / (i + 1), 3),
+                    "avg_score_b": round(total_b / (i + 1), 3),
+                    "rate": round(rate, 1),
+                    "elapsed": round(elapsed, 1),
+                })
 
     avg_diff = sum(diffs) / len(diffs)
     win_rate_a = a_wins / n_hands
