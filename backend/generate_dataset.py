@@ -84,11 +84,12 @@ def generate_brute_force(n: int, out_path: str, append: bool = False):
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
                 count += 1
 
-                if count % 500 == 0:
+                if count % 200 == 0:
                     elapsed = time.time() - start
-                    rate = count / elapsed
-                    eta = (n - count) / rate if rate > 0 else 0
-                    print(f"  {count:6,}/{n:,}  ({rate:.0f}/min)  ETA {eta/60:.1f} min")
+                    rate = count / elapsed * 60   # per minute
+                    eta = (n - count) / (rate / 60) if rate > 0 else 0
+                    bar = '█' * (count * 20 // n) + '░' * (20 - count * 20 // n)
+                    print(f"  [{bar}] {count:6,}/{n:,}  {rate:.0f}/min  ETA {eta/60:.1f}min", flush=True)
 
     elapsed = time.time() - start
     print(f"\nDone! {count:,} samples in {elapsed:.1f}s → {out_path}")
@@ -144,11 +145,12 @@ def generate_monte_carlo(n: int, out_path: str, top_k: int = 20,
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
                 count += 1
 
-                if count % 100 == 0:
+                if count % 20 == 0:
                     elapsed = time.time() - start
                     rate = count / elapsed * 60  # per minute
                     eta = (n - count) / (rate / 60) if rate > 0 else 0
-                    print(f"  {count:5,}/{n:,}  ({rate:.1f}/min)  ETA {eta/60:.1f} min")
+                    bar = '█' * (count * 20 // n) + '░' * (20 - count * 20 // n)
+                    print(f"  [{bar}] {count:5,}/{n:,}  {rate:.1f}/min  ETA {eta/60:.1f}min", flush=True)
 
     elapsed = time.time() - start
     print(f"\nDone! {count:,} samples in {elapsed:.1f}s → {out_path}")
@@ -178,7 +180,12 @@ if __name__ == "__main__":
         print(f"  top_k={args.top_k}  sims={args.sims}")
     print()
 
+    # Print upfront ETA estimate
     if args.mode == "brute_force":
+        est_min = args.n / 1000
+        print(f"預估時間：約 {est_min:.0f} 分鐘（brute_force ~1000手/分）\n")
         generate_brute_force(args.n, args.out, args.append)
     else:
+        est_min = args.n * args.top_k * args.sims / 50 / 60  # rough estimate
+        print(f"預估時間：約 {est_min:.0f} 分鐘（monte_carlo 非常慢，建議先用 brute_force）\n")
         generate_monte_carlo(args.n, args.out, args.top_k, args.sims, args.append)

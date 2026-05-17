@@ -58,9 +58,16 @@ def load_jsonl(path: str):
 def train(data_path: str, out_path: str, epochs: int = 50,
           batch_size: int = 256, lr: float = 1e-3, val_split: float = 0.1):
 
+    import time as _time
+    t0 = _time.time()
+
     print(f"Loading data from {data_path}…")
     records = load_jsonl(data_path)
-    print(f"  {len(records):,} samples loaded")
+    n_samples = len(records)
+    print(f"  {n_samples:,} samples loaded")
+    # Rough ETA: ~1s per epoch per 10k samples on CPU
+    est_min = epochs * n_samples / 10000 / 60
+    print(f"  預估訓練時間：約 {max(1, est_min):.0f} 分鐘（CPU，{epochs} epochs）")
 
     dataset = ThirteenCardsDataset(records)
     n_val = max(1, int(len(dataset) * val_split))
@@ -126,11 +133,12 @@ def train(data_path: str, out_path: str, epochs: int = 50,
         else:
             saved = ""
 
-        if epoch % 5 == 0 or epoch == 1:
-            print(f"Epoch {epoch:3d}/{epochs}  "
-                  f"train={train_loss:.4f}  val={val_loss:.4f}  acc={acc:.3f}{saved}")
+        print(f"Epoch {epoch:3d}/{epochs}  "
+              f"train={train_loss:.4f}  val={val_loss:.4f}  acc={acc:.1%}{saved}", flush=True)
 
+    elapsed = _time.time() - t0
     print(f"\nBest val loss: {best_val_loss:.4f}")
+    print(f"訓練完成！共 {elapsed/60:.1f} 分鐘")
     print(f"Model saved → {out_path}")
 
 
