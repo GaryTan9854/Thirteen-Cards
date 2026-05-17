@@ -96,6 +96,7 @@ def play_one_game(player_names=None):
     for idx, name in enumerate(player_names):
         h13 = Hand13(hands[idx])
         sp = h13.chk_special()
+        h13.specialhand = sp       # must set so compete() can detect special hands
         if sp == "normal":
             h13.arrange13()
         hand13_list.append(h13)

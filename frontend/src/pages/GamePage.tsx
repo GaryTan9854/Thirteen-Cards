@@ -5,7 +5,11 @@ import BattleLog from '../components/BattleLog'
 
 const DEFAULT_NAMES = ['Glory', 'Jack', 'Ian', 'Gary']
 
-export default function GamePage() {
+interface Props {
+  embedded?: boolean   // when true, skip the outer header (App.tsx draws it)
+}
+
+export default function GamePage({ embedded = false }: Props) {
   const [result, setResult] = useState<GameResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,8 +38,9 @@ export default function GamePage() {
     : {}
 
   return (
-    <div className="min-h-screen bg-green-950 text-white">
-      {/* Header */}
+    <div className={embedded ? '' : 'min-h-screen bg-green-950 text-white'}>
+      {/* Header — only shown when not embedded */}
+      {!embedded && (
       <div className="flex items-center justify-between px-6 py-4 bg-green-900 shadow">
         <div>
           <h1 className="text-xl font-bold tracking-wide">🃏 Thirteen Cards</h1>
@@ -49,8 +54,22 @@ export default function GamePage() {
           {loading ? '洗牌中…' : result ? '再來一局' : '開始發牌'}
         </button>
       </div>
+      )}
 
-      <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col gap-6">
+      {/* Embedded deal button */}
+      {embedded && (
+        <div className="mb-4 flex justify-end">
+          <button
+            onClick={playGame}
+            disabled={loading}
+            className="px-5 py-2 rounded-xl bg-yellow-400 text-gray-900 font-bold text-sm shadow hover:bg-yellow-300 active:scale-95 transition disabled:opacity-50"
+          >
+            {loading ? '洗牌中…' : result ? '再來一局' : '開始發牌'}
+          </button>
+        </div>
+      )}
+
+      <div className={`flex flex-col gap-6 ${!embedded ? 'max-w-7xl mx-auto px-4 py-6' : ''}`}>
         {error && (
           <div className="bg-red-900 text-red-200 rounded-xl p-4 text-sm">
             ❌ {error}
