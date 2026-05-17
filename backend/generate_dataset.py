@@ -82,9 +82,10 @@ def generate_brute_force(n: int, out_path: str, append: bool = False):
                     }
 
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                f.flush()
                 count += 1
 
-                if count % 200 == 0:
+                if count % 100 == 0:
                     elapsed = time.time() - start
                     rate = count / elapsed * 60   # per minute
                     eta = (n - count) / (rate / 60) if rate > 0 else 0
