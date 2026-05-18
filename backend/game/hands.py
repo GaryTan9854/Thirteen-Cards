@@ -62,7 +62,12 @@ class Hand3(Hand):
             self.score = self._check_three_of_a_kind()
         elif cat == 1:
             self.score = self._check_pair()
-        elif cat == 0:
+        elif cat == 4:
+            # 3-card consecutive ranks: no such hand in 13支 — treat as 亂
+            self.handtype_val = 0
+            self.handtype = HandName[0]
+            self.score = self._check_highcard()
+        else:
             self.score = self._check_highcard()
         return [self.score, self.handtype, self.handtype_val]
 
@@ -300,58 +305,14 @@ class Hand13(Hand):
             self.totalscore = self.handtype_val
             return self
 
-        cards = self.handlist  # sorted list of 13 unique cardstrs
+        from .arrange import best_arrangement
+        result = best_arrangement(self.handlist)
 
-        # ── Step 1: pre-compute scores for all sub-hands (1,573 calls total) ──
-        # C(13,3)=286 possible 3-card tops, C(13,5)=1,287 possible 5-card mid/bots
-        top_cache = {}   # tuple-of-3 → Hand3 (with score_hand already called)
-        five_cache = {}  # tuple-of-5 → Hand5 (with score_hand already called)
+        if result is None:
+            # Fallback: should not happen for a legal hand
+            return self
 
-        for combo3 in itertools.combinations(cards, 3):
-            h = Hand3(list(combo3))
-            h.score_hand()
-            top_cache[combo3] = h
-
-        for combo5 in itertools.combinations(cards, 5):
-            h = Hand5(list(combo5))
-            h.score_hand()
-            five_cache[combo5] = h
-
-        # ── Step 2: enumerate 72,072 combos using cached scores (no new objects) ──
-        best_sc1 = best_sc2 = -1
-        best_atk = best_def = None
-        best_atk_s = (0, 0, 0)
-
-        for top3 in itertools.combinations(cards, 3):
-            s1 = top_cache[top3].score
-            rest = [c for c in cards if c not in set(top3)]
-
-            for mid5 in itertools.combinations(rest, 5):
-                s2 = five_cache[mid5].score
-                if s1 > s2:
-                    continue
-                bot5 = tuple(c for c in rest if c not in set(mid5))
-                s3 = five_cache[bot5].score
-                if s2 > s3:
-                    continue
-
-                sc1 = self.eval_attack(s1, s2, s3)
-                sc2 = self.eval_defense(s1, s2, s3)
-                if sc1 > best_sc1:
-                    best_sc1 = sc1
-                    best_atk = (top3, mid5, bot5)
-                    best_atk_s = (s1, s2, s3)
-                if sc2 > best_sc2:
-                    best_sc2 = sc2
-                    best_def = (top3, mid5, bot5)
-
-        can_atk = self.eval_CanAttack(*best_atk_s)
-        chosen = best_atk if can_atk else best_def
-
-        self.htop = top_cache[chosen[0]]
-        self.hmid = five_cache[chosen[1]]
-        self.hbot = five_cache[chosen[2]]
-        self.CanAttack = can_atk
+        self.htop, self.hmid, self.hbot = result
         self.ss = [self.htop.score, self.hmid.score, self.hbot.score]
         self.score = sum(self.ss)
         self.totalscore = self.score
