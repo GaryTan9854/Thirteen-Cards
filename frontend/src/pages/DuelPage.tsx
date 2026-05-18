@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 
-const STRATEGIES = ['rule_base', 'ai_model', 'random']
+const STRATEGIES = ['rule_base', 'monte_carlo', 'ai_model', 'random']
 const LABELS: Record<string, string> = {
-  rule_base: 'Rule-Base',
-  ai_model:  'AI 神經網路',
-  random:    '隨機（基準線）',
+  rule_base:   'Rule-Base',
+  monte_carlo: 'Monte Carlo（模擬150局）',
+  ai_model:    'AI 神經網路',
+  random:      '隨機（基準線）',
 }
 
 interface Progress {

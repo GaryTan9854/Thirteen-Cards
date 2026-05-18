@@ -9,7 +9,7 @@ import os
 from game.game import play_one_game
 from game.hands import Hand13
 
-APP_VERSION = "1.20"
+APP_VERSION = "2.0"
 
 app = FastAPI(title="ThirteenCards", version=APP_VERSION)
 
@@ -165,7 +165,7 @@ def list_strategies():
     except Exception:
         ai_ready = False
     return {
-        "strategies": ["rule_base", "monte_carlo", "ai_model", "random"],
+        "strategies": ["rule_base", "monte_carlo", "ai_model", "random"],  # monte_carlo restored
         "ai_model_ready": ai_ready,
         "descriptions": {
             "rule_base":    "規則排列（攻守判斷 + 名次%評分），~70 種候選，3 ms／手",
