@@ -9,7 +9,7 @@ import os
 from game.game import play_one_game
 from game.hands import Hand13
 
-APP_VERSION = "1.19"
+APP_VERSION = "1.20"
 
 app = FastAPI(title="ThirteenCards", version=APP_VERSION)
 
@@ -174,6 +174,23 @@ def list_strategies():
             "random":       "隨機選一個合法排列（基準線）",
         },
     }
+
+
+# ── Loss case study ──────────────────────────────────
+@app.get("/api/eval/loss_cases")
+def get_loss_cases():
+    """Return all loss cases logged from the last duel run."""
+    import json
+    path = os.path.join(os.path.dirname(__file__), "data", "loss_cases.jsonl")
+    if not os.path.exists(path):
+        return {"cases": []}
+    cases = []
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                cases.append(json.loads(line))
+    return {"cases": cases}
 
 
 # ── Dataset status ────────────────────────────────────

@@ -22,6 +22,7 @@ Usage as CLI:
 
 import argparse
 import itertools
+import json
 import random
 import sys
 import time
@@ -118,14 +119,28 @@ def get_arranger_fn(strategy: str, ai_model_path: str = None):
 # Duel engine
 # ──────────────────────────────────────────────────────
 
+def _hand_detail(h13: Hand13) -> dict:
+    """Extract arranged hand details for logging."""
+    def fmt(hand): return [c.cardstr() for c in hand.handlist] if hand else []
+    return {
+        "cards":     [c.cardstr() for c in h13.handlist],
+        "special":   h13.specialhand,
+        "top":       fmt(h13.htop) if hasattr(h13, 'htop') and h13.htop else [],
+        "mid":       fmt(h13.hmid) if hasattr(h13, 'hmid') and h13.hmid else [],
+        "bot":       fmt(h13.hbot) if hasattr(h13, 'hbot') and h13.hbot else [],
+        "top_type":  h13.htop.handtype if hasattr(h13, 'htop') and h13.htop else "",
+        "mid_type":  h13.hmid.handtype if hasattr(h13, 'hmid') and h13.hmid else "",
+        "bot_type":  h13.hbot.handtype if hasattr(h13, 'hbot') and h13.hbot else "",
+    }
+
+
 def _play_hand(arr_a, arr_b, arr_c, arr_d, hand_a, hand_b, hand_c, hand_d) -> tuple:
-    """Arrange all 4 hands and return scores for A and B."""
+    """Arrange all 4 hands and return (score_a, score_b, h_a, h_b)."""
     h_a = arr_a(hand_a)
     h_b = arr_b(hand_b)
     h_c = arr_c(hand_c)
     h_d = arr_d(hand_d)
 
-    # A vs B, C, D
     score_a = 0
     score_b = 0
 
@@ -142,7 +157,7 @@ def _play_hand(arr_a, arr_b, arr_c, arr_d, hand_a, hand_b, hand_c, hand_d) -> tu
         else:
             score_b += s
 
-    return score_a, score_b
+    return score_a, score_b, h_a, h_b
 
 
 def duel(strategy_a: str, strategy_b: str, n_hands: int = 500,
@@ -177,7 +192,11 @@ def duel(strategy_a: str, strategy_b: str, n_hands: int = 500,
     total_b = 0.0
     a_wins = b_wins = draws = 0
     diffs = []
+    loss_cases = []
     start = time.time()
+
+    loss_log_path = Path(__file__).parent / "data" / "loss_cases.jsonl"
+    loss_log_path.open("w").close()  # clear previous run
 
     for i in range(n_hands):
         deck = Deck()
@@ -185,9 +204,9 @@ def duel(strategy_a: str, strategy_b: str, n_hands: int = 500,
         h1, h2, h3, h4 = hands
 
         # Round 1: A=h1, B=h2
-        sa1, sb1 = _play_hand(arr_a, arr_b, arr_other, arr_other, h1, h2, h3, h4)
+        sa1, sb1, ha1, hb1 = _play_hand(arr_a, arr_b, arr_other, arr_other, h1, h2, h3, h4)
         # Round 2: A=h2, B=h1  (duplicate swap)
-        sa2, sb2 = _play_hand(arr_a, arr_b, arr_other, arr_other, h2, h1, h3, h4)
+        sa2, sb2, ha2, hb2 = _play_hand(arr_a, arr_b, arr_other, arr_other, h2, h1, h3, h4)
 
         # Combined (each player faced same cards once each)
         hand_a = sa1 + sa2
@@ -201,6 +220,26 @@ def duel(strategy_a: str, strategy_b: str, n_hands: int = 500,
             a_wins += 1
         elif diff < 0:
             b_wins += 1
+            # Log this loss case for case study
+            entry = {
+                "hand_no":    i + 1,
+                "strategy_a": strategy_a,
+                "strategy_b": strategy_b,
+                "score_a":    hand_a,
+                "score_b":    hand_b,
+                "diff":       diff,
+                "round1": {
+                    "a": _hand_detail(ha1), "b": _hand_detail(hb1),
+                    "score_a": sa1, "score_b": sb1,
+                },
+                "round2": {
+                    "a": _hand_detail(ha2), "b": _hand_detail(hb2),
+                    "score_a": sa2, "score_b": sb2,
+                },
+            }
+            loss_cases.append(entry)
+            with open(loss_log_path, "a") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         else:
             draws += 1
 
@@ -250,6 +289,7 @@ def duel(strategy_a: str, strategy_b: str, n_hands: int = 500,
                    else f"{strategy_b} wins" if elo_diff < -20
                    else "too close to call",
         "elapsed_sec": round(time.time() - start, 1),
+        "loss_cases":  loss_cases,
     }
 
     if verbose:
