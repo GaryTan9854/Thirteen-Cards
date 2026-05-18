@@ -287,7 +287,10 @@ class Hand13(Hand):
         return s1 * 5.5 + s2 + s3
 
     def eval_CanAttack(self, s1, s2, s3):
-        return s1 >= 17 and s2 > 33 and s3 > 82
+        # s1 >= 102: 頭墩至少一對2 (100+2=102)
+        # s2 > 41:   中墩至少 JJ33 (30+13+11/100≈43)
+        # s3 > 82:   下墩至少同花
+        return s1 >= 102 and s2 > 41 and s3 > 82
 
     def arrange13(self):
         ht = self.specialhand
