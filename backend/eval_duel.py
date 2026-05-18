@@ -7,17 +7,17 @@ Compare two arrangement strategies fairly by:
   3. Report average score difference, win rate, and Elo estimate
 
 Strategies available:
-  "brute_force"   — Current exhaustive search with heuristic scoring
+  "rule_base"      — 規則排列（攻守判斷 + 名次%，~70 種候選）
   "monte_carlo"   — Top-K brute force + Monte Carlo evaluation
   "ai_model"      — Trained neural network (requires data/model.pt)
   "random"        — Random valid arrangement (baseline)
 
 Usage as module:
   from eval_duel import duel
-  result = duel("brute_force", "random", n_hands=200)
+  result = duel("rule_base", "random", n_hands=200)
 
 Usage as CLI:
-  python3 eval_duel.py --a brute_force --b random --n 200
+  python3 eval_duel.py --a rule_base --b random --n 200
 """
 
 import argparse
@@ -39,7 +39,7 @@ from game.evaluate import best_arrangement_mc
 # Strategy implementations
 # ──────────────────────────────────────────────────────
 
-def arrange_brute_force(cards) -> Hand13:
+def arrange_rule_base(cards) -> Hand13:
     h = Hand13(cards)
     sp = h.chk_special()
     h.specialhand = sp
@@ -91,13 +91,13 @@ def arrange_ai_model(cards, arranger) -> Hand13:
     return arranger.arrange_hand13(h)
 
 
-STRATEGIES = ["brute_force", "monte_carlo", "ai_model", "random"]
+STRATEGIES = ["rule_base", "brute_force", "monte_carlo", "ai_model", "random"]
 
 
 def get_arranger_fn(strategy: str, ai_model_path: str = None):
     """Return a callable: cards → Hand13."""
-    if strategy == "brute_force":
-        return arrange_brute_force
+    if strategy in ("rule_base", "brute_force"):
+        return arrange_rule_base
 
     elif strategy == "random":
         return arrange_random
@@ -155,7 +155,7 @@ def duel(strategy_a: str, strategy_b: str, n_hands: int = 500,
     For each of n_hands random deals:
       Round 1: A gets hand_1, B gets hand_2
       Round 2: A gets hand_2, B gets hand_1  ← duplicate swap
-      Other 2 players always use brute_force.
+      Other 2 players always use rule_base.
 
     Returns:
       score_a, score_b: cumulative scores
@@ -270,7 +270,7 @@ def duel(strategy_a: str, strategy_b: str, n_hands: int = 500,
 # ──────────────────────────────────────────────────────
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Duel two ThirteenCards strategies")
-    parser.add_argument("--a", default="brute_force", choices=STRATEGIES)
+    parser.add_argument("--a", default="rule_base", choices=STRATEGIES)
     parser.add_argument("--b", default="random",      choices=STRATEGIES)
     parser.add_argument("--n", type=int, default=200, help="Number of hand pairs")
     parser.add_argument("--model", default=None,

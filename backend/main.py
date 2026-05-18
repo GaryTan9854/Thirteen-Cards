@@ -9,7 +9,7 @@ import os
 from game.game import play_one_game
 from game.hands import Hand13
 
-APP_VERSION = "1.17"
+APP_VERSION = "1.18"
 
 app = FastAPI(title="ThirteenCards", version=APP_VERSION)
 
@@ -30,7 +30,7 @@ def health():
 # ── Game: play a full 4-player game ──────────────────
 class PlayRequest(BaseModel):
     player_names: Optional[List[str]] = None
-    strategy: Optional[str] = "brute_force"  # brute_force | ai_model
+    strategy: Optional[str] = "rule_base"  # rule_base | ai_model
 
 
 @app.post("/api/game/play")
@@ -45,7 +45,7 @@ def game_play(req: PlayRequest = None):
 # ── AI arrange: arrange a single hand with specified strategy ──
 class ArrangeRequest(BaseModel):
     hand: List[str]                          # 13 cardstrs e.g. ["02C","05H",...]
-    strategy: Optional[str] = "brute_force"  # brute_force | monte_carlo | ai_model
+    strategy: Optional[str] = "rule_base"  # rule_base | monte_carlo | ai_model
 
 
 @app.post("/api/game/arrange")
@@ -67,7 +67,10 @@ def arrange_hand(req: ArrangeRequest):
             "strategy_used": "special_hand",
         }
 
-    strategy = req.strategy or "brute_force"
+    strategy = req.strategy or "rule_base"
+    # backward-compat alias
+    if strategy == "brute_force":
+        strategy = "rule_base"
 
     if strategy == "monte_carlo":
         from game.evaluate import best_arrangement_mc
@@ -77,13 +80,12 @@ def arrange_hand(req: ArrangeRequest):
         from ml.inference import AIArranger
         ai = AIArranger.get()
         if ai is None:
-            # No model trained yet → fall back to brute force
-            strategy = "brute_force"
+            strategy = "rule_base"
             h13.arrange13()
             arr = h13
         else:
             arr = ai.arrange_hand13(h13)
-    else:
+    else:  # rule_base
         h13.arrange13()
         arr = h13
 
@@ -110,7 +112,7 @@ def arrange_hand(req: ArrangeRequest):
 
 # ── Duel: compare two strategies ─────────────────────
 class DuelRequest(BaseModel):
-    strategy_a: str = "brute_force"
+    strategy_a: str = "rule_base"
     strategy_b: str = "random"
     n_hands: int = 200
 
@@ -163,10 +165,10 @@ def list_strategies():
     except Exception:
         ai_ready = False
     return {
-        "strategies": ["brute_force", "monte_carlo", "ai_model", "random"],
+        "strategies": ["rule_base", "monte_carlo", "ai_model", "random"],
         "ai_model_ready": ai_ready,
         "descriptions": {
-            "brute_force":  "枚舉 72,072 種排列，取啟發式分數最高者",
+            "rule_base":    "規則排列（攻守判斷 + 名次%評分），~70 種候選，3 ms／手",
             "monte_carlo":  "對前 20 名候選排列各跑 150 次模擬，取期望得分最高者",
             "ai_model":     "神經網路（需先訓練 data/model.pt）",
             "random":       "隨機選一個合法排列（基準線）",
