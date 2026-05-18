@@ -121,9 +121,9 @@ def get_arranger_fn(strategy: str, ai_model_path: str = None):
 
 def _hand_detail(h13: Hand13) -> dict:
     """Extract arranged hand details for logging."""
-    def fmt(hand): return [c.cardstr() for c in hand.handlist] if hand else []
+    def fmt(hand): return list(hand.handlist) if hand else []
     return {
-        "cards":     [c.cardstr() for c in h13.handlist],
+        "cards":     list(h13.handlist),
         "special":   h13.specialhand,
         "top":       fmt(h13.htop) if hasattr(h13, 'htop') and h13.htop else [],
         "mid":       fmt(h13.hmid) if hasattr(h13, 'hmid') and h13.hmid else [],
