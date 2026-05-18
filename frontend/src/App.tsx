@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import GamePage from './pages/GamePage'
 import DuelPage from './pages/DuelPage'
 
@@ -9,13 +9,21 @@ const TABS = [
 
 export default function App() {
   const [tab, setTab] = useState('game')
+  const [version, setVersion] = useState('')
+
+  useEffect(() => {
+    fetch('/api/health').then(r => r.json()).then(d => setVersion(d.version)).catch(() => {})
+  }, [])
 
   return (
     <div className="min-h-screen bg-green-950 text-white">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 bg-green-900 shadow">
         <div>
-          <h1 className="text-xl font-bold tracking-wide">🃏 Thirteen Cards</h1>
+          <h1 className="text-xl font-bold tracking-wide">
+            🃏 Thirteen Cards
+            {version && <span className="ml-2 text-xs font-normal text-green-400">v{version}</span>}
+          </h1>
           <p className="text-xs text-green-300 mt-0.5">十三支 AI 排牌模擬器</p>
         </div>
         {/* Tabs */}

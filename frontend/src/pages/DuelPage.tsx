@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 
-const STRATEGIES = ['brute_force', 'monte_carlo', 'ai_model', 'random']
+const STRATEGIES = ['rule_base', 'ai_model', 'random']
 const LABELS: Record<string, string> = {
-  brute_force: '暴力搜尋',
-  monte_carlo: 'Monte Carlo',
-  ai_model: 'AI 神經網路',
-  random: '隨機（基準線）',
+  rule_base: 'Rule-Base',
+  ai_model:  'AI 神經網路',
+  random:    '隨機（基準線）',
 }
 
 interface Progress {
@@ -45,7 +44,7 @@ interface MLStatus {
 }
 
 export default function DuelPage() {
-  const [stratA, setStratA] = useState('brute_force')
+  const [stratA, setStratA] = useState('rule_base')
   const [stratB, setStratB] = useState('random')
   const [nHands, setNHands] = useState(200)
   const [_taskId, setTaskId] = useState<string | null>(null)

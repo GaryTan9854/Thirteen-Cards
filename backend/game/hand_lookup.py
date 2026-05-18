@@ -22,6 +22,7 @@ eval_attack(h3,hm,hb) → bool  三墩同時達攻擊門檻
   尾 ≥ 69.9%  (23457 同花)
 """
 
+from __future__ import annotations
 import os, sqlite3
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
