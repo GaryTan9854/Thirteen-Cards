@@ -183,13 +183,17 @@ def generate_5card_options(available: list) -> list:
                 options.append(by_rank[tr][:3] + bot2)
 
     # ── 一對 P ───────────────────────────────────────────────────────────
-    # Try all individual pairs (not just the best one).
-    # Also try kicker sets that SKIP other pair ranks — this frees a high pair
-    # for the top row (e.g. AA mid + QQ top instead of QQAA two-pair everywhere).
+    # Try top-3 AND bottom-3 kickers (same logic as 三條): high single cards
+    # (e.g. A Q J) should go to top row, not be wasted as pair kickers.
+    # Also skip other pair ranks so they can go to top/bot rows.
     for pr in pair_ranks_desc:
-        kickers = _top_n(available, 3, {pr})
-        if len(kickers) >= 3:
-            options.append(by_rank[pr][:2] + kickers)
+        non_pair = sorted([cs for cs in available if int(cs[:2]) != pr],
+                          key=lambda cs: -int(cs[:2]))
+        if len(non_pair) >= 3:
+            options.append(by_rank[pr][:2] + non_pair[:3])    # top-3 kickers
+            bot3 = non_pair[-3:]                                # bottom-3 kickers
+            if set(bot3) != set(non_pair[:3]):
+                options.append(by_rank[pr][:2] + bot3)
         # Variant: skip each other pair rank so it can go to top/bot
         for skip in pair_ranks_desc:
             if skip == pr:
