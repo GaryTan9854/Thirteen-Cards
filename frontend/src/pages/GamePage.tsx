@@ -228,7 +228,7 @@ export default function GamePage({ embedded = false }: Props) {
 
   const roundCount = history.length
   const canDeal    = phase !== 'appeal_pending' && phase !== 'ended' && !loading
-  const dealLabel  = loading ? '洗牌中…' : result ? '再來一局' : '開始發牌'
+  const dealLabel  = loading ? '洗牌中…' : result ? '新一局' : '開始發牌'
 
   const roundLabel =
     phase === 'in_appeal'      ? `申訴加賽 第 ${appealPlayed + 1} / ${ROUNDS_APPEAL} 局` :
@@ -305,29 +305,32 @@ export default function GamePage({ embedded = false }: Props) {
   // ── Tournament status bar ─────────────────────────────────────────────────
   const TournamentBar = () => (
     <div className="bg-green-900 rounded-2xl p-4 shadow-inner">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs text-green-400 font-semibold">{roundLabel}</span>
-        <div className="flex gap-2">
-          <button
-            onClick={toggleVoice}
-            className={`text-xs px-3 py-1 rounded-full transition ${voiceOn ? 'bg-green-700 text-green-200 hover:bg-green-600' : 'bg-gray-700 text-gray-500 hover:bg-gray-600'}`}
-            title={voiceOn ? '語音開啟（點擊關閉）' : '語音關閉（點擊開啟）'}
-          >
-            {voiceOn ? '🔊' : '🔇'}
+      {/* 全部控制項同一排：局數 | 🔊 | 成績表 | 新一場比賽 | 新一局 */}
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <span className="text-sm text-green-300 font-semibold mr-auto whitespace-nowrap">{roundLabel}</span>
+        {phase === 'appeal_pending' && (
+          <button onClick={startAppeal}
+            className="text-xs px-3 py-1 rounded-full bg-orange-600 text-white font-bold hover:bg-orange-500 transition whitespace-nowrap">
+            ⚖️ 申訴
           </button>
-          <button
-            onClick={() => setShowHistory(v => !v)}
-            className="text-xs px-3 py-1 rounded-full bg-green-800 text-green-300 hover:bg-green-700 transition"
-          >
-            {showHistory ? '▾' : '▸'} 成績表
-          </button>
-          <button
-            onClick={resetTournament}
-            className="text-xs px-3 py-1 rounded-full bg-gray-700 text-gray-300 hover:bg-gray-600 transition"
-          >
-            新一場比賽
-          </button>
-        </div>
+        )}
+        <button onClick={toggleVoice}
+          className={`text-xs px-3 py-1 rounded-full transition ${voiceOn ? 'bg-green-700 text-green-200 hover:bg-green-600' : 'bg-gray-700 text-gray-500 hover:bg-gray-600'}`}
+          title={voiceOn ? '語音開啟（點擊關閉）' : '語音關閉（點擊開啟）'}>
+          {voiceOn ? '🔊' : '🔇'}
+        </button>
+        <button onClick={() => setShowHistory(v => !v)}
+          className="text-xs px-3 py-1 rounded-full bg-green-800 text-green-300 hover:bg-green-700 transition">
+          {showHistory ? '▾' : '▸'} 成績表
+        </button>
+        <button onClick={resetTournament}
+          className="text-xs px-3 py-1 rounded-full bg-gray-700 text-gray-300 hover:bg-gray-600 transition whitespace-nowrap">
+          新一場比賽
+        </button>
+        <button onClick={playGame} disabled={!canDeal}
+          className="text-xs px-4 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold hover:bg-yellow-300 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+          {dealLabel}
+        </button>
       </div>
 
       <div className="grid grid-cols-4 gap-3">
@@ -351,16 +354,8 @@ export default function GamePage({ embedded = false }: Props) {
       </div>
 
       {phase === 'appeal_pending' && (
-        <div className="mt-3 flex items-center justify-between bg-orange-900/50 rounded-xl px-4 py-2.5">
-          <span className="text-sm text-orange-300">
-            ⚖️ <strong>{DEFAULT_NAMES[lowestPlayer]}</strong> 申訴（加賽 {ROUNDS_APPEAL} 局）
-          </span>
-          <button
-            onClick={startAppeal}
-            className="px-4 py-1.5 rounded-xl bg-orange-500 text-white font-bold text-sm hover:bg-orange-400 active:scale-95 transition"
-          >
-            申訴
-          </button>
+        <div className="mt-2 px-3 py-1.5 rounded-xl bg-orange-900/40 text-xs text-orange-300 text-center">
+          ⚖️ <strong>{DEFAULT_NAMES[lowestPlayer]}</strong> 可申訴加賽 {ROUNDS_APPEAL} 局
         </div>
       )}
 
@@ -386,33 +381,15 @@ export default function GamePage({ embedded = false }: Props) {
     <div className={embedded ? '' : 'min-h-screen bg-green-950 text-white'}>
 
       {!embedded && (
-        <div className="flex items-center justify-between px-6 py-4 bg-green-900 shadow">
-          <div>
-            <h1 className="text-xl font-bold tracking-wide">🃏 Thirteen Cards</h1>
-            <p className="text-xs text-green-300 mt-0.5">十三支 AI 排牌模擬器</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {phase === 'appeal_pending' && (
-              <button
-                onClick={startAppeal}
-                className="px-4 py-2 rounded-xl bg-orange-500 text-white font-bold text-sm shadow hover:bg-orange-400 active:scale-95 transition"
-              >
-                ⚖️ {DEFAULT_NAMES[lowestPlayer]} 申訴
-              </button>
-            )}
-            <button
-              onClick={playGame}
-              disabled={!canDeal}
-              className="px-5 py-2 rounded-xl bg-yellow-400 text-gray-900 font-bold text-sm shadow hover:bg-yellow-300 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {dealLabel}
-            </button>
-          </div>
+        <div className="px-6 py-3 bg-green-900 shadow">
+          <h1 className="text-lg font-bold tracking-wide">🃏 Thirteen Cards
+            <span className="text-xs font-normal text-green-400 ml-2">十三支 AI 排牌模擬器</span>
+          </h1>
         </div>
       )}
 
       {embedded && (
-        <div className="mb-4 flex flex-col gap-3">
+        <div className="mb-3">
           <div className="grid grid-cols-4 gap-2">
             {DEFAULT_NAMES.map((name, i) => (
               <div key={name} className="flex flex-col gap-1">
@@ -428,23 +405,6 @@ export default function GamePage({ embedded = false }: Props) {
                 </select>
               </div>
             ))}
-          </div>
-          <div className="flex justify-end gap-2">
-            {phase === 'appeal_pending' && (
-              <button
-                onClick={startAppeal}
-                className="px-4 py-2 rounded-xl bg-orange-500 text-white font-bold text-sm shadow hover:bg-orange-400 active:scale-95 transition"
-              >
-                ⚖️ {DEFAULT_NAMES[lowestPlayer]} 申訴
-              </button>
-            )}
-            <button
-              onClick={playGame}
-              disabled={!canDeal}
-              className="px-5 py-2 rounded-xl bg-yellow-400 text-gray-900 font-bold text-sm shadow hover:bg-yellow-300 active:scale-95 transition disabled:opacity-50"
-            >
-              {dealLabel}
-            </button>
           </div>
         </div>
       )}
@@ -473,16 +433,26 @@ export default function GamePage({ embedded = false }: Props) {
 
         {result && !loading && (
           <>
-            <div className="bg-green-900 rounded-2xl p-4 shadow-inner">
-              <div className="text-xs text-green-400 mb-2 font-semibold text-center">本局比分</div>
-              <div className="grid grid-cols-4 gap-3">
+            <div className="bg-green-900 rounded-2xl px-4 py-3 shadow-inner">
+              {/* grid: label列 + 4個玩家欄 */}
+              <div className="grid gap-x-2 gap-y-1.5 items-center"
+                   style={{ gridTemplateColumns: '2.5rem repeat(4, 1fr)' }}>
+                {/* 名字列 */}
+                <div />
+                {DEFAULT_NAMES.map(n => (
+                  <span key={n} className="text-center text-sm font-semibold text-green-300">{n}</span>
+                ))}
+                {/* 累積列 */}
+                <span className="text-xs text-green-500 text-right pr-1 leading-none">累積</span>
+                {totalScores.map((s, i) => (
+                  <span key={i} className={`text-center text-lg font-bold leading-tight ${scoreColor(s)}`}>{fmt(s)}</span>
+                ))}
+                {/* 本局列（字體放大） */}
+                <span className="text-xs text-green-500 text-right pr-1 leading-none">本局</span>
                 {result.final_scores.map((fs: any) => (
-                  <div key={fs.name} className="flex flex-col items-center">
-                    <span className="text-sm text-green-200 font-medium">{fs.name}</span>
-                    <span className={`text-2xl font-bold ${scoreColor(fs.score)}`}>
-                      {fmt(fs.score)}
-                    </span>
-                  </div>
+                  <span key={fs.name} className={`text-center text-3xl font-bold leading-tight ${scoreColor(fs.score)}`}>
+                    {fmt(fs.score)}
+                  </span>
                 ))}
               </div>
             </div>
