@@ -44,11 +44,15 @@ def _load():
     d3  = {k: r for k, r in cur.execute("SELECT key, rank FROM hand3_top")}
     d5m = {k: r for k, r in cur.execute("SELECT key, rank FROM hand5_mid")}
     d5b = {k: r for k, r in cur.execute("SELECT key, rank FROM hand5_bot")}
+    # 千萬位勝率：C(52,k) 中能打敗多少比例的組合（0.0–1.0）
+    wr3  = {k: w for k, w in cur.execute("SELECT key, win_rate FROM hand3_top")}
+    wr5m = {k: w for k, w in cur.execute("SELECT key, win_rate FROM hand5_mid")}
+    wr5b = {k: w for k, w in cur.execute("SELECT key, win_rate FROM hand5_bot")}
     conn.close()
-    return d3, d5m, d5b
+    return d3, d5m, d5b, wr3, wr5m, wr5b
 
 
-_D3, _D5M, _D5B = _load()
+_D3, _D5M, _D5B, _WR3, _WR5M, _WR5B = _load()
 
 
 # ── Key 建構 ──────────────────────────────────────────────────────────────────
@@ -115,6 +119,21 @@ def pct5_mid(h) -> float:
 def pct5_bot(h) -> float | None:
     r = rank5_bot(h)
     return r / _TOT5B if r is not None else None
+
+
+# ── 千萬位勝率查詢（0.0–1.0，以所有 C(52,k) 組合為分母）─────────────────────
+
+def winrate3(h) -> float:
+    """頭墩：能打敗 C(52,3) 中多少比例的手牌。"""
+    return _WR3.get(_key3(h), 0.0)
+
+def winrate5_mid(h) -> float:
+    """中墩：能打敗 C(52,5) 中多少比例的手牌。"""
+    return _WR5M.get(_key5(h), 0.0)
+
+def winrate5_bot(h) -> float:
+    """尾墩：能打敗 C(52,5) 中多少比例的手牌（包含低於門檻的弱牌）。"""
+    return _WR5B.get(_key5(h), 0.0)
 
 
 # ── 攻擊判斷 ─────────────────────────────────────────────────────────────────

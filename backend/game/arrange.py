@@ -22,7 +22,8 @@ from collections import Counter, defaultdict
 from itertools import combinations as _comb
 from .hands import Hand3, Hand5
 from .pct_score import pct_score3, pct_score5
-from .hand_lookup import pct3, pct5_mid, pct5_bot, rank5_bot, eval_attack
+from .hand_lookup import (pct3, pct5_mid, pct5_bot, rank5_bot, eval_attack,
+                          winrate3, winrate5_mid, winrate5_bot)
 
 
 # ─── Inventory analysis ───────────────────────────────────────────────────────
@@ -287,42 +288,36 @@ def spare_variants(top3: list, mid5: list):
 
 def score_arrangement(h3: Hand3, hm: Hand5, hb: Hand5) -> float:
     """
-    期望得分指標（含打槍加成）：
+    攻擊分（千萬位勝率 + 打槍加成）：
 
       score = (p1+p2+p3) + 1.5·p1p2p3 - 1.5·(1-p1)(1-p2)(1-p3)
 
-    推導自 1v1 對決期望得分（打槍/被打槍各有 2× 乘數）：
-      E = 2(p1+p2+p3) - 3 + 3·p1p2p3 - 3·(1-p1)(1-p2)(1-p3)
-
-    - 打槍加成使「三墩均強」獲得額外獎勵（打槍機率高）
-    - 被打槍懲罰使「一墩極強但其他兩墩極弱」受到正確懲罰
-    - 尾墩弱於 66432（不入尾墩池）計 p3=0（必輸）
+    p 使用千萬位勝率（能打敗 C(52,k) 中多少比例的組合），
+    使順子/葫蘆等強牌的真實強度被正確反映（約 99%+，而非名次% 的 70%）。
     """
-    p1 = pct3(h3)
-    p2 = pct5_mid(hm)
-    p3 = pct5_bot(hb) or 0.0
+    p1 = winrate3(h3)
+    p2 = winrate5_mid(hm)
+    p3 = winrate5_bot(hb)
     return (p1 + p2 + p3) + 1.5 * p1 * p2 * p3 - 1.5 * (1-p1) * (1-p2) * (1-p3)
 
 
 def score_defensive(h3: Hand3, hm: Hand5, hb: Hand5) -> float:
     """
-    防守分 = (p1+p2+p3) − 1.5·(1−p1)(1−p2)(1−p3)。
+    防守分 = -(1-p1)(1-p2)(1-p3)。
 
-    適用於無攻擊機會的防守牌。
-    - 不含打槍加成（p1p2p3 項），因三墩同贏機率極低
-    - 保留被打槍懲罰，鼓勵三墩均衡守住
-    - 包含 p1+p2+p3 加總，不會被單一超強尾墩誤導
-      （舊公式 -(1-p1)(1-p2)(1-p3) 對葫蘆95%+頭中極弱 給出誤導性高分）
+    最小化「三墩全輸（被打槍）」機率。
+    p 使用千萬位勝率：中尾墩的順子/葫蘆正確反映為 99%+ 的極難打破防線，
+    使 (1-p) 極小，排列選擇聚焦在「最難被打槍」的組合。
     """
-    p1 = pct3(h3)
-    p2 = pct5_mid(hm)
-    p3 = pct5_bot(hb) or 0.0
-    return (p1 + p2 + p3) - 1.5 * (1 - p1) * (1 - p2) * (1 - p3)
+    p1 = winrate3(h3)
+    p2 = winrate5_mid(hm)
+    p3 = winrate5_bot(hb)
+    return -(1 - p1) * (1 - p2) * (1 - p3)
 
 
 def best_arrangement_simple(handstrs: list):
     """
-    Rule-Base 1：純用 p1+p2+p3 合計% 選最佳排列。
+    Rule-Base 1：純用千萬位勝率 p1+p2+p3 合計選最佳排列。
 
     最透明的基準版本：無打槍加成、無攻守切換。
     用途：若正確排法未被選中，可判斷是「候選未生成」還是「評分選錯」。
@@ -333,7 +328,7 @@ def best_arrangement_simple(handstrs: list):
     if not candidates:
         return None
     return max(candidates, key=lambda t: (
-        pct3(t[0]) + pct5_mid(t[1]) + (pct5_bot(t[2]) or 0.0)
+        winrate3(t[0]) + winrate5_mid(t[1]) + winrate5_bot(t[2])
     ))
 
 
