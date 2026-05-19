@@ -4,12 +4,13 @@ import PlayerPanel from '../components/PlayerPanel'
 import BattleLog from '../components/BattleLog'
 
 const DEFAULT_NAMES = ['Glory', 'Jack', 'Ian', 'Gary']
-const STRATEGIES = ['rule_base', 'monte_carlo', 'ai_model', 'random']
+const STRATEGIES = ['rule_base_1', 'rule_base_as', 'monte_carlo', 'ai_model', 'random']
 const STRATEGY_LABEL: Record<string, string> = {
-  rule_base:   'Rule-Base',
-  monte_carlo: 'Monte Carlo',
-  ai_model:    'AI 神經網路',
-  random:      '隨機',
+  rule_base_1:  'Rule-Base 1 (Σ%)',
+  rule_base_as: 'Rule-Base 攻守',
+  monte_carlo:  'Monte Carlo',
+  ai_model:     'AI 神經網路',
+  random:       '隨機',
 }
 
 const ROUNDS_NORMAL = 16
@@ -36,7 +37,7 @@ export default function GamePage({ embedded = false }: Props) {
   const [result, setResult]     = useState<GameResult | null>(null)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState<string | null>(null)
-  const [strategies, setStrategies] = useState<string[]>(['rule_base','rule_base','rule_base','rule_base'])
+  const [strategies, setStrategies] = useState<string[]>(['rule_base_as','rule_base_as','rule_base_as','rule_base_as'])
 
   // ── Tournament state ──────────────────────────────────────────
   const [history, setHistory]           = useState<number[][]>([])   // [round][player]

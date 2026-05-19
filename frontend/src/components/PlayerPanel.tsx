@@ -10,13 +10,15 @@ interface Props {
 
 const ROW_LABELS = ['頭墩 (3)', '中墩 (5)', '尾墩 (5)']
 const STRATEGY_LABEL: Record<string, string> = {
-  rule_base:   'Rule-Base',
-  monte_carlo: 'Monte Carlo',
-  ai_model:    'AI',
-  random:      '隨機',
+  rule_base_1:  'RB-1 Σ%',
+  rule_base_as: 'RB-攻守',
+  rule_base:    'Rule-Base',   // backward compat
+  monte_carlo:  'Monte Carlo',
+  ai_model:     'AI',
+  random:       '隨機',
 }
 
-export default function PlayerPanel({ player, finalScore, strategy = 'rule_base' }: Props) {
+export default function PlayerPanel({ player, finalScore, strategy = 'rule_base_as' }: Props) {
   const [showHand, setShowHand] = useState(false)
   const isSpecial = player.special_hand !== 'normal'
   const rows = isSpecial ? [] : [player.top, player.mid, player.bot]

@@ -320,16 +320,33 @@ def score_defensive(h3: Hand3, hm: Hand5, hb: Hand5) -> float:
     return (p1 + p2 + p3) - 1.5 * (1 - p1) * (1 - p2) * (1 - p3)
 
 
+def best_arrangement_simple(handstrs: list):
+    """
+    Rule-Base 1：純用 p1+p2+p3 合計% 選最佳排列。
+
+    最透明的基準版本：無打槍加成、無攻守切換。
+    用途：若正確排法未被選中，可判斷是「候選未生成」還是「評分選錯」。
+    - 若 Rule-Base 1 也選錯 → 候選生成問題
+    - 若 Rule-Base 1 選對但攻守版選錯 → 評分公式問題
+    """
+    candidates = enumerate_arrangements(handstrs)
+    if not candidates:
+        return None
+    return max(candidates, key=lambda t: (
+        pct3(t[0]) + pct5_mid(t[1]) + (pct5_bot(t[2]) or 0.0)
+    ))
+
+
 def best_arrangement(handstrs: list):
     """
-    從合法排列中選最佳一組（頭≤中≤尾 強度）。
+    Rule-Base 攻守：雙模式評分選最佳排列。
 
-    雙模式評分：
-    - 攻牌模式：任一候選可 eval_attack → 用 score_arrangement（含打槍加成）
-    - 防守模式：無候選可攻 → 用 score_defensive（不含打槍加成，防被打槍）
+    - 攻牌模式（任一候選可 eval_attack）：含打槍加成
+        score = (p1+p2+p3) + 1.5·p1p2p3 - 1.5·(1-p1)(1-p2)(1-p3)
+    - 防守模式（無候選可攻）：去掉打槍加成，只留被打槍懲罰
+        score = (p1+p2+p3) - 1.5·(1-p1)(1-p2)(1-p3)
 
-    防守模式不用 -(1-p1)(1-p2)(1-p3)（會被超強尾墩誤導），
-    而用 (p1+p2+p3) - 1.5*(1-p1)(1-p2)(1-p3)。
+    防守不用舊式 -(1-p1)(1-p2)(1-p3)（會被超強尾墩誤導）。
     """
     candidates = enumerate_arrangements(handstrs)
     if not candidates:

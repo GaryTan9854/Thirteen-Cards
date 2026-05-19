@@ -97,7 +97,19 @@ def _arrange(hand_cards, strategy: str) -> 'Hand13':
             h = Hand13(cardstrs)
             h.specialhand = 'normal'
             return ai.arrange_hand13(h)
-    # default: rule_base
+    elif strategy == 'rule_base_1':
+        # Rule-Base 1：純 Σ% 選牌，無打槍加成、無攻守切換
+        from .arrange import best_arrangement_simple
+        h = Hand13(cardstrs)
+        h.specialhand = 'normal'
+        result = best_arrangement_simple(cardstrs)
+        if result:
+            h.htop, h.hmid, h.hbot = result
+            h.ss = [h.htop.score, h.hmid.score, h.hbot.score]
+            h.score = sum(h.ss)
+            h.totalscore = h.score
+        return h
+    # rule_base_as | rule_base (default)：攻守雙模式
     h = Hand13(cardstrs)
     h.specialhand = 'normal'
     h.arrange13()
