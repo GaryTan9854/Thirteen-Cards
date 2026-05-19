@@ -276,8 +276,6 @@ export default function GamePage({ embedded = false }: Props) {
     setLoading(true); setError(null)
     setCurrentGun(null); gunQueueRef.current = []
     window.speechSynthesis?.cancel()               // 清掉上一局殘留 TTS
-    // 倍率唸出（在 fetch 期間播完，不與後續 TTS 衝突）
-    if (multiplier > 1 && voiceRef.current) speak(`本局分數 x${multiplier}！`, 1.0)
     try {
       const res = await fetch('/api/game/play', {
         method: 'POST',
@@ -345,9 +343,22 @@ export default function GamePage({ embedded = false }: Props) {
       setHistory(newHistory)
       setRoundMultipliers(prev => [...prev, multiplier])   // 記錄本局倍率
 
-      // 無聊局偵測（所有人得分絕對值 ≤ 1）→ 下局倍率 +1
+      // 無聊局偵測（所有人得分絕對值 ≤ 1）→ 下局倍率 +1，且在本局所有 TTS 結束後播報
       const isBoring = rawScores.every(s => Math.abs(s) <= 1)
-      setMultiplier(isBoring ? multiplier + 1 : 1)
+      const newMultiplier = isBoring ? multiplier + 1 : 1
+      setMultiplier(newMultiplier)
+      if (isBoring && voiceRef.current) {
+        // 估算本局所有 TTS 播完需要的時間，再追加「下一局計分乘N」
+        const ttsMs = (slam ? 3500 : 0)
+          + baodaoLines.length * 2000
+          + gunNotifs.length * GUN_NOTIF_MS
+          + monsterLines.length * 2200
+          + 1500  // buffer
+        setTimeout(() => {
+          if (ttsGenRef.current !== myGen || !voiceRef.current) return
+          speak(`下一局計分乘${newMultiplier}！`, 1.0)
+        }, ttsMs)
+      }
 
       // ── 回合推進 ─────────────────────────────────────────────────────────
       const newTotals = computeTotals(newHistory)
@@ -418,9 +429,11 @@ export default function GamePage({ embedded = false }: Props) {
   const dealLabel  = loading ? '洗牌中…' : '開始發牌'
 
   const appealRounds = appealGeneration >= 2 ? 1 : ROUNDS_APPEAL   // 第二次申訴只得1局
+  // loading 中：顯示「正在打第 N 局」；結果出來後：顯示「剛打完第 N 局」
+  const appealDisplayRound = loading ? appealPlayed + 1 : Math.max(1, appealPlayed)
   const roundLabel =
-    isTiebreaking              ? `平局加賽 第 ${appealPlayed - appealRounds + 1} 局` :
-    phase === 'in_appeal'      ? `申訴加賽 第 ${appealPlayed + 1} / ${appealRounds} 局${appealGeneration >= 2 ? '（終輪）' : ''}` :
+    isTiebreaking              ? `平局加賽 第 ${Math.max(1, appealPlayed - appealRounds + 1)} 局` :
+    phase === 'in_appeal'      ? `申訴加賽 第 ${appealDisplayRound} / ${appealRounds} 局${appealGeneration >= 2 ? '（終輪）' : ''}` :
     phase === 'appeal_pending' ? `正式賽 ${ROUNDS_NORMAL} 局結束` :
     phase === 'ended'          ? `本場結束（共 ${roundCount} 局）` :
     roundCount === 0           ? '準備開始' :
