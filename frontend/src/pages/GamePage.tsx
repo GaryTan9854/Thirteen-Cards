@@ -15,8 +15,11 @@ const STRATEGY_LABEL: Record<string, string> = {
 
 const ROUNDS_NORMAL = 16
 const ROUNDS_APPEAL = 4
+const GUN_NOTIF_MS  = 2400   // 每個打槍通知顯示時間
 
 type Phase = 'normal' | 'appeal_pending' | 'in_appeal' | 'ended'
+
+interface GunNotif { id: number; winner: string; loser: string }
 
 interface Props {
   embedded?: boolean
@@ -33,7 +36,7 @@ function scoreColor(n: number) {
   return n > 0 ? 'text-yellow-300' : n < 0 ? 'text-red-400' : 'text-gray-400'
 }
 
-// ── Grand Slam detection ──────────────────────────────────────────────────
+// ── Grand Slam detection ──────────────────────────────────────────────────────
 function detectGrandSlam(battles: any[]): string | null {
   const gunCount: Record<string, number> = {}
   for (const b of battles) {
@@ -44,6 +47,45 @@ function detectGrandSlam(battles: any[]): string | null {
   return entry ? entry[0] : null
 }
 
+// ── 打槍 event list ───────────────────────────────────────────────────────────
+function detectGuns(battles: any[]): GunNotif[] {
+  return battles
+    .filter(b => b.gun !== 0)
+    .map((b, idx) => ({
+      id:     Date.now() + idx,
+      winner: b.gun === 1 ? b.p1 : b.p2,
+      loser:  b.gun === 1 ? b.p2 : b.p1,
+    }))
+}
+
+// ── 女聲 TTS（Web Speech API，優先 zh-TW）────────────────────────────────────
+function speak(text: string, rate = 1.05) {
+  const synth = window.speechSynthesis
+  if (!synth) return
+  synth.cancel()
+
+  const utter = new SpeechSynthesisUtterance(text)
+  utter.lang  = 'zh-TW'
+  utter.rate  = rate
+  utter.pitch = 1.2
+
+  const doSpeak = () => {
+    const voices  = synth.getVoices()
+    const zh      = voices.filter(v => v.lang.startsWith('zh'))
+    // 優先找有女聲名稱的（macOS: 美嘉/Sin-ji；iOS: 雅雯…）
+    const female  =
+      zh.find(v => /meijia|美嘉|sin[\s-]?ji|sinji|ya[\s-]?wen|雅雯/i.test(v.name)) ||
+      zh.find(v => /tingting|ting[\s-]?ting/i.test(v.name)) ||
+      zh.find(v => v.lang === 'zh-TW') ||
+      zh[0]
+    if (female) utter.voice = female
+    synth.speak(utter)
+  }
+
+  if (synth.getVoices().length > 0) doSpeak()
+  else synth.addEventListener('voiceschanged', doSpeak, { once: true })
+}
+
 export default function GamePage({ embedded = false }: Props) {
   const [result, setResult]     = useState<GameResult | null>(null)
   const [loading, setLoading]   = useState(false)
@@ -51,21 +93,37 @@ export default function GamePage({ embedded = false }: Props) {
   const [strategies, setStrategies] = useState<string[]>(['rule_base_as','rule_base_as','rule_base_as','rule_base_as'])
   const [grandSlammer, setGrandSlammer] = useState<string | null>(null)
 
-  // ── Tournament state ──────────────────────────────────────────
-  const [history, setHistory]           = useState<number[][]>([])   // [round][player]
+  // 打槍通知佇列
+  const [gunQueue,  setGunQueue]  = useState<GunNotif[]>([])
+  const [currentGun, setCurrentGun] = useState<GunNotif | null>(null)
+
+  // ── Tournament state ──────────────────────────────────────────────────────
+  const [history, setHistory]           = useState<number[][]>([])
   const [phase, setPhase]               = useState<Phase>('normal')
-  const [appealPlayed, setAppealPlayed] = useState(0)                // rounds played in current appeal
-  const [appealLoser, setAppealLoser]   = useState(-1)               // who was loser when appeal started
+  const [appealPlayed, setAppealPlayed] = useState(0)
+  const [appealLoser, setAppealLoser]   = useState(-1)
   const [showHistory, setShowHistory]   = useState(false)
 
-  // Auto-dismiss grand slam overlay after 5 s
+  // 全壘打：顯示 5 s 後自動關閉，並念出
   useEffect(() => {
     if (!grandSlammer) return
+    speak(`${grandSlammer}，全壘打！打爆三家！`, 0.88)
     const t = setTimeout(() => setGrandSlammer(null), 5000)
     return () => clearTimeout(t)
   }, [grandSlammer])
 
-  const totalScores = useMemo(() => computeTotals(history), [history])
+  // 打槍佇列：一次顯示一個，結束後自動顯示下一個
+  useEffect(() => {
+    if (currentGun !== null || gunQueue.length === 0) return
+    const [next, ...rest] = gunQueue
+    setCurrentGun(next)
+    setGunQueue(rest)
+    speak(`${next.winner} 打槍 ${next.loser}`)
+    const t = setTimeout(() => setCurrentGun(null), GUN_NOTIF_MS)
+    return () => clearTimeout(t)
+  }, [currentGun, gunQueue])
+
+  const totalScores  = useMemo(() => computeTotals(history), [history])
   const lowestPlayer = lowestIdx(totalScores)
 
   function setStrategy(idx: number, val: string) {
@@ -74,7 +132,8 @@ export default function GamePage({ embedded = false }: Props) {
 
   function resetTournament() {
     setHistory([]); setPhase('normal'); setAppealPlayed(0)
-    setAppealLoser(-1); setResult(null); setError(null); setGrandSlammer(null)
+    setAppealLoser(-1); setResult(null); setError(null)
+    setGrandSlammer(null); setGunQueue([]); setCurrentGun(null)
   }
 
   function startAppeal() {
@@ -85,6 +144,7 @@ export default function GamePage({ embedded = false }: Props) {
 
   async function playGame() {
     setLoading(true); setError(null)
+    setCurrentGun(null); setGunQueue([])   // 清掉上一局的通知
     try {
       const res = await fetch('/api/game/play', {
         method: 'POST',
@@ -94,8 +154,13 @@ export default function GamePage({ embedded = false }: Props) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data: GameResult = await res.json()
       setResult(data)
-      setGrandSlammer(detectGrandSlam(data.battles))
 
+      // ── 打槍 / 全壘打 通知 ───────────────────────────────────────────────
+      const slam = detectGrandSlam(data.battles)
+      setGrandSlammer(slam)
+      if (!slam) setGunQueue(detectGuns(data.battles))
+
+      // ── 更新分數 ─────────────────────────────────────────────────────────
       const newScores = DEFAULT_NAMES.map(n => {
         const fs = data.final_scores.find((s: any) => s.name === n)
         return fs ? fs.score : 0
@@ -103,21 +168,24 @@ export default function GamePage({ embedded = false }: Props) {
       const newHistory = [...history, newScores]
       setHistory(newHistory)
 
-      // Phase transitions
+      // ── 回合推進 ─────────────────────────────────────────────────────────
       if (phase === 'normal') {
         if (newHistory.length >= ROUNDS_NORMAL) setPhase('appeal_pending')
       } else if (phase === 'in_appeal') {
         const newPlayed = appealPlayed + 1
         if (newPlayed >= ROUNDS_APPEAL) {
-          const newTotals = computeTotals(newHistory)
-          const newLowest = lowestIdx(newTotals)
+          const newTotals  = computeTotals(newHistory)
+          const newLowest  = lowestIdx(newTotals)
           if (newLowest !== appealLoser) {
-            // Loser changed — new lowest can appeal
             setAppealLoser(newLowest)
             setAppealPlayed(0)
             setPhase('appeal_pending')
           } else {
             setPhase('ended')
+            // 本場結束語音（延遲一點，等打槍 TTS 不衝突）
+            const endWinner = DEFAULT_NAMES[newTotals.indexOf(Math.max(...newTotals))]
+            const endLoser  = DEFAULT_NAMES[newLowest]
+            setTimeout(() => speak(`本場結束！冠軍 ${endWinner}！${endLoser} 請客！`, 0.92), 800)
           }
         } else {
           setAppealPlayed(newPlayed)
@@ -130,16 +198,16 @@ export default function GamePage({ embedded = false }: Props) {
     }
   }
 
-  const roundCount  = history.length
-  const canDeal     = phase !== 'appeal_pending' && phase !== 'ended' && !loading
-  const dealLabel   = loading ? '洗牌中…' : result ? '再來一局' : '開始發牌'
+  const roundCount = history.length
+  const canDeal    = phase !== 'appeal_pending' && phase !== 'ended' && !loading
+  const dealLabel  = loading ? '洗牌中…' : result ? '再來一局' : '開始發牌'
 
-  const roundLabel  =
-    phase === 'in_appeal'       ? `申訴加賽 第 ${appealPlayed + 1} / ${ROUNDS_APPEAL} 局` :
-    phase === 'appeal_pending'  ? `正式賽 ${ROUNDS_NORMAL} 局結束` :
-    phase === 'ended'           ? `本場結束（共 ${roundCount} 局）` :
-    roundCount === 0            ? '準備開始' :
-                                  `第 ${roundCount} / ${ROUNDS_NORMAL} 局`
+  const roundLabel =
+    phase === 'in_appeal'      ? `申訴加賽 第 ${appealPlayed + 1} / ${ROUNDS_APPEAL} 局` :
+    phase === 'appeal_pending' ? `正式賽 ${ROUNDS_NORMAL} 局結束` :
+    phase === 'ended'          ? `本場結束（共 ${roundCount} 局）` :
+    roundCount === 0           ? '準備開始' :
+                                 `第 ${roundCount} / ${ROUNDS_NORMAL} 局`
 
   const winnerName = DEFAULT_NAMES[totalScores.indexOf(Math.max(...totalScores))]
 
@@ -147,18 +215,16 @@ export default function GamePage({ embedded = false }: Props) {
     ? Object.fromEntries(result.final_scores.map((s: any) => [s.name, s.score]))
     : {}
 
-  // ── Score history panel ───────────────────────────────────────
+  // ── Score history panel ───────────────────────────────────────────────────
   const HistoryPanel = () => (
     <div className="mt-3 bg-black/30 rounded-xl p-3 overflow-x-auto">
       <div className="font-mono text-xs whitespace-nowrap">
-        {/* Header */}
         <div className="flex gap-0 mb-1">
           <span className="w-10 text-gray-500"></span>
           {DEFAULT_NAMES.map(n => (
             <span key={n} className="w-14 text-center text-green-400 font-semibold">{n}</span>
           ))}
         </div>
-        {/* Rows */}
         {history.map((scores, i) => (
           <div key={i} className="flex gap-0">
             <span className="w-10 text-gray-500">#{i + 1}</span>
@@ -167,7 +233,6 @@ export default function GamePage({ embedded = false }: Props) {
             ))}
           </div>
         ))}
-        {/* Total */}
         {history.length > 0 && (
           <div className="flex gap-0 border-t border-gray-600 mt-1 pt-1 font-bold">
             <span className="w-10 text-gray-400">合計</span>
@@ -180,7 +245,7 @@ export default function GamePage({ embedded = false }: Props) {
     </div>
   )
 
-  // ── Tournament status bar ─────────────────────────────────────
+  // ── Tournament status bar ─────────────────────────────────────────────────
   const TournamentBar = () => (
     <div className="bg-green-900 rounded-2xl p-4 shadow-inner">
       <div className="flex items-center justify-between mb-3">
@@ -201,7 +266,6 @@ export default function GamePage({ embedded = false }: Props) {
         </div>
       </div>
 
-      {/* Cumulative scores */}
       <div className="grid grid-cols-4 gap-3">
         {DEFAULT_NAMES.map((name, i) => (
           <div key={name} className="flex flex-col items-center">
@@ -219,7 +283,6 @@ export default function GamePage({ embedded = false }: Props) {
         ))}
       </div>
 
-      {/* Appeal notice */}
       {phase === 'appeal_pending' && (
         <div className="mt-3 flex items-center justify-between bg-orange-900/50 rounded-xl px-4 py-2.5">
           <span className="text-sm text-orange-300">
@@ -241,7 +304,6 @@ export default function GamePage({ embedded = false }: Props) {
         </div>
       )}
 
-      {/* Score history */}
       {showHistory && <HistoryPanel />}
     </div>
   )
@@ -249,7 +311,6 @@ export default function GamePage({ embedded = false }: Props) {
   return (
     <div className={embedded ? '' : 'min-h-screen bg-green-950 text-white'}>
 
-      {/* ── Non-embedded header ── */}
       {!embedded && (
         <div className="flex items-center justify-between px-6 py-4 bg-green-900 shadow">
           <div>
@@ -276,7 +337,6 @@ export default function GamePage({ embedded = false }: Props) {
         </div>
       )}
 
-      {/* ── Embedded controls ── */}
       {embedded && (
         <div className="mb-4 flex flex-col gap-3">
           <div className="grid grid-cols-4 gap-2">
@@ -316,8 +376,6 @@ export default function GamePage({ embedded = false }: Props) {
       )}
 
       <div className={`flex flex-col gap-6 ${!embedded ? 'max-w-7xl mx-auto px-4 py-6' : ''}`}>
-
-        {/* ── Tournament bar (always visible) ── */}
         <TournamentBar />
 
         {error && (
@@ -341,7 +399,6 @@ export default function GamePage({ embedded = false }: Props) {
 
         {result && !loading && (
           <>
-            {/* This round's scores */}
             <div className="bg-green-900 rounded-2xl p-4 shadow-inner">
               <div className="text-xs text-green-400 mb-2 font-semibold text-center">本局比分</div>
               <div className="grid grid-cols-4 gap-3">
@@ -356,7 +413,6 @@ export default function GamePage({ embedded = false }: Props) {
               </div>
             </div>
 
-            {/* Player hands */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               {result.players.map((p: any, i: number) => (
                 <PlayerPanel key={p.name} player={p} finalScore={scoreMap[p.name] ?? 0} strategy={strategies[i]} />
@@ -368,7 +424,36 @@ export default function GamePage({ embedded = false }: Props) {
         )}
       </div>
 
-      {/* ── 全壘打 Celebration Overlay ── */}
+      {/* ── 打槍 Toast（下方，輕量）─────────────────────────────────────────── */}
+      {currentGun && !grandSlammer && (
+        <div className="fixed bottom-14 left-0 right-0 z-40 flex justify-center pointer-events-none">
+          <div
+            className="text-center px-10 py-4 rounded-2xl shadow-2xl border border-red-700/50"
+            style={{
+              background: 'rgba(10,0,0,0.88)',
+              animation: 'gunShot 0.28s ease-out',
+            }}
+          >
+            <div className="text-5xl mb-1.5">🔫</div>
+            <div
+              className="text-3xl font-black tracking-widest"
+              style={{
+                color: '#f87171',
+                textShadow: '0 0 22px rgba(239,68,68,0.75)',
+              }}
+            >
+              打槍！
+            </div>
+            <div className="text-base text-gray-300 mt-1.5">
+              <span className="font-bold text-red-300">{currentGun.winner}</span>
+              <span className="text-gray-500 mx-1.5">轟掉</span>
+              <span className="text-gray-400">{currentGun.loser}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 全壘打 Overlay（全螢幕，搶眼）──────────────────────────────────── */}
       {grandSlammer && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center cursor-pointer"
@@ -392,17 +477,23 @@ export default function GamePage({ embedded = false }: Props) {
             </div>
             <div className="text-base text-yellow-300 opacity-70 mt-4">點擊關閉</div>
           </div>
-
-          <style>{`
-            @keyframes grandSlam {
-              0%   { transform: scale(0.3) rotate(-8deg); opacity: 0; }
-              60%  { transform: scale(1.12) rotate(2deg); opacity: 1; }
-              80%  { transform: scale(0.96) rotate(-1deg); }
-              100% { transform: scale(1) rotate(0deg); }
-            }
-          `}</style>
         </div>
       )}
+
+      <style>{`
+        @keyframes grandSlam {
+          0%   { transform: scale(0.3) rotate(-8deg); opacity: 0; }
+          60%  { transform: scale(1.12) rotate(2deg); opacity: 1; }
+          80%  { transform: scale(0.96) rotate(-1deg); }
+          100% { transform: scale(1) rotate(0deg); }
+        }
+        @keyframes gunShot {
+          0%   { transform: scale(0.55) translateY(18px); opacity: 0; }
+          55%  { transform: scale(1.06) translateY(-4px); opacity: 1; }
+          80%  { transform: scale(0.97) translateY(0);    opacity: 1; }
+          100% { transform: scale(1)    translateY(0);    opacity: 1; }
+        }
+      `}</style>
     </div>
   )
 }
