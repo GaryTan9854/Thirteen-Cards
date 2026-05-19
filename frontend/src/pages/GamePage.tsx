@@ -548,7 +548,10 @@ export default function GamePage({ embedded = false }: Props) {
         <button onClick={() => setShowHistory(v => !v)} className={BTN}>
           {showHistory ? '▾' : '▸'} 成績表
         </button>
-        <button onClick={resetTournament} className={BTN}>新一場比賽</button>
+        <button onClick={resetTournament}
+          className={`text-xs px-3 py-1 rounded-full text-gray-900 font-bold active:scale-95 transition whitespace-nowrap ${phase === 'ended' ? 'bg-orange-400 hover:bg-orange-300 animate-pulse' : 'bg-yellow-400 hover:bg-yellow-300'}`}>
+          新一場比賽
+        </button>
         <button onClick={playGame} disabled={!canDeal}
           className={`text-xs px-3 py-1 rounded-full text-gray-900 font-bold active:scale-95 transition whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed ${canDeal ? 'bg-orange-400 hover:bg-orange-300 animate-pulse' : 'bg-yellow-400 hover:bg-yellow-300'}`}>
           {dealLabel}
