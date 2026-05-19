@@ -204,7 +204,19 @@ def generate_5card_options(available: list) -> list:
 
     # ── 亂 R ─────────────────────────────────────────────────────────────
     if len(available) >= 5:
-        options.append(_top_n(available, 5))
+        top5 = _top_n(available, 5)
+        options.append(top5)
+
+        # 最大散牌往前 variant:
+        # highest card + 4 lowest-rank cards.
+        # e.g. A2378 as mid → frees Q J 9 for top row instead of wasting A there.
+        sorted_asc = sorted(available, key=lambda cs: int(cs[:2]))
+        highest_cs = sorted_asc[-1]
+        low4 = sorted_asc[:4]
+        if highest_cs not in low4:
+            alt_r = [highest_cs] + low4
+            if tuple(sorted(alt_r)) != tuple(sorted(top5)):
+                options.append(alt_r)
 
     # Deduplicate
     seen_keys: set = set()
