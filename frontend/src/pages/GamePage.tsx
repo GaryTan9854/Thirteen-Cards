@@ -69,45 +69,44 @@ function buildGunNotifs(battles: any[], slam: string | null): GunNotif[] {
   return notifs
 }
 
-// ── 特殊牌型 TTS 建構（結果出來後掃描每位玩家）────────────────────────────────
-function buildSpecialTTS(players: any[]): string[] {
-  const lines: string[] = []
+// ── 特殊牌型 TTS 建構（分兩批：報到 / 怪物牌型）────────────────────────────
+function buildSpecialTTS(players: any[]): { baodao: string[]; monsters: string[] } {
+  const baodao:   string[] = []
+  const monsters: string[] = []
   for (const p of players) {
     const name = p.name as string
-    // 特殊手牌（六對半、全大全小、三同花…）—— 直接報到，跳過逐墩掃描
+    // 特殊手牌（六對半、全大全小、三同花、兩花色…）→ 報到批
     if (p.special_hand && p.special_hand !== 'normal') {
-      lines.push(`${name}，${p.special_hand} 報到！`)
+      baodao.push(`${name}，${p.special_hand} 報到！`)
       continue
     }
-    // 頭墩
+    // 逐墩掃描怪物牌型 → 怪物批
     if (p.top) {
       if (p.top.hand_type === '三條') {
-        lines.push(`${name}，原子頭！${p.top.description}！`)
+        monsters.push(`${name}，原子頭！${p.top.description}！`)
       } else if (p.top.hand_type === '一對') {
         const aces = (p.top.cards as string[]).filter((c: string) => parseInt(c) === 14).length
-        if (aces >= 2) lines.push(`${name}，柳丁！老A 撐頭！`)
+        if (aces >= 2) monsters.push(`${name}，柳丁！老A 撐頭！`)
       }
     }
-    // 中墩
     if (p.mid) {
       if (p.mid.hand_type === '鐵支') {
-        lines.push(`${name}，中墩鐵支！${p.mid.description}！`)
+        monsters.push(`${name}，中墩鐵支！${p.mid.description}！`)
       } else if (p.mid.hand_type === '葫蘆') {
-        lines.push(`${name}，中墩葫蘆！${p.mid.description}！`)
+        monsters.push(`${name}，中墩葫蘆！${p.mid.description}！`)
       } else if (['同花順', '同花次大順', '同花大順'].includes(p.mid.hand_type)) {
-        lines.push(`${name}，中墩同花順！${p.mid.description}！`)
+        monsters.push(`${name}，中墩同花順！${p.mid.description}！`)
       }
     }
-    // 尾墩
     if (p.bot) {
       if (p.bot.hand_type === '鐵支') {
-        lines.push(`${name}，尾墩鐵支！${p.bot.description}！`)
+        monsters.push(`${name}，尾墩鐵支！${p.bot.description}！`)
       } else if (['同花順', '同花次大順', '同花大順'].includes(p.bot.hand_type)) {
-        lines.push(`${name}，尾墩同花順！${p.bot.description}！`)
+        monsters.push(`${name}，尾墩同花順！${p.bot.description}！`)
       }
     }
   }
-  return lines
+  return { baodao, monsters }
 }
 
 // ── 女聲 TTS（Web Speech API，優先 zh-TW）────────────────────────────────────
@@ -138,22 +137,27 @@ function speak(text: string, rate = 1.05) {
   else synth.addEventListener('voiceschanged', doSpeak, { once: true })
 }
 
-// ── 連續多行 TTS（不 cancel，讓 Web Speech API 自然排隊播完）────────────────
-function speakQueue(lines: string[]) {
+// ── 連續多行 TTS（onend 鏈接，每句說完才說下一句；全部說完觸發 onDone）────
+function speakSequence(lines: string[], onDone?: () => void, rate = 1.05) {
+  if (lines.length === 0) { onDone?.(); return }
   const synth = window.speechSynthesis
-  if (!synth || lines.length === 0) return
+  if (!synth) { onDone?.(); return }
   const voices = synth.getVoices()
   const zh     = voices.filter(v => v.lang.startsWith('zh'))
   const female =
     zh.find(v => /meijia|美嘉|sin[\s-]?ji|sinji|ya[\s-]?wen|雅雯/i.test(v.name)) ||
     zh.find(v => /tingting|ting[\s-]?ting/i.test(v.name))                         ||
     zh.find(v => v.lang === 'zh-TW') || zh[0]
-  for (const text of lines) {
-    const utter = new SpeechSynthesisUtterance(text)
-    utter.lang = 'zh-TW'; utter.rate = 1.05; utter.pitch = 1.2
+  let idx = 0
+  const playNext = () => {
+    if (idx >= lines.length) { onDone?.(); return }
+    const utter = new SpeechSynthesisUtterance(lines[idx++])
+    utter.lang = 'zh-TW'; utter.rate = rate; utter.pitch = 1.2
     if (female) utter.voice = female
-    synth.speak(utter)   // 自然排隊，不互相打斷
+    utter.onend = playNext
+    synth.speak(utter)
   }
+  playNext()
 }
 
 export default function GamePage({ embedded = false }: Props) {
@@ -169,7 +173,8 @@ export default function GamePage({ embedded = false }: Props) {
 
   // 語音開關（ref 讓 effect 閉包永遠讀到最新值）
   const [voiceOn, setVoiceOn] = useState(true)
-  const voiceRef = useRef(true)
+  const voiceRef  = useRef(true)
+  const ttsGenRef = useRef(0)   // 每局遞增，舊的 TTS 回呼對比後自動放棄
   function toggleVoice() {
     const next = !voiceRef.current
     voiceRef.current = next
@@ -236,7 +241,8 @@ export default function GamePage({ embedded = false }: Props) {
 
   async function playGame() {
     setLoading(true); setError(null)
-    setCurrentGun(null); gunQueueRef.current = []   // 清掉上一局的通知
+    setCurrentGun(null); gunQueueRef.current = []
+    window.speechSynthesis?.cancel()               // 清掉上一局殘留 TTS
     try {
       const res = await fetch('/api/game/play', {
         method: 'POST',
@@ -247,24 +253,51 @@ export default function GamePage({ embedded = false }: Props) {
       const data: GameResult = await res.json()
       setResult(data)
 
-      // ── 打槍 / 全壘打 通知 ───────────────────────────────────────────────
+      // ── TTS 順序：全壘打 → 報到 → 打槍 → 怪物 ──────────────────────────
       const slam      = detectGrandSlam(data.battles)
       const gunNotifs = buildGunNotifs(data.battles, slam)
-      setGrandSlammer(slam)
-      if (!slam) {
-        gunQueueRef.current = gunNotifs
-        processNextGun()
+      setGrandSlammer(slam)                          // 全壘打 TTS 由 useEffect 觸發
+
+      const { baodao: baodaoLines, monsters: monsterLines } = buildSpecialTTS(data.players)
+      const myGen = ++ttsGenRef.current              // 此局識別碼，舊回呼對比後放棄
+
+      // 打槍佇列啟動（含：打槍全部結束後唸怪物）
+      const startGuns = () => {
+        if (ttsGenRef.current !== myGen) return
+        if (gunNotifs.length > 0) {
+          gunQueueRef.current = gunNotifs
+          processNextGun()
+          if (monsterLines.length > 0) {
+            setTimeout(() => {
+              if (ttsGenRef.current !== myGen || !voiceRef.current) return
+              speakSequence(monsterLines)
+            }, gunNotifs.length * GUN_NOTIF_MS + 800)
+          }
+        } else if (monsterLines.length > 0 && voiceRef.current) {
+          speakSequence(monsterLines)                // 無打槍 → 直接唸怪物
+        }
       }
 
-      // ── 特殊牌型 TTS（打槍/全壘打之後再播）─────────────────────────────
-      const specialLines = buildSpecialTTS(data.players)
-      if (specialLines.length > 0) {
-        const delay = slam
-          ? 4500                                      // 等全壘打 TTS 完
-          : gunNotifs.length * GUN_NOTIF_MS + 800    // 等打槍佇列清空
+      if (slam) {
+        // 全壘打 TTS 約 3 s；等 4.5 s 後依序唸 報到 → 怪物
         setTimeout(() => {
-          if (voiceRef.current) speakQueue(specialLines)
-        }, delay)
+          if (ttsGenRef.current !== myGen || !voiceRef.current) return
+          if (baodaoLines.length > 0) {
+            speakSequence(baodaoLines, () => {
+              if (ttsGenRef.current !== myGen || !voiceRef.current) return
+              if (monsterLines.length > 0) speakSequence(monsterLines)
+            })
+          } else if (monsterLines.length > 0) {
+            speakSequence(monsterLines)
+          }
+        }, 4500)
+      } else {
+        // 報到唸完 → 打槍 → 怪物
+        if (baodaoLines.length > 0 && voiceRef.current) {
+          speakSequence(baodaoLines, startGuns)
+        } else {
+          startGuns()                                // 無報到 → 直接打槍
+        }
       }
 
       // ── 更新分數（乘以本局倍率）─────────────────────────────────────────
