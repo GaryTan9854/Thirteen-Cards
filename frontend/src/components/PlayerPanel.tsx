@@ -1,14 +1,23 @@
+import { useState } from 'react'
 import CardChip from './CardChip'
 import { PlayerData } from '../types/game'
 
 interface Props {
   player: PlayerData
   finalScore: number
+  strategy?: string
 }
 
 const ROW_LABELS = ['頭墩 (3)', '中墩 (5)', '尾墩 (5)']
+const STRATEGY_LABEL: Record<string, string> = {
+  rule_base:   'Rule-Base',
+  monte_carlo: 'Monte Carlo',
+  ai_model:    'AI',
+  random:      '隨機',
+}
 
-export default function PlayerPanel({ player, finalScore }: Props) {
+export default function PlayerPanel({ player, finalScore, strategy = 'rule_base' }: Props) {
+  const [showHand, setShowHand] = useState(false)
   const isSpecial = player.special_hand !== 'normal'
   const rows = isSpecial ? [] : [player.top, player.mid, player.bot]
 
@@ -18,6 +27,9 @@ export default function PlayerPanel({ player, finalScore }: Props) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-lg font-bold text-gray-800">{player.name}</span>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
+            {STRATEGY_LABEL[strategy] ?? strategy}
+          </span>
           {player.can_attack && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-semibold">攻擊</span>
           )}
@@ -32,12 +44,19 @@ export default function PlayerPanel({ player, finalScore }: Props) {
         </span>
       </div>
 
-      {/* Original hand */}
+      {/* Original hand — collapsible */}
       <div>
-        <div className="text-xs text-gray-400 mb-1">原始手牌</div>
-        <div className="flex flex-wrap gap-1">
-          {player.original_hand.map((c, i) => <CardChip key={i} card={c} />)}
-        </div>
+        <button
+          onClick={() => setShowHand(v => !v)}
+          className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 mb-1"
+        >
+          {showHand ? '▾' : '▸'} 原始手牌
+        </button>
+        {showHand && (
+          <div className="flex flex-wrap gap-1">
+            {player.original_hand.map((c, i) => <CardChip key={i} card={c} />)}
+          </div>
+        )}
       </div>
 
       {/* Arranged rows */}

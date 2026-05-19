@@ -4,15 +4,27 @@ import PlayerPanel from '../components/PlayerPanel'
 import BattleLog from '../components/BattleLog'
 
 const DEFAULT_NAMES = ['Glory', 'Jack', 'Ian', 'Gary']
+const STRATEGIES = ['rule_base', 'monte_carlo', 'ai_model', 'random']
+const STRATEGY_LABEL: Record<string, string> = {
+  rule_base:   'Rule-Base',
+  monte_carlo: 'Monte Carlo',
+  ai_model:    'AI 神經網路',
+  random:      '隨機',
+}
 
 interface Props {
-  embedded?: boolean   // when true, skip the outer header (App.tsx draws it)
+  embedded?: boolean
 }
 
 export default function GamePage({ embedded = false }: Props) {
   const [result, setResult] = useState<GameResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [strategies, setStrategies] = useState<string[]>(['rule_base', 'rule_base', 'rule_base', 'rule_base'])
+
+  function setStrategy(idx: number, val: string) {
+    setStrategies(prev => prev.map((s, i) => i === idx ? val : s))
+  }
 
   async function playGame() {
     setLoading(true)
@@ -21,7 +33,7 @@ export default function GamePage({ embedded = false }: Props) {
       const res = await fetch('/api/game/play', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ player_names: DEFAULT_NAMES }),
+        body: JSON.stringify({ player_names: DEFAULT_NAMES, strategies }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data: GameResult = await res.json()
@@ -56,16 +68,35 @@ export default function GamePage({ embedded = false }: Props) {
       </div>
       )}
 
-      {/* Embedded deal button */}
+      {/* Embedded deal button + per-player strategy */}
       {embedded && (
-        <div className="mb-4 flex justify-end">
-          <button
-            onClick={playGame}
-            disabled={loading}
-            className="px-5 py-2 rounded-xl bg-yellow-400 text-gray-900 font-bold text-sm shadow hover:bg-yellow-300 active:scale-95 transition disabled:opacity-50"
-          >
-            {loading ? '洗牌中…' : result ? '再來一局' : '開始發牌'}
-          </button>
+        <div className="mb-4 flex flex-col gap-3">
+          {/* Per-player strategy selectors */}
+          <div className="grid grid-cols-4 gap-2">
+            {DEFAULT_NAMES.map((name, i) => (
+              <div key={name} className="flex flex-col gap-1">
+                <span className="text-xs text-green-300 font-semibold">{name}</span>
+                <select
+                  value={strategies[i]}
+                  onChange={e => setStrategy(i, e.target.value)}
+                  className="text-xs rounded-lg bg-green-800 text-white border border-green-600 px-2 py-1.5 focus:outline-none"
+                >
+                  {STRATEGIES.map(s => (
+                    <option key={s} value={s}>{STRATEGY_LABEL[s]}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={playGame}
+              disabled={loading}
+              className="px-5 py-2 rounded-xl bg-yellow-400 text-gray-900 font-bold text-sm shadow hover:bg-yellow-300 active:scale-95 transition disabled:opacity-50"
+            >
+              {loading ? '洗牌中…' : result ? '再來一局' : '開始發牌'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -110,8 +141,8 @@ export default function GamePage({ embedded = false }: Props) {
 
             {/* Player hands */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-              {result.players.map(p => (
-                <PlayerPanel key={p.name} player={p} finalScore={scoreMap[p.name] ?? 0} />
+              {result.players.map((p, i) => (
+                <PlayerPanel key={p.name} player={p} finalScore={scoreMap[p.name] ?? 0} strategy={strategies[i]} />
               ))}
             </div>
 

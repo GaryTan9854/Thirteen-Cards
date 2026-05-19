@@ -9,7 +9,7 @@ import os
 from game.game import play_one_game
 from game.hands import Hand13
 
-APP_VERSION = "2.1"
+APP_VERSION = "2.2"
 
 app = FastAPI(title="ThirteenCards", version=APP_VERSION)
 
@@ -30,15 +30,14 @@ def health():
 # ── Game: play a full 4-player game ──────────────────
 class PlayRequest(BaseModel):
     player_names: Optional[List[str]] = None
-    strategy: Optional[str] = "rule_base"  # rule_base | ai_model
+    strategies:   Optional[List[str]] = None  # list of 4 strategy strings
 
 
 @app.post("/api/game/play")
 def game_play(req: PlayRequest = None):
-    names = None
-    if req and req.player_names and len(req.player_names) == 4:
-        names = req.player_names
-    result = play_one_game(names)
+    names = req.player_names if req and req.player_names and len(req.player_names) == 4 else None
+    strats = req.strategies  if req and req.strategies  and len(req.strategies)  == 4 else None
+    result = play_one_game(names, strats)
     return result
 
 

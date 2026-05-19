@@ -83,9 +83,32 @@ def compete(h1, h2):
     return res
 
 
-def play_one_game(player_names=None):
+def _arrange(hand_cards, strategy: str) -> 'Hand13':
+    """Arrange a hand using the specified strategy. hand_cards = list of Card objects."""
+    cardstrs = [c.cardstr() for c in hand_cards]
+    if strategy == 'monte_carlo':
+        from .evaluate import best_arrangement_mc
+        result = best_arrangement_mc(cardstrs, top_k=20, n_sims=150)
+        return result["arrangement"]
+    elif strategy == 'ai_model':
+        from ml.inference import AIArranger
+        ai = AIArranger.get()
+        if ai:
+            h = Hand13(cardstrs)
+            h.specialhand = 'normal'
+            return ai.arrange_hand13(h)
+    # default: rule_base
+    h = Hand13(cardstrs)
+    h.specialhand = 'normal'
+    h.arrange13()
+    return h
+
+
+def play_one_game(player_names=None, strategies=None):
     if player_names is None:
         player_names = ["Glory", "Jack", "Ian", "Gary"]
+    if strategies is None:
+        strategies = ['rule_base'] * 4
 
     myDeck = Deck()
     hands = myDeck.distribute()
@@ -94,11 +117,18 @@ def play_one_game(player_names=None):
     hand13_list = []
 
     for idx, name in enumerate(player_names):
+        strategy = strategies[idx] if idx < len(strategies) else 'rule_base'
         h13 = Hand13(hands[idx])
         sp = h13.chk_special()
-        h13.specialhand = sp       # must set so compete() can detect special hands
+        h13.specialhand = sp
         if sp == "normal":
-            h13.arrange13()
+            arranged = _arrange(hands[idx], strategy)
+            h13.htop = arranged.htop
+            h13.hmid = arranged.hmid
+            h13.hbot = arranged.hbot
+            h13.ss   = arranged.ss
+            h13.totalscore = arranged.totalscore
+            h13.CanAttack  = getattr(arranged, 'CanAttack', False)
         hand13_list.append(h13)
 
         original_display = [c.show() for c in sorted(hands[idx])]
