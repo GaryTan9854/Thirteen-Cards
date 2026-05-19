@@ -171,10 +171,16 @@ def generate_5card_options(available: list) -> list:
                 options.append(by_rank[p1][:2] + by_rank[p2][:2] + kicker_card)
 
     # ── 三條 TR ──────────────────────────────────────────────────────────
+    # Try top-2 kickers (greedy) AND bottom-2 kickers (frees high cards for
+    # top/mid rows — e.g. 888+AK bot wastes A,K that could form AKQ top).
     for tr in trip_ranks:
-        kickers = _top_n(available, 2, {tr})
-        if len(kickers) >= 2:
-            options.append(by_rank[tr][:3] + kickers)
+        non_trip = sorted([cs for cs in available if int(cs[:2]) != tr],
+                          key=lambda cs: -int(cs[:2]))
+        if len(non_trip) >= 2:
+            options.append(by_rank[tr][:3] + non_trip[:2])   # top-2 kickers
+            bot2 = non_trip[-2:]                               # bottom-2 kickers
+            if set(bot2) != set(non_trip[:2]):
+                options.append(by_rank[tr][:3] + bot2)
 
     # ── 一對 P ───────────────────────────────────────────────────────────
     # Try all individual pairs (not just the best one).
@@ -269,18 +275,16 @@ def best_arrangement(handstrs: list):
     """
     從合法排列中選最佳一組（頭≤中≤尾 強度）。
 
-    攻擊模式：有任何排列同時滿足三墩攻擊門檻 → 從中選攻擊分最高者。
-    防守模式：否則選被打槍機率最低者（自動均衡三墩）。
+    統一使用 score_arrangement（頭+中+尾 名次% 之和）作為選擇依據。
+    防守分公式 -(1-p1)(1-p2)(1-p3) 會被單一超強尾墩誤導
+    （例如葫蘆 95% 讓乘積極小，即使頭 1% 中 17% 幾乎必輸兩墩），
+    合計% 才能正確反映實戰得分期望。
     """
     candidates = enumerate_arrangements(handstrs)
     if not candidates:
         return None
 
-    attack = [t for t in candidates if eval_attack(*t)]
-    if attack:
-        return max(attack, key=lambda t: score_arrangement(*t))
-
-    return max(candidates, key=lambda t: score_defensive(*t))
+    return max(candidates, key=lambda t: score_arrangement(*t))
 
 
 # ─── Main enumeration ─────────────────────────────────────────────────────────
