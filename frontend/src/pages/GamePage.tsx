@@ -22,7 +22,7 @@ type Phase = 'normal' | 'appeal_pending' | 'in_appeal' | 'ended'
 interface GunNotif {
   id:     number
   winner: string
-  loser:  string | null   // null = 打槍兩人
+  losers: string[]   // length 1 = 打槍, length 2 = 打槍兩人
   count:  1 | 2
 }
 
@@ -63,8 +63,8 @@ function buildGunNotifs(battles: any[], slam: string | null): GunNotif[] {
   const notifs: GunNotif[] = []
   for (const [winner, losers] of Object.entries(byWinner)) {
     if (winner === slam) continue            // grand slam 已獨立處理
-    if      (losers.length === 1) notifs.push({ id: id++, winner, loser: losers[0], count: 1 })
-    else if (losers.length === 2) notifs.push({ id: id++, winner, loser: null,      count: 2 })
+    if      (losers.length === 1) notifs.push({ id: id++, winner, losers,             count: 1 })
+    else if (losers.length === 2) notifs.push({ id: id++, winner, losers,             count: 2 })
   }
   return notifs
 }
@@ -126,8 +126,8 @@ export default function GamePage({ embedded = false }: Props) {
     setCurrentGun(next)
     if (voiceRef.current) {
       speak(next.count === 2
-        ? `${next.winner} 打槍兩人！`
-        : `${next.winner} 打槍 ${next.loser}`)
+        ? `${next.winner} 打槍兩人！${next.losers[0]} 和 ${next.losers[1]}`
+        : `${next.winner} 打槍 ${next.losers[0]}`)
     }
     setTimeout(processNextGun, GUN_NOTIF_MS)
   }, [])  // refs/setters 本身穩定，deps 可為空
@@ -228,7 +228,7 @@ export default function GamePage({ embedded = false }: Props) {
 
   const roundCount = history.length
   const canDeal    = phase !== 'appeal_pending' && phase !== 'ended' && !loading
-  const dealLabel  = loading ? '洗牌中…' : result ? '新一局' : '開始發牌'
+  const dealLabel  = loading ? '洗牌中…' : '開始發牌'
 
   const roundLabel =
     phase === 'in_appeal'      ? `申訴加賽 第 ${appealPlayed + 1} / ${ROUNDS_APPEAL} 局` :
@@ -305,30 +305,30 @@ export default function GamePage({ embedded = false }: Props) {
   // ── Tournament status bar ─────────────────────────────────────────────────
   const TournamentBar = () => (
     <div className="bg-green-900 rounded-2xl p-4 shadow-inner">
-      {/* 全部控制項同一排：局數 | 🔊 | 成績表 | 新一場比賽 | 新一局 */}
-      <div className="flex items-center gap-2 mb-3 flex-wrap">
+      {/* 局數在左，所有按鈕（黃色）在右 */}
+      <div className="flex items-center gap-1.5 mb-3 flex-wrap">
         <span className="text-sm text-green-300 font-semibold mr-auto whitespace-nowrap">{roundLabel}</span>
         {phase === 'appeal_pending' && (
           <button onClick={startAppeal}
-            className="text-xs px-3 py-1 rounded-full bg-orange-600 text-white font-bold hover:bg-orange-500 transition whitespace-nowrap">
+            className="text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold hover:bg-yellow-300 active:scale-95 transition whitespace-nowrap">
             ⚖️ 申訴
           </button>
         )}
         <button onClick={toggleVoice}
-          className={`text-xs px-3 py-1 rounded-full transition ${voiceOn ? 'bg-green-700 text-green-200 hover:bg-green-600' : 'bg-gray-700 text-gray-500 hover:bg-gray-600'}`}
+          className={`text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold hover:bg-yellow-300 transition ${!voiceOn ? 'opacity-50' : ''}`}
           title={voiceOn ? '語音開啟（點擊關閉）' : '語音關閉（點擊開啟）'}>
           {voiceOn ? '🔊' : '🔇'}
         </button>
         <button onClick={() => setShowHistory(v => !v)}
-          className="text-xs px-3 py-1 rounded-full bg-green-800 text-green-300 hover:bg-green-700 transition">
+          className="text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold hover:bg-yellow-300 transition">
           {showHistory ? '▾' : '▸'} 成績表
         </button>
         <button onClick={resetTournament}
-          className="text-xs px-3 py-1 rounded-full bg-gray-700 text-gray-300 hover:bg-gray-600 transition whitespace-nowrap">
+          className="text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold hover:bg-yellow-300 transition whitespace-nowrap">
           新一場比賽
         </button>
         <button onClick={playGame} disabled={!canDeal}
-          className="text-xs px-4 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold hover:bg-yellow-300 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+          className="text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold hover:bg-yellow-300 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
           {dealLabel}
         </button>
       </div>
@@ -433,26 +433,16 @@ export default function GamePage({ embedded = false }: Props) {
 
         {result && !loading && (
           <>
-            <div className="bg-green-900 rounded-2xl px-4 py-3 shadow-inner">
-              {/* grid: label列 + 4個玩家欄 */}
-              <div className="grid gap-x-2 gap-y-1.5 items-center"
-                   style={{ gridTemplateColumns: '2.5rem repeat(4, 1fr)' }}>
-                {/* 名字列 */}
-                <div />
-                {DEFAULT_NAMES.map(n => (
-                  <span key={n} className="text-center text-sm font-semibold text-green-300">{n}</span>
-                ))}
-                {/* 累積列 */}
-                <span className="text-xs text-green-500 text-right pr-1 leading-none">累積</span>
-                {totalScores.map((s, i) => (
-                  <span key={i} className={`text-center text-lg font-bold leading-tight ${scoreColor(s)}`}>{fmt(s)}</span>
-                ))}
-                {/* 本局列（字體放大） */}
-                <span className="text-xs text-green-500 text-right pr-1 leading-none">本局</span>
+            <div className="bg-green-900 rounded-2xl p-4 shadow-inner">
+              <div className="text-xs text-green-400 mb-2 font-semibold text-center">本局比分</div>
+              <div className="grid grid-cols-4 gap-3">
                 {result.final_scores.map((fs: any) => (
-                  <span key={fs.name} className={`text-center text-3xl font-bold leading-tight ${scoreColor(fs.score)}`}>
-                    {fmt(fs.score)}
-                  </span>
+                  <div key={fs.name} className="flex flex-col items-center">
+                    <span className="text-sm text-green-200 font-medium">{fs.name}</span>
+                    <span className={`text-2xl font-bold ${scoreColor(fs.score)}`}>
+                      {fmt(fs.score)}
+                    </span>
+                  </div>
                 ))}
               </div>
             </div>
@@ -485,10 +475,15 @@ export default function GamePage({ embedded = false }: Props) {
             </div>
             <div className="text-base text-gray-300 mt-1.5">
               <span className="font-bold text-red-300">{currentGun.winner}</span>
-              {currentGun.count === 1 && (
+              {currentGun.count === 1 ? (
                 <>
                   <span className="text-gray-500 mx-1.5">轟掉</span>
-                  <span className="text-gray-400">{currentGun.loser}</span>
+                  <span className="text-gray-400">{currentGun.losers[0]}</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-gray-500 mx-1.5">：</span>
+                  <span className="text-gray-400">{currentGun.losers[0]} &amp; {currentGun.losers[1]}</span>
                 </>
               )}
             </div>
