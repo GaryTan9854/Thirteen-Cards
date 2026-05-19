@@ -204,6 +204,7 @@ export default function GamePage({ embedded = false }: Props) {
   const [appealGeneration, setAppealGeneration] = useState(0)  // 1=初次申訴 2=第二次（終局）
   const [isTiebreaking, setIsTiebreaking]   = useState(false)  // 申訴後平局加賽
   const [multiplier, setMultiplier]         = useState(1)       // 無聊局倍率 1/2/3…
+  const [roundMultipliers, setRoundMultipliers] = useState<number[]>([])  // 每局實際倍率
   const [showHistory, setShowHistory]       = useState(false)
 
   // 全壘打：顯示 5 s 後自動關閉，並念出
@@ -225,7 +226,7 @@ export default function GamePage({ embedded = false }: Props) {
     setHistory([]); setPhase('normal'); setAppealPlayed(0)
     setAppealLoser(-1); setResult(null); setError(null)
     setGrandSlammer(null); setCurrentGun(null); gunQueueRef.current = []
-    setAppealGeneration(0); setIsTiebreaking(false); setMultiplier(1)
+    setAppealGeneration(0); setIsTiebreaking(false); setMultiplier(1); setRoundMultipliers([])
   }
 
   function startAppeal() {
@@ -243,6 +244,8 @@ export default function GamePage({ embedded = false }: Props) {
     setLoading(true); setError(null)
     setCurrentGun(null); gunQueueRef.current = []
     window.speechSynthesis?.cancel()               // 清掉上一局殘留 TTS
+    // 倍率唸出（在 fetch 期間播完，不與後續 TTS 衝突）
+    if (multiplier > 1 && voiceRef.current) speak(`本局分數 x${multiplier}！`, 1.0)
     try {
       const res = await fetch('/api/game/play', {
         method: 'POST',
@@ -308,6 +311,7 @@ export default function GamePage({ embedded = false }: Props) {
       const scaledScores = rawScores.map(s => Math.round(s * multiplier))
       const newHistory = [...history, scaledScores]
       setHistory(newHistory)
+      setRoundMultipliers(prev => [...prev, multiplier])   // 記錄本局倍率
 
       // 無聊局偵測（所有人得分絕對值 ≤ 1）→ 下局倍率 +1
       const isBoring = rawScores.every(s => Math.abs(s) <= 1)
@@ -403,7 +407,7 @@ export default function GamePage({ embedded = false }: Props) {
 
     const ColHeader = () => (
       <div className="flex mb-1">
-        <span className="w-8 shrink-0" />
+        <span className="w-11 shrink-0" />
         {DEFAULT_NAMES.map(n => (
           <span key={n} className="flex-1 text-center text-green-400 font-semibold text-sm truncate">{n}</span>
         ))}
@@ -411,14 +415,22 @@ export default function GamePage({ embedded = false }: Props) {
     )
     const ColRows = ({ rounds, base }: { rounds: number[][], base: number }) => (
       <>
-        {rounds.map((scores, i) => (
-          <div key={i} className="flex">
-            <span className="w-8 shrink-0 text-gray-500 text-sm">{base + i + 1}</span>
-            {scores.map((s, j) => (
-              <span key={j} className={`flex-1 text-center text-sm ${scoreColor(s)}`}>{fmt(s)}</span>
-            ))}
-          </div>
-        ))}
+        {rounds.map((scores, i) => {
+          const mul = roundMultipliers[base + i] ?? 1
+          return (
+            <div key={i} className="flex items-center">
+              <span className="w-11 shrink-0 text-gray-500 text-sm leading-tight">
+                {base + i + 1}
+                {mul > 1 && (
+                  <span className="text-orange-400 font-bold text-xs ml-0.5">×{mul}</span>
+                )}
+              </span>
+              {scores.map((s, j) => (
+                <span key={j} className={`flex-1 text-center text-sm ${scoreColor(s)}`}>{fmt(s)}</span>
+              ))}
+            </div>
+          )
+        })}
       </>
     )
 
