@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { GameResult } from '../types/game'
 import PlayerPanel from '../components/PlayerPanel'
 import BattleLog from '../components/BattleLog'
@@ -33,11 +33,23 @@ function scoreColor(n: number) {
   return n > 0 ? 'text-yellow-300' : n < 0 ? 'text-red-400' : 'text-gray-400'
 }
 
+// ── Grand Slam detection ──────────────────────────────────────────────────
+function detectGrandSlam(battles: any[]): string | null {
+  const gunCount: Record<string, number> = {}
+  for (const b of battles) {
+    if (b.gun === 1)       gunCount[b.p1] = (gunCount[b.p1] || 0) + 1
+    else if (b.gun === -1) gunCount[b.p2] = (gunCount[b.p2] || 0) + 1
+  }
+  const entry = Object.entries(gunCount).find(([, c]) => c === 3)
+  return entry ? entry[0] : null
+}
+
 export default function GamePage({ embedded = false }: Props) {
   const [result, setResult]     = useState<GameResult | null>(null)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState<string | null>(null)
   const [strategies, setStrategies] = useState<string[]>(['rule_base_as','rule_base_as','rule_base_as','rule_base_as'])
+  const [grandSlammer, setGrandSlammer] = useState<string | null>(null)
 
   // ── Tournament state ──────────────────────────────────────────
   const [history, setHistory]           = useState<number[][]>([])   // [round][player]
@@ -45,6 +57,13 @@ export default function GamePage({ embedded = false }: Props) {
   const [appealPlayed, setAppealPlayed] = useState(0)                // rounds played in current appeal
   const [appealLoser, setAppealLoser]   = useState(-1)               // who was loser when appeal started
   const [showHistory, setShowHistory]   = useState(false)
+
+  // Auto-dismiss grand slam overlay after 5 s
+  useEffect(() => {
+    if (!grandSlammer) return
+    const t = setTimeout(() => setGrandSlammer(null), 5000)
+    return () => clearTimeout(t)
+  }, [grandSlammer])
 
   const totalScores = useMemo(() => computeTotals(history), [history])
   const lowestPlayer = lowestIdx(totalScores)
@@ -55,7 +74,7 @@ export default function GamePage({ embedded = false }: Props) {
 
   function resetTournament() {
     setHistory([]); setPhase('normal'); setAppealPlayed(0)
-    setAppealLoser(-1); setResult(null); setError(null)
+    setAppealLoser(-1); setResult(null); setError(null); setGrandSlammer(null)
   }
 
   function startAppeal() {
@@ -75,6 +94,7 @@ export default function GamePage({ embedded = false }: Props) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data: GameResult = await res.json()
       setResult(data)
+      setGrandSlammer(detectGrandSlam(data.battles))
 
       const newScores = DEFAULT_NAMES.map(n => {
         const fs = data.final_scores.find((s: any) => s.name === n)
@@ -346,6 +366,42 @@ export default function GamePage({ embedded = false }: Props) {
           </>
         )}
       </div>
+
+      {/* ── 全壘打 Celebration Overlay ── */}
+      {grandSlammer && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center cursor-pointer"
+          style={{ background: 'rgba(0,0,0,0.72)' }}
+          onClick={() => setGrandSlammer(null)}
+        >
+          <div className="text-center select-none px-8" style={{ animation: 'grandSlam 0.4s ease-out' }}>
+            <div className="text-8xl mb-4" style={{ filter: 'drop-shadow(0 0 24px #facc15)' }}>🎯</div>
+            <div
+              className="text-7xl font-black tracking-widest mb-3"
+              style={{
+                color: '#FFD700',
+                textShadow: '0 0 40px #FFD700, 0 0 80px #FF8C00, 3px 3px 0 #7c2d12',
+                letterSpacing: '0.08em',
+              }}
+            >
+              全壘打！！
+            </div>
+            <div className="text-3xl font-bold text-white mb-1">
+              🏆 {grandSlammer} 打爆三家！
+            </div>
+            <div className="text-base text-yellow-300 opacity-70 mt-4">點擊關閉</div>
+          </div>
+
+          <style>{`
+            @keyframes grandSlam {
+              0%   { transform: scale(0.3) rotate(-8deg); opacity: 0; }
+              60%  { transform: scale(1.12) rotate(2deg); opacity: 1; }
+              80%  { transform: scale(0.96) rotate(-1deg); }
+              100% { transform: scale(1) rotate(0deg); }
+            }
+          `}</style>
+        </div>
+      )}
     </div>
   )
 }
