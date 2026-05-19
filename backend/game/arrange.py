@@ -286,31 +286,40 @@ def score_arrangement(h3: Hand3, hm: Hand5, hb: Hand5) -> float:
 
 def score_defensive(h3: Hand3, hm: Hand5, hb: Hand5) -> float:
     """
-    防守分 = 負的被打槍機率 = −(1−p₁)(1−p₂)(1−p₃)，越大（越接近0）越好。
+    防守分 = (p1+p2+p3) − 1.5·(1−p1)(1−p2)(1−p3)。
 
-    三墩均衡時乘積最小（AM-GM），自然實現「三墩各約 55–60 分」的老司機策略。
-    尾墩弱於 66432 者計 p₃=0（必輸）。
+    適用於無攻擊機會的防守牌。
+    - 不含打槍加成（p1p2p3 項），因三墩同贏機率極低
+    - 保留被打槍懲罰，鼓勵三墩均衡守住
+    - 包含 p1+p2+p3 加總，不會被單一超強尾墩誤導
+      （舊公式 -(1-p1)(1-p2)(1-p3) 對葫蘆95%+頭中極弱 給出誤導性高分）
     """
     p1 = pct3(h3)
     p2 = pct5_mid(hm)
     p3 = pct5_bot(hb) or 0.0
-    return -((1 - p1) * (1 - p2) * (1 - p3))
+    return (p1 + p2 + p3) - 1.5 * (1 - p1) * (1 - p2) * (1 - p3)
 
 
 def best_arrangement(handstrs: list):
     """
     從合法排列中選最佳一組（頭≤中≤尾 強度）。
 
-    統一使用 score_arrangement（頭+中+尾 名次% 之和）作為選擇依據。
-    防守分公式 -(1-p1)(1-p2)(1-p3) 會被單一超強尾墩誤導
-    （例如葫蘆 95% 讓乘積極小，即使頭 1% 中 17% 幾乎必輸兩墩），
-    合計% 才能正確反映實戰得分期望。
+    雙模式評分：
+    - 攻牌模式：任一候選可 eval_attack → 用 score_arrangement（含打槍加成）
+    - 防守模式：無候選可攻 → 用 score_defensive（不含打槍加成，防被打槍）
+
+    防守模式不用 -(1-p1)(1-p2)(1-p3)（會被超強尾墩誤導），
+    而用 (p1+p2+p3) - 1.5*(1-p1)(1-p2)(1-p3)。
     """
     candidates = enumerate_arrangements(handstrs)
     if not candidates:
         return None
 
-    return max(candidates, key=lambda t: score_arrangement(*t))
+    can_attack = any(eval_attack(*c) for c in candidates)
+    if can_attack:
+        return max(candidates, key=lambda t: score_arrangement(*t))
+    else:
+        return max(candidates, key=lambda t: score_defensive(*t))
 
 
 # ─── Main enumeration ─────────────────────────────────────────────────────────
