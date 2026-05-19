@@ -142,6 +142,26 @@ def generate_5card_options(available: list) -> list:
         if not is_sf:
             options.append(best5)
 
+        # Variant: for each card in best5 whose rank also appears in another suit
+        # (i.e., it can form a pair/trip outside the flush), also generate a flush
+        # that excludes it — frees the paired card for mid/top rows.
+        # e.g., 9♣ in a club flush when 9♠ also exists → try K♣Q♣7♣4♣2♣ so
+        # 9♣ stays available and 99 pair can be formed in mid.
+        if len(scards) >= 6:
+            suit_rank_set = {int(cs[:2]) for cs in scards}
+            outside_ranks = {int(cs[:2]) for cs in available
+                             if cs[2] != suit and int(cs[:2]) in suit_rank_set}
+            for exc_card in best5:
+                if int(exc_card[:2]) in outside_ranks:
+                    alt = [cs for cs in scards if cs != exc_card]
+                    alt5 = sorted(alt, key=lambda cs: -int(cs[:2]))[:5]
+                    alt_ranks = [int(cs[:2]) for cs in alt5]
+                    alt_is_sf = len(set(alt_ranks)) == 5 and (
+                        max(alt_ranks) - min(alt_ranks) == 4
+                        or set(alt_ranks) == {14, 2, 3, 4, 5})
+                    if not alt_is_sf:
+                        options.append(alt5)
+
     # ── 葫蘆 H ───────────────────────────────────────────────────────────
     # Rule: BEST trip + MINIMUM available pair  (H strength = trip rank only)
     trip_ranks = sorted([r for r, c in cnt.items() if c >= 3], reverse=True)
