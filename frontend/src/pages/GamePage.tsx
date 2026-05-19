@@ -237,6 +237,7 @@ export default function GamePage({ embedded = false }: Props) {
       {phase === 'ended' && (
         <div className="mt-3 bg-gray-800 rounded-xl px-4 py-2.5 text-center text-sm text-gray-300">
           🏁 本場結束！冠軍：<strong className="text-yellow-300">{winnerName}</strong>
+          　🍽️ <strong className="text-orange-300">{DEFAULT_NAMES[lowestPlayer]}</strong> 請客！
         </div>
       )}
 
