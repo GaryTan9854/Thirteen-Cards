@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { GameResult } from '../types/game'
 import PlayerPanel from '../components/PlayerPanel'
 import BattleLog from '../components/BattleLog'
@@ -94,8 +94,17 @@ export default function GamePage({ embedded = false }: Props) {
   const [grandSlammer, setGrandSlammer] = useState<string | null>(null)
 
   // 打槍通知佇列
-  const [gunQueue,  setGunQueue]  = useState<GunNotif[]>([])
+  const [gunQueue,   setGunQueue]  = useState<GunNotif[]>([])
   const [currentGun, setCurrentGun] = useState<GunNotif | null>(null)
+
+  // 語音開關（ref 讓 effect 閉包永遠讀到最新值）
+  const [voiceOn, setVoiceOn] = useState(true)
+  const voiceRef = useRef(true)
+  function toggleVoice() {
+    const next = !voiceRef.current
+    voiceRef.current = next
+    setVoiceOn(next)
+  }
 
   // ── Tournament state ──────────────────────────────────────────────────────
   const [history, setHistory]           = useState<number[][]>([])
@@ -107,7 +116,7 @@ export default function GamePage({ embedded = false }: Props) {
   // 全壘打：顯示 5 s 後自動關閉，並念出
   useEffect(() => {
     if (!grandSlammer) return
-    speak(`${grandSlammer}，全壘打！打爆三家！`, 0.88)
+    if (voiceRef.current) speak(`${grandSlammer}，全壘打！打爆三家！`, 0.88)
     const t = setTimeout(() => setGrandSlammer(null), 5000)
     return () => clearTimeout(t)
   }, [grandSlammer])
@@ -118,7 +127,7 @@ export default function GamePage({ embedded = false }: Props) {
     const [next, ...rest] = gunQueue
     setCurrentGun(next)
     setGunQueue(rest)
-    speak(`${next.winner} 打槍 ${next.loser}`)
+    if (voiceRef.current) speak(`${next.winner} 打槍 ${next.loser}`)
     const t = setTimeout(() => setCurrentGun(null), GUN_NOTIF_MS)
     return () => clearTimeout(t)
   }, [currentGun, gunQueue])
@@ -185,7 +194,8 @@ export default function GamePage({ embedded = false }: Props) {
             // 本場結束語音（延遲一點，等打槍 TTS 不衝突）
             const endWinner = DEFAULT_NAMES[newTotals.indexOf(Math.max(...newTotals))]
             const endLoser  = DEFAULT_NAMES[newLowest]
-            setTimeout(() => speak(`本場結束！冠軍 ${endWinner}！${endLoser} 請客！`, 0.92), 800)
+            if (voiceRef.current)
+              setTimeout(() => speak(`本場結束！冠軍 ${endWinner}！${endLoser} 請客！`, 0.92), 800)
           }
         } else {
           setAppealPlayed(newPlayed)
@@ -215,35 +225,64 @@ export default function GamePage({ embedded = false }: Props) {
     ? Object.fromEntries(result.final_scores.map((s: any) => [s.name, s.score]))
     : {}
 
-  // ── Score history panel ───────────────────────────────────────────────────
-  const HistoryPanel = () => (
-    <div className="mt-3 bg-black/30 rounded-xl p-3 overflow-x-auto">
-      <div className="font-mono text-xs whitespace-nowrap">
-        <div className="flex gap-0 mb-1">
-          <span className="w-10 text-gray-500"></span>
-          {DEFAULT_NAMES.map(n => (
-            <span key={n} className="w-14 text-center text-green-400 font-semibold">{n}</span>
-          ))}
-        </div>
-        {history.map((scores, i) => (
-          <div key={i} className="flex gap-0">
-            <span className="w-10 text-gray-500">#{i + 1}</span>
+  // ── Score history panel（左右兩欄，最多各 10 局，字體放大）────────────────
+  const HistoryPanel = () => {
+    const SPLIT = 10
+    const leftRounds  = history.slice(0, SPLIT)
+    const rightRounds = history.slice(SPLIT)
+
+    const ColHeader = () => (
+      <div className="flex mb-1">
+        <span className="w-8 shrink-0" />
+        {DEFAULT_NAMES.map(n => (
+          <span key={n} className="flex-1 text-center text-green-400 font-semibold text-sm truncate">{n}</span>
+        ))}
+      </div>
+    )
+    const ColRows = ({ rounds, base }: { rounds: number[][], base: number }) => (
+      <>
+        {rounds.map((scores, i) => (
+          <div key={i} className="flex">
+            <span className="w-8 shrink-0 text-gray-500 text-sm">{base + i + 1}</span>
             {scores.map((s, j) => (
-              <span key={j} className={`w-14 text-center ${scoreColor(s)}`}>{fmt(s)}</span>
+              <span key={j} className={`flex-1 text-center text-sm ${scoreColor(s)}`}>{fmt(s)}</span>
             ))}
           </div>
         ))}
+      </>
+    )
+
+    return (
+      <div className="mt-3 bg-black/30 rounded-xl p-3">
+        <div className="flex gap-3">
+          {/* 左欄：#1–10 */}
+          <div className="flex-1 min-w-0">
+            <ColHeader />
+            <ColRows rounds={leftRounds} base={0} />
+          </div>
+          {/* 右欄：#11–20（有資料才顯示） */}
+          {rightRounds.length > 0 && (
+            <>
+              <div className="w-px bg-gray-600 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <ColHeader />
+                <ColRows rounds={rightRounds} base={SPLIT} />
+              </div>
+            </>
+          )}
+        </div>
+        {/* 合計列 */}
         {history.length > 0 && (
-          <div className="flex gap-0 border-t border-gray-600 mt-1 pt-1 font-bold">
-            <span className="w-10 text-gray-400">合計</span>
+          <div className="flex mt-2 pt-2 border-t border-gray-600 font-bold">
+            <span className="w-8 shrink-0 text-gray-400 text-sm">合計</span>
             {totalScores.map((s, j) => (
-              <span key={j} className={`w-14 text-center ${scoreColor(s)}`}>{fmt(s)}</span>
+              <span key={j} className={`flex-1 text-center text-sm ${scoreColor(s)}`}>{fmt(s)}</span>
             ))}
           </div>
         )}
       </div>
-    </div>
-  )
+    )
+  }
 
   // ── Tournament status bar ─────────────────────────────────────────────────
   const TournamentBar = () => (
@@ -251,6 +290,13 @@ export default function GamePage({ embedded = false }: Props) {
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs text-green-400 font-semibold">{roundLabel}</span>
         <div className="flex gap-2">
+          <button
+            onClick={toggleVoice}
+            className={`text-xs px-3 py-1 rounded-full transition ${voiceOn ? 'bg-green-700 text-green-200 hover:bg-green-600' : 'bg-gray-700 text-gray-500 hover:bg-gray-600'}`}
+            title={voiceOn ? '語音開啟（點擊關閉）' : '語音關閉（點擊開啟）'}
+          >
+            {voiceOn ? '🔊' : '🔇'}
+          </button>
           <button
             onClick={() => setShowHistory(v => !v)}
             className="text-xs px-3 py-1 rounded-full bg-green-800 text-green-300 hover:bg-green-700 transition"
@@ -279,6 +325,9 @@ export default function GamePage({ embedded = false }: Props) {
             {phase === 'ended' && i === totalScores.indexOf(Math.max(...totalScores)) && (
               <span className="text-xs text-yellow-400 mt-0.5">🏆 冠軍</span>
             )}
+            {phase === 'ended' && i === lowestPlayer && (
+              <span className="text-xs text-orange-400 mt-0.5">🍽️ 請客</span>
+            )}
           </div>
         ))}
       </div>
@@ -298,9 +347,16 @@ export default function GamePage({ embedded = false }: Props) {
       )}
 
       {phase === 'ended' && (
-        <div className="mt-3 bg-gray-800 rounded-xl px-4 py-2.5 text-center text-sm text-gray-300">
-          🏁 本場結束！冠軍：<strong className="text-yellow-300">{winnerName}</strong>
-          　🍽️ <strong className="text-orange-300">{DEFAULT_NAMES[lowestPlayer]}</strong> 請客！
+        <div className="mt-3 bg-gray-800 rounded-xl px-4 py-2.5">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-400 font-semibold whitespace-nowrap">🏁 本場結束！</span>
+            <span className="text-gray-300">
+              冠軍：<strong className="text-yellow-300">{winnerName}</strong>
+            </span>
+            <span className="text-gray-300 whitespace-nowrap">
+              <strong className="text-orange-300">{DEFAULT_NAMES[lowestPlayer]}</strong> 請客 🍽️
+            </span>
+          </div>
         </div>
       )}
 
