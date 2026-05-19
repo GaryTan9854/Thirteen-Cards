@@ -1,6 +1,6 @@
 import itertools
 from datetime import datetime
-from .cards import Deck, SpecialHand, SpecialCharge, Suits, Values
+from .cards import Deck, SpecialHand, SpecialCharge, SpecialChargeByName, Suits, Values
 from .hands import Hand13, Hand3, Hand5
 
 
@@ -19,19 +19,36 @@ def splevel(h):
     return "sp0"
 
 
+def _get_special_charge(h) -> int:
+    """
+    Return the point charge for a special hand.
+    Per-name overrides (SpecialChargeByName) take precedence over tier-based charges.
+    """
+    override = SpecialChargeByName.get(getattr(h, 'specialhand', ''))
+    if override is not None:
+        return override
+    return SpecialCharge[splevel(h)]
+
+
 def compete(h1, h2):
     res = [0, 0, 0, 0, 0]
 
     if h1.specialhand != "normal":
         if h2.specialhand != "normal":
-            s1 = SpecialCharge[splevel(h1)]
-            s2 = SpecialCharge[splevel(h2)]
-            res[3] = s1 if s1 > s2 else (-s2 if s1 < s2 else 0)
+            # Winner determined by SpecialHand VALUE (higher = stronger)
+            # Amount collected = winner's own charge (per-name override if applicable)
+            v1 = h1.handtype_val
+            v2 = h2.handtype_val
+            if v1 > v2:
+                res[3] = _get_special_charge(h1)
+            elif v1 < v2:
+                res[3] = -_get_special_charge(h2)
+            # else: same value (same hand type) → tie, res[3] = 0
         else:
-            res[3] = SpecialCharge[splevel(h1)]
+            res[3] = _get_special_charge(h1)
         return res
     elif h2.specialhand != "normal":
-        res[3] = -SpecialCharge[splevel(h2)]
+        res[3] = -_get_special_charge(h2)
         return res
 
     for i in range(3):

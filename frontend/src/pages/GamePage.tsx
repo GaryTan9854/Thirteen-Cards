@@ -69,6 +69,47 @@ function buildGunNotifs(battles: any[], slam: string | null): GunNotif[] {
   return notifs
 }
 
+// ── 特殊牌型 TTS 建構（結果出來後掃描每位玩家）────────────────────────────────
+function buildSpecialTTS(players: any[]): string[] {
+  const lines: string[] = []
+  for (const p of players) {
+    const name = p.name as string
+    // 特殊手牌（六對半、全大全小、三同花…）—— 直接報到，跳過逐墩掃描
+    if (p.special_hand && p.special_hand !== 'normal') {
+      lines.push(`${name}，${p.special_hand} 報到！`)
+      continue
+    }
+    // 頭墩
+    if (p.top) {
+      if (p.top.hand_type === '三條') {
+        lines.push(`${name}，原子頭！${p.top.description}！`)
+      } else if (p.top.hand_type === '一對') {
+        const aces = (p.top.cards as string[]).filter((c: string) => parseInt(c) === 14).length
+        if (aces >= 2) lines.push(`${name}，柳丁！老A 撐頭！`)
+      }
+    }
+    // 中墩
+    if (p.mid) {
+      if (p.mid.hand_type === '鐵支') {
+        lines.push(`${name}，中墩鐵支！${p.mid.description}！`)
+      } else if (p.mid.hand_type === '葫蘆') {
+        lines.push(`${name}，中墩葫蘆！${p.mid.description}！`)
+      } else if (['同花順', '同花次大順', '同花大順'].includes(p.mid.hand_type)) {
+        lines.push(`${name}，中墩同花順！${p.mid.description}！`)
+      }
+    }
+    // 尾墩
+    if (p.bot) {
+      if (p.bot.hand_type === '鐵支') {
+        lines.push(`${name}，尾墩鐵支！${p.bot.description}！`)
+      } else if (['同花順', '同花次大順', '同花大順'].includes(p.bot.hand_type)) {
+        lines.push(`${name}，尾墩同花順！${p.bot.description}！`)
+      }
+    }
+  }
+  return lines
+}
+
 // ── 女聲 TTS（Web Speech API，優先 zh-TW）────────────────────────────────────
 function speak(text: string, rate = 1.05) {
   const synth = window.speechSynthesis
@@ -95,6 +136,24 @@ function speak(text: string, rate = 1.05) {
 
   if (synth.getVoices().length > 0) doSpeak()
   else synth.addEventListener('voiceschanged', doSpeak, { once: true })
+}
+
+// ── 連續多行 TTS（不 cancel，讓 Web Speech API 自然排隊播完）────────────────
+function speakQueue(lines: string[]) {
+  const synth = window.speechSynthesis
+  if (!synth || lines.length === 0) return
+  const voices = synth.getVoices()
+  const zh     = voices.filter(v => v.lang.startsWith('zh'))
+  const female =
+    zh.find(v => /meijia|美嘉|sin[\s-]?ji|sinji|ya[\s-]?wen|雅雯/i.test(v.name)) ||
+    zh.find(v => /tingting|ting[\s-]?ting/i.test(v.name))                         ||
+    zh.find(v => v.lang === 'zh-TW') || zh[0]
+  for (const text of lines) {
+    const utter = new SpeechSynthesisUtterance(text)
+    utter.lang = 'zh-TW'; utter.rate = 1.05; utter.pitch = 1.2
+    if (female) utter.voice = female
+    synth.speak(utter)   // 自然排隊，不互相打斷
+  }
 }
 
 export default function GamePage({ embedded = false }: Props) {
@@ -133,11 +192,14 @@ export default function GamePage({ embedded = false }: Props) {
   }, [])  // refs/setters 本身穩定，deps 可為空
 
   // ── Tournament state ──────────────────────────────────────────────────────
-  const [history, setHistory]           = useState<number[][]>([])
-  const [phase, setPhase]               = useState<Phase>('normal')
-  const [appealPlayed, setAppealPlayed] = useState(0)
-  const [appealLoser, setAppealLoser]   = useState(-1)
-  const [showHistory, setShowHistory]   = useState(false)
+  const [history, setHistory]               = useState<number[][]>([])
+  const [phase, setPhase]                   = useState<Phase>('normal')
+  const [appealPlayed, setAppealPlayed]     = useState(0)
+  const [appealLoser, setAppealLoser]       = useState(-1)
+  const [appealGeneration, setAppealGeneration] = useState(0)  // 1=初次申訴 2=第二次（終局）
+  const [isTiebreaking, setIsTiebreaking]   = useState(false)  // 申訴後平局加賽
+  const [multiplier, setMultiplier]         = useState(1)       // 無聊局倍率 1/2/3…
+  const [showHistory, setShowHistory]       = useState(false)
 
   // 全壘打：顯示 5 s 後自動關閉，並念出
   useEffect(() => {
@@ -158,12 +220,18 @@ export default function GamePage({ embedded = false }: Props) {
     setHistory([]); setPhase('normal'); setAppealPlayed(0)
     setAppealLoser(-1); setResult(null); setError(null)
     setGrandSlammer(null); setCurrentGun(null); gunQueueRef.current = []
+    setAppealGeneration(0); setIsTiebreaking(false); setMultiplier(1)
   }
 
   function startAppeal() {
+    const nextGen = appealGeneration + 1
+    setAppealGeneration(nextGen)
     setAppealLoser(lowestPlayer)
     setAppealPlayed(0)
+    setIsTiebreaking(false)
     setPhase('in_appeal')
+    const label = nextGen >= 2 ? '終局申訴，加賽四局開始！' : '加賽四局開始！'
+    if (voiceRef.current) speak(`${DEFAULT_NAMES[lowestPlayer]} 上訴，${label}`, 0.9)
   }
 
   async function playGame() {
@@ -180,43 +248,93 @@ export default function GamePage({ embedded = false }: Props) {
       setResult(data)
 
       // ── 打槍 / 全壘打 通知 ───────────────────────────────────────────────
-      const slam = detectGrandSlam(data.battles)
+      const slam      = detectGrandSlam(data.battles)
+      const gunNotifs = buildGunNotifs(data.battles, slam)
       setGrandSlammer(slam)
       if (!slam) {
-        gunQueueRef.current = buildGunNotifs(data.battles, slam)
+        gunQueueRef.current = gunNotifs
         processNextGun()
       }
 
-      // ── 更新分數 ─────────────────────────────────────────────────────────
-      const newScores = DEFAULT_NAMES.map(n => {
+      // ── 特殊牌型 TTS（打槍/全壘打之後再播）─────────────────────────────
+      const specialLines = buildSpecialTTS(data.players)
+      if (specialLines.length > 0) {
+        const delay = slam
+          ? 4500                                      // 等全壘打 TTS 完
+          : gunNotifs.length * GUN_NOTIF_MS + 800    // 等打槍佇列清空
+        setTimeout(() => {
+          if (voiceRef.current) speakQueue(specialLines)
+        }, delay)
+      }
+
+      // ── 更新分數（乘以本局倍率）─────────────────────────────────────────
+      const rawScores = DEFAULT_NAMES.map(n => {
         const fs = data.final_scores.find((s: any) => s.name === n)
         return fs ? fs.score : 0
       })
-      const newHistory = [...history, newScores]
+      const scaledScores = rawScores.map(s => Math.round(s * multiplier))
+      const newHistory = [...history, scaledScores]
       setHistory(newHistory)
 
+      // 無聊局偵測（所有人得分絕對值 ≤ 1）→ 下局倍率 +1
+      const isBoring = rawScores.every(s => Math.abs(s) <= 1)
+      setMultiplier(isBoring ? multiplier + 1 : 1)
+
       // ── 回合推進 ─────────────────────────────────────────────────────────
+      const newTotals = computeTotals(newHistory)
+
       if (phase === 'normal') {
         if (newHistory.length >= ROUNDS_NORMAL) setPhase('appeal_pending')
       } else if (phase === 'in_appeal') {
-        const newPlayed = appealPlayed + 1
-        if (newPlayed >= ROUNDS_APPEAL) {
-          const newTotals  = computeTotals(newHistory)
-          const newLowest  = lowestIdx(newTotals)
-          if (newLowest !== appealLoser) {
-            setAppealLoser(newLowest)
-            setAppealPlayed(0)
-            setPhase('appeal_pending')
+        const newPlayed  = appealPlayed + 1
+        const minScore   = Math.min(...newTotals)
+        const hasTie     = newTotals.filter(s => s === minScore).length > 1
+
+        // ── 申訴局結算（共用 helper）────────────────────────────────────
+        const endGame = (totals: number[]) => {
+          setPhase('ended')
+          const endWinner = DEFAULT_NAMES[totals.indexOf(Math.max(...totals))]
+          const endLoser  = DEFAULT_NAMES[lowestIdx(totals)]
+          if (voiceRef.current)
+            setTimeout(() => speak(`本場結束！冠軍 ${endWinner}！${endLoser} 請客！`, 0.92), 800)
+        }
+
+        if (isTiebreaking) {
+          // 加賽平局延長中：等平局打破
+          if (hasTie) {
+            setAppealPlayed(newPlayed)
           } else {
-            setPhase('ended')
-            // 本場結束語音（延遲一點，等打槍 TTS 不衝突）
-            const endWinner = DEFAULT_NAMES[newTotals.indexOf(Math.max(...newTotals))]
-            const endLoser  = DEFAULT_NAMES[newLowest]
-            if (voiceRef.current)
-              setTimeout(() => speak(`本場結束！冠軍 ${endWinner}！${endLoser} 請客！`, 0.92), 800)
+            setIsTiebreaking(false)
+            const newLowest = lowestIdx(newTotals)
+            if (newLowest === appealLoser || appealGeneration >= 2) {
+              endGame(newTotals)
+            } else {
+              // 換人最輸，且仍在第一輪申訴 → 給新人申訴資格
+              setAppealLoser(newLowest)
+              setAppealPlayed(0)
+              setPhase('appeal_pending')
+            }
           }
-        } else {
+        } else if (newPlayed < ROUNDS_APPEAL) {
           setAppealPlayed(newPlayed)
+        } else {
+          // 標準申訴局打完
+          if (hasTie) {
+            // 平局 → 進入無限加賽直到分出勝負
+            setIsTiebreaking(true)
+            setAppealPlayed(newPlayed)
+            if (voiceRef.current) setTimeout(() => speak('平局！繼續加賽！', 0.9), 1500)
+          } else {
+            const newLowest = lowestIdx(newTotals)
+            if (newLowest === appealLoser || appealGeneration >= 2) {
+              endGame(newTotals)
+            } else {
+              // 換人最輸（第一輪申訴結束）→ 給新人申訴資格
+              setAppealLoser(newLowest)
+              setAppealPlayed(0)
+              setPhase('appeal_pending')
+            }
+          }
         }
       }
     } catch (e) {
@@ -231,7 +349,8 @@ export default function GamePage({ embedded = false }: Props) {
   const dealLabel  = loading ? '洗牌中…' : '開始發牌'
 
   const roundLabel =
-    phase === 'in_appeal'      ? `申訴加賽 第 ${appealPlayed + 1} / ${ROUNDS_APPEAL} 局` :
+    isTiebreaking              ? `平局加賽 第 ${appealPlayed - ROUNDS_APPEAL + 1} 局` :
+    phase === 'in_appeal'      ? `申訴加賽 第 ${appealPlayed + 1} / ${ROUNDS_APPEAL} 局${appealGeneration >= 2 ? '（終輪）' : ''}` :
     phase === 'appeal_pending' ? `正式賽 ${ROUNDS_NORMAL} 局結束` :
     phase === 'ended'          ? `本場結束（共 ${roundCount} 局）` :
     roundCount === 0           ? '準備開始' :
@@ -314,6 +433,12 @@ export default function GamePage({ embedded = false }: Props) {
         <span className="text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold whitespace-nowrap select-none">
           {roundLabel}
         </span>
+        {/* 倍率標籤：無聊局觸發後亮橘色 */}
+        {multiplier > 1 && (
+          <span className="text-xs px-3 py-1 rounded-full bg-orange-500 text-white font-bold whitespace-nowrap select-none animate-pulse">
+            本局 {multiplier}✕
+          </span>
+        )}
         <div className="flex-1" />
         {phase === 'appeal_pending' && (
           <button onClick={startAppeal} className={BTN}>⚖️ 申訴</button>

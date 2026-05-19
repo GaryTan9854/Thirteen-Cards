@@ -144,6 +144,10 @@ class Hist_Cards13(Hist_Cards):
         br = self.h13.isAllButOneRed()
         if br > 0:
             return "全黑一點紅" if br == 14 else "全黑一張紅"
+        # 兩花色：恰好兩種花色（非全黑/全紅已先攔截），不限張數分配
+        all_suits = set(c.suit for c in self.h13)
+        if len(all_suits) == 2:
+            return "兩花色"
         if self.chk_bigallbig():
             return "大全大"
         if self.chk_allbig():
