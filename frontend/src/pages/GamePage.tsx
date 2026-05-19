@@ -173,8 +173,9 @@ export default function GamePage({ embedded = false }: Props) {
 
   // 語音開關（ref 讓 effect 閉包永遠讀到最新值）
   const [voiceOn, setVoiceOn] = useState(true)
-  const voiceRef  = useRef(true)
-  const ttsGenRef = useRef(0)   // 每局遞增，舊的 TTS 回呼對比後自動放棄
+  const voiceRef   = useRef(true)
+  const ttsGenRef  = useRef(0)   // 每局遞增，舊的 TTS 回呼對比後自動放棄
+  const autoPlayRef = useRef(false)  // appeal YES 後自動發牌
   function toggleVoice() {
     const next = !voiceRef.current
     voiceRef.current = next
@@ -215,6 +216,24 @@ export default function GamePage({ embedded = false }: Props) {
     return () => clearTimeout(t)
   }, [grandSlammer])
 
+  // 自動發牌（appeal YES 後觸發）── 無 deps，每次 render 都檢查
+  useEffect(() => {
+    if (!autoPlayRef.current || !canDeal) return
+    autoPlayRef.current = false
+    playGame()
+  })
+
+  // appeal_pending 語音提示
+  useEffect(() => {
+    if (phase !== 'appeal_pending') return
+    const name = DEFAULT_NAMES[lowestPlayer]
+    const msg = appealGeneration === 0
+      ? `比賽結束，請問 ${name}，你要申訴嗎？`
+      : `申訴局結束，請問 ${name}，你也要申訴嗎？`
+    const t = setTimeout(() => { if (voiceRef.current) speak(msg, 0.88) }, 4000)
+    return () => clearTimeout(t)
+  }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const totalScores  = useMemo(() => computeTotals(history), [history])
   const lowestPlayer = lowestIdx(totalScores)
 
@@ -238,6 +257,18 @@ export default function GamePage({ embedded = false }: Props) {
     setPhase('in_appeal')
     const label = nextGen >= 2 ? '終局申訴，加賽四局開始！' : '加賽四局開始！'
     if (voiceRef.current) speak(`${DEFAULT_NAMES[lowestPlayer]} 上訴，${label}`, 0.9)
+  }
+
+  function handleAppealYes() {
+    startAppeal()
+    autoPlayRef.current = true   // 下一次 render 的無 deps useEffect 會自動發牌
+  }
+
+  function handleAppealNo() {
+    setPhase('ended')
+    const winner = DEFAULT_NAMES[totalScores.indexOf(Math.max(...totalScores))]
+    const loser  = DEFAULT_NAMES[lowestPlayer]
+    if (voiceRef.current) speak(`好的！本場結束！冠軍 ${winner}！${loser} 請客！`, 0.92)
   }
 
   async function playGame() {
@@ -485,9 +516,6 @@ export default function GamePage({ embedded = false }: Props) {
           </span>
         )}
         <div className="flex-1" />
-        {phase === 'appeal_pending' && (
-          <button onClick={startAppeal} className={BTN}>⚖️ 申訴</button>
-        )}
         <button onClick={toggleVoice}
           className={`${BTN} ${!voiceOn ? 'opacity-50' : ''}`}
           title={voiceOn ? '語音開啟（點擊關閉）' : '語音關閉（點擊開啟）'}>
@@ -631,6 +659,33 @@ export default function GamePage({ embedded = false }: Props) {
           </>
         )}
       </div>
+
+      {/* ── 申訴 Popup（正式賽 / 申訴局結束後詢問）───────────────────────── */}
+      {phase === 'appeal_pending' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center"
+             style={{ background: 'rgba(0,0,0,0.78)' }}>
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-8 max-w-xs w-full mx-4 text-center shadow-2xl">
+            <div className="text-5xl mb-4">⚖️</div>
+            <div className="text-sm text-gray-400 mb-1">
+              {appealGeneration === 0 ? `正式賽 ${ROUNDS_NORMAL} 局結束` : '申訴局結束'}
+            </div>
+            <div className="text-xl font-bold text-white mb-1">
+              <span className="text-orange-300">{DEFAULT_NAMES[lowestPlayer]}</span>，你要申訴嗎？
+            </div>
+            <div className="text-xs text-gray-500 mb-5">申訴可加賽 {ROUNDS_APPEAL} 局</div>
+            <div className="flex gap-3 justify-center">
+              <button onClick={handleAppealYes}
+                className="flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-bold text-lg active:scale-95 transition">
+                ✅ 申訴
+              </button>
+              <button onClick={handleAppealNo}
+                className="flex-1 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-bold text-lg active:scale-95 transition">
+                ❌ 不了
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── 打槍 Toast（下方，輕量）─────────────────────────────────────────── */}
       {currentGun && !grandSlammer && (

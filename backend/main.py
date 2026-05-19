@@ -9,7 +9,7 @@ import os
 from game.game import play_one_game
 from game.hands import Hand13
 
-APP_VERSION = "3.3"
+APP_VERSION = "3.4"
 
 app = FastAPI(title="ThirteenCards", version=APP_VERSION)
 
