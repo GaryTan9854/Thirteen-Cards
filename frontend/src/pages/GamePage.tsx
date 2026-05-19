@@ -255,7 +255,8 @@ export default function GamePage({ embedded = false }: Props) {
     setAppealPlayed(0)
     setIsTiebreaking(false)
     setPhase('in_appeal')
-    const label = nextGen >= 2 ? '終局申訴，加賽四局開始！' : '加賽四局開始！'
+    const rounds = nextGen >= 2 ? 1 : ROUNDS_APPEAL
+    const label  = nextGen >= 2 ? `終局申訴，加賽一局！` : `加賽 ${rounds} 局開始！`
     if (voiceRef.current) speak(`${DEFAULT_NAMES[lowestPlayer]} 上訴，${label}`, 0.9)
   }
 
@@ -383,7 +384,7 @@ export default function GamePage({ embedded = false }: Props) {
               setPhase('appeal_pending')
             }
           }
-        } else if (newPlayed < ROUNDS_APPEAL) {
+        } else if (newPlayed < (appealGeneration >= 2 ? 1 : ROUNDS_APPEAL)) {
           setAppealPlayed(newPlayed)
         } else {
           // 標準申訴局打完
@@ -416,9 +417,10 @@ export default function GamePage({ embedded = false }: Props) {
   const canDeal    = phase !== 'appeal_pending' && phase !== 'ended' && !loading
   const dealLabel  = loading ? '洗牌中…' : '開始發牌'
 
+  const appealRounds = appealGeneration >= 2 ? 1 : ROUNDS_APPEAL   // 第二次申訴只得1局
   const roundLabel =
-    isTiebreaking              ? `平局加賽 第 ${appealPlayed - ROUNDS_APPEAL + 1} 局` :
-    phase === 'in_appeal'      ? `申訴加賽 第 ${appealPlayed + 1} / ${ROUNDS_APPEAL} 局${appealGeneration >= 2 ? '（終輪）' : ''}` :
+    isTiebreaking              ? `平局加賽 第 ${appealPlayed - appealRounds + 1} 局` :
+    phase === 'in_appeal'      ? `申訴加賽 第 ${appealPlayed + 1} / ${appealRounds} 局${appealGeneration >= 2 ? '（終輪）' : ''}` :
     phase === 'appeal_pending' ? `正式賽 ${ROUNDS_NORMAL} 局結束` :
     phase === 'ended'          ? `本場結束（共 ${roundCount} 局）` :
     roundCount === 0           ? '準備開始' :
@@ -556,7 +558,7 @@ export default function GamePage({ embedded = false }: Props) {
 
         {phase === 'appeal_pending' && (
           <div className="mt-2 px-3 py-1.5 rounded-xl bg-orange-900/40 text-xs text-orange-300 text-center">
-            ⚖️ <strong>{DEFAULT_NAMES[lowestPlayer]}</strong> 可申訴加賽 {ROUNDS_APPEAL} 局
+            ⚖️ <strong>{DEFAULT_NAMES[lowestPlayer]}</strong> 可申訴加賽 {(appealGeneration + 1) >= 2 ? 1 : ROUNDS_APPEAL} 局
           </div>
         )}
 
@@ -672,7 +674,9 @@ export default function GamePage({ embedded = false }: Props) {
             <div className="text-xl font-bold text-white mb-1">
               <span className="text-orange-300">{DEFAULT_NAMES[lowestPlayer]}</span>，你要申訴嗎？
             </div>
-            <div className="text-xs text-gray-500 mb-5">申訴可加賽 {ROUNDS_APPEAL} 局</div>
+            <div className="text-xs text-gray-500 mb-5">
+              申訴可加賽 {(appealGeneration + 1) >= 2 ? 1 : ROUNDS_APPEAL} 局
+            </div>
             <div className="flex gap-3 justify-center">
               <button onClick={handleAppealYes}
                 className="flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-bold text-lg active:scale-95 transition">
