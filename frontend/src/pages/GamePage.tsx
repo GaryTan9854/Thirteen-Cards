@@ -303,77 +303,81 @@ export default function GamePage({ embedded = false }: Props) {
   }
 
   // ── Tournament status bar ─────────────────────────────────────────────────
+  const BTN = "text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold hover:bg-yellow-300 active:scale-95 transition whitespace-nowrap"
+
   const TournamentBar = () => (
-    <div className="bg-green-900 rounded-2xl p-4 shadow-inner">
-      {/* 局數在左，所有按鈕（黃色）在右 */}
-      <div className="flex items-center gap-1.5 mb-3 flex-wrap">
-        <span className="text-sm text-green-300 font-semibold mr-auto whitespace-nowrap">{roundLabel}</span>
+    <div className="flex flex-col gap-3">
+
+      {/* ── 控制列（無綠底）── */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {/* 局數標籤：黃色但不可按 */}
+        <span className="text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold whitespace-nowrap select-none">
+          {roundLabel}
+        </span>
+        <div className="flex-1" />
         {phase === 'appeal_pending' && (
-          <button onClick={startAppeal}
-            className="text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold hover:bg-yellow-300 active:scale-95 transition whitespace-nowrap">
-            ⚖️ 申訴
-          </button>
+          <button onClick={startAppeal} className={BTN}>⚖️ 申訴</button>
         )}
         <button onClick={toggleVoice}
-          className={`text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold hover:bg-yellow-300 transition ${!voiceOn ? 'opacity-50' : ''}`}
+          className={`${BTN} ${!voiceOn ? 'opacity-50' : ''}`}
           title={voiceOn ? '語音開啟（點擊關閉）' : '語音關閉（點擊開啟）'}>
           {voiceOn ? '🔊' : '🔇'}
         </button>
-        <button onClick={() => setShowHistory(v => !v)}
-          className="text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold hover:bg-yellow-300 transition">
+        <button onClick={() => setShowHistory(v => !v)} className={BTN}>
           {showHistory ? '▾' : '▸'} 成績表
         </button>
-        <button onClick={resetTournament}
-          className="text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold hover:bg-yellow-300 transition whitespace-nowrap">
-          新一場比賽
-        </button>
+        <button onClick={resetTournament} className={BTN}>新一場比賽</button>
         <button onClick={playGame} disabled={!canDeal}
-          className="text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold hover:bg-yellow-300 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+          className={`${BTN} disabled:opacity-50 disabled:cursor-not-allowed`}>
           {dealLabel}
         </button>
       </div>
 
-      <div className="grid grid-cols-4 gap-3">
-        {DEFAULT_NAMES.map((name, i) => (
-          <div key={name} className="flex flex-col items-center">
-            <span className="text-xs text-green-300">{name}</span>
-            <span className={`text-xl font-bold ${scoreColor(totalScores[i])}`}>
-              {fmt(totalScores[i])}
-            </span>
-            {roundCount > 0 && i === lowestPlayer && phase !== 'ended' && (
-              <span className="text-xs text-orange-400 mt-0.5">▼ 最低</span>
-            )}
-            {phase === 'ended' && i === totalScores.indexOf(Math.max(...totalScores)) && (
-              <span className="text-xs text-yellow-400 mt-0.5">🏆 冠軍</span>
-            )}
-            {phase === 'ended' && i === lowestPlayer && (
-              <span className="text-xs text-orange-400 mt-0.5">🍽️ 請客</span>
-            )}
+      {/* ── 累積比分綠框（與本局比分同寬）── */}
+      <div className="bg-green-900 rounded-2xl p-4 shadow-inner">
+        <div className="text-xs text-green-400 mb-2 font-semibold text-center">累積比分</div>
+        <div className="grid grid-cols-4 gap-3">
+          {DEFAULT_NAMES.map((name, i) => (
+            <div key={name} className="flex flex-col items-center">
+              <span className="text-sm text-green-300">{name}</span>
+              <span className={`text-xl font-bold ${scoreColor(totalScores[i])}`}>
+                {fmt(totalScores[i])}
+              </span>
+              {roundCount > 0 && i === lowestPlayer && phase !== 'ended' && (
+                <span className="text-xs text-orange-400 mt-0.5">▼ 最低</span>
+              )}
+              {phase === 'ended' && i === totalScores.indexOf(Math.max(...totalScores)) && (
+                <span className="text-xs text-yellow-400 mt-0.5">🏆 冠軍</span>
+              )}
+              {phase === 'ended' && i === lowestPlayer && (
+                <span className="text-xs text-orange-400 mt-0.5">🍽️ 請客</span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {phase === 'appeal_pending' && (
+          <div className="mt-2 px-3 py-1.5 rounded-xl bg-orange-900/40 text-xs text-orange-300 text-center">
+            ⚖️ <strong>{DEFAULT_NAMES[lowestPlayer]}</strong> 可申訴加賽 {ROUNDS_APPEAL} 局
           </div>
-        ))}
+        )}
+
+        {phase === 'ended' && (
+          <div className="mt-3 bg-gray-800 rounded-xl px-4 py-2.5">
+            <div className="flex items-center justify-between text-sm gap-2">
+              <span className="text-gray-400 font-semibold whitespace-nowrap">🏁 本場結束！</span>
+              <span className="text-gray-300 whitespace-nowrap">
+                <strong className="text-orange-300">{DEFAULT_NAMES[lowestPlayer]}</strong> 請客 🍽️
+              </span>
+              <span className="text-gray-300 whitespace-nowrap">
+                冠軍：<strong className="text-yellow-300">{winnerName}</strong>
+              </span>
+            </div>
+          </div>
+        )}
+
+        {showHistory && <HistoryPanel />}
       </div>
-
-      {phase === 'appeal_pending' && (
-        <div className="mt-2 px-3 py-1.5 rounded-xl bg-orange-900/40 text-xs text-orange-300 text-center">
-          ⚖️ <strong>{DEFAULT_NAMES[lowestPlayer]}</strong> 可申訴加賽 {ROUNDS_APPEAL} 局
-        </div>
-      )}
-
-      {phase === 'ended' && (
-        <div className="mt-3 bg-gray-800 rounded-xl px-4 py-2.5">
-          <div className="flex items-center justify-between text-sm gap-2">
-            <span className="text-gray-400 font-semibold whitespace-nowrap">🏁 本場結束！</span>
-            <span className="text-gray-300 whitespace-nowrap">
-              <strong className="text-orange-300">{DEFAULT_NAMES[lowestPlayer]}</strong> 請客 🍽️
-            </span>
-            <span className="text-gray-300 whitespace-nowrap">
-              冠軍：<strong className="text-yellow-300">{winnerName}</strong>
-            </span>
-          </div>
-        </div>
-      )}
-
-      {showHistory && <HistoryPanel />}
     </div>
   )
 
@@ -438,8 +442,8 @@ export default function GamePage({ embedded = false }: Props) {
               <div className="grid grid-cols-4 gap-3">
                 {result.final_scores.map((fs: any) => (
                   <div key={fs.name} className="flex flex-col items-center">
-                    <span className="text-sm text-green-200 font-medium">{fs.name}</span>
-                    <span className={`text-2xl font-bold ${scoreColor(fs.score)}`}>
+                    <span className="text-sm text-green-300">{fs.name}</span>
+                    <span className={`text-xl font-bold ${scoreColor(fs.score)}`}>
                       {fmt(fs.score)}
                     </span>
                   </div>
