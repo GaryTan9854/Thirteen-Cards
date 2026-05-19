@@ -177,11 +177,20 @@ def generate_5card_options(available: list) -> list:
             options.append(by_rank[tr][:3] + kickers)
 
     # ── 一對 P ───────────────────────────────────────────────────────────
-    # Try all individual pairs (not just the best one)
+    # Try all individual pairs (not just the best one).
+    # Also try kicker sets that SKIP other pair ranks — this frees a high pair
+    # for the top row (e.g. AA mid + QQ top instead of QQAA two-pair everywhere).
     for pr in pair_ranks_desc:
         kickers = _top_n(available, 3, {pr})
         if len(kickers) >= 3:
             options.append(by_rank[pr][:2] + kickers)
+        # Variant: skip each other pair rank so it can go to top/bot
+        for skip in pair_ranks_desc:
+            if skip == pr:
+                continue
+            alt_kickers = _top_n(available, 3, {pr, skip})
+            if len(alt_kickers) >= 3:
+                options.append(by_rank[pr][:2] + alt_kickers)
 
     # ── 亂 R ─────────────────────────────────────────────────────────────
     if len(available) >= 5:
