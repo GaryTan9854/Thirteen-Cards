@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { GameResult } from '../types/game'
 import PlayerPanel from '../components/PlayerPanel'
 import BattleLog from '../components/BattleLog'
@@ -19,7 +19,12 @@ const GUN_NOTIF_MS  = 2400   // 每個打槍通知顯示時間
 
 type Phase = 'normal' | 'appeal_pending' | 'in_appeal' | 'ended'
 
-interface GunNotif { id: number; winner: string; loser: string }
+interface GunNotif {
+  id:     number
+  winner: string
+  loser:  string | null   // null = 打槍兩人
+  count:  1 | 2
+}
 
 interface Props {
   embedded?: boolean
@@ -47,15 +52,21 @@ function detectGrandSlam(battles: any[]): string | null {
   return entry ? entry[0] : null
 }
 
-// ── 打槍 event list ───────────────────────────────────────────────────────────
-function detectGuns(battles: any[]): GunNotif[] {
-  return battles
-    .filter(b => b.gun !== 0)
-    .map((b, idx) => ({
-      id:     Date.now() + idx,
-      winner: b.gun === 1 ? b.p1 : b.p2,
-      loser:  b.gun === 1 ? b.p2 : b.p1,
-    }))
+// ── 打槍 event builder（同一人打兩人 → 合併成打槍兩人）─────────────────────
+function buildGunNotifs(battles: any[], slam: string | null): GunNotif[] {
+  const byWinner: Record<string, string[]> = {}
+  for (const b of battles) {
+    if      (b.gun === 1)  { byWinner[b.p1] = [...(byWinner[b.p1] ?? []), b.p2] }
+    else if (b.gun === -1) { byWinner[b.p2] = [...(byWinner[b.p2] ?? []), b.p1] }
+  }
+  let id = Date.now()
+  const notifs: GunNotif[] = []
+  for (const [winner, losers] of Object.entries(byWinner)) {
+    if (winner === slam) continue            // grand slam 已獨立處理
+    if      (losers.length === 1) notifs.push({ id: id++, winner, loser: losers[0], count: 1 })
+    else if (losers.length === 2) notifs.push({ id: id++, winner, loser: null,      count: 2 })
+  }
+  return notifs
 }
 
 // ── 女聲 TTS（Web Speech API，優先 zh-TW）────────────────────────────────────
@@ -93,9 +104,9 @@ export default function GamePage({ embedded = false }: Props) {
   const [strategies, setStrategies] = useState<string[]>(['rule_base_as','rule_base_as','rule_base_as','rule_base_as'])
   const [grandSlammer, setGrandSlammer] = useState<string | null>(null)
 
-  // 打槍通知佇列
-  const [gunQueue,   setGunQueue]  = useState<GunNotif[]>([])
-  const [currentGun, setCurrentGun] = useState<GunNotif | null>(null)
+  // 打槍通知佇列（用 ref 避免 effect cleanup 把 timeout 清掉）
+  const [currentGun,  setCurrentGun]  = useState<GunNotif | null>(null)
+  const gunQueueRef = useRef<GunNotif[]>([])
 
   // 語音開關（ref 讓 effect 閉包永遠讀到最新值）
   const [voiceOn, setVoiceOn] = useState(true)
@@ -105,6 +116,21 @@ export default function GamePage({ embedded = false }: Props) {
     voiceRef.current = next
     setVoiceOn(next)
   }
+
+  // 遞迴消化打槍佇列（useCallback 保持穩定引用，才能在 setTimeout 裡正確遞迴）
+  const processNextGun = useCallback(() => {
+    const q = gunQueueRef.current
+    if (q.length === 0) { setCurrentGun(null); return }
+    const [next, ...rest] = q
+    gunQueueRef.current = rest
+    setCurrentGun(next)
+    if (voiceRef.current) {
+      speak(next.count === 2
+        ? `${next.winner} 打槍兩人！`
+        : `${next.winner} 打槍 ${next.loser}`)
+    }
+    setTimeout(processNextGun, GUN_NOTIF_MS)
+  }, [])  // refs/setters 本身穩定，deps 可為空
 
   // ── Tournament state ──────────────────────────────────────────────────────
   const [history, setHistory]           = useState<number[][]>([])
@@ -121,17 +147,6 @@ export default function GamePage({ embedded = false }: Props) {
     return () => clearTimeout(t)
   }, [grandSlammer])
 
-  // 打槍佇列：一次顯示一個，結束後自動顯示下一個
-  useEffect(() => {
-    if (currentGun !== null || gunQueue.length === 0) return
-    const [next, ...rest] = gunQueue
-    setCurrentGun(next)
-    setGunQueue(rest)
-    if (voiceRef.current) speak(`${next.winner} 打槍 ${next.loser}`)
-    const t = setTimeout(() => setCurrentGun(null), GUN_NOTIF_MS)
-    return () => clearTimeout(t)
-  }, [currentGun, gunQueue])
-
   const totalScores  = useMemo(() => computeTotals(history), [history])
   const lowestPlayer = lowestIdx(totalScores)
 
@@ -142,7 +157,7 @@ export default function GamePage({ embedded = false }: Props) {
   function resetTournament() {
     setHistory([]); setPhase('normal'); setAppealPlayed(0)
     setAppealLoser(-1); setResult(null); setError(null)
-    setGrandSlammer(null); setGunQueue([]); setCurrentGun(null)
+    setGrandSlammer(null); setCurrentGun(null); gunQueueRef.current = []
   }
 
   function startAppeal() {
@@ -153,7 +168,7 @@ export default function GamePage({ embedded = false }: Props) {
 
   async function playGame() {
     setLoading(true); setError(null)
-    setCurrentGun(null); setGunQueue([])   // 清掉上一局的通知
+    setCurrentGun(null); gunQueueRef.current = []   // 清掉上一局的通知
     try {
       const res = await fetch('/api/game/play', {
         method: 'POST',
@@ -167,7 +182,10 @@ export default function GamePage({ embedded = false }: Props) {
       // ── 打槍 / 全壘打 通知 ───────────────────────────────────────────────
       const slam = detectGrandSlam(data.battles)
       setGrandSlammer(slam)
-      if (!slam) setGunQueue(detectGuns(data.battles))
+      if (!slam) {
+        gunQueueRef.current = buildGunNotifs(data.battles, slam)
+        processNextGun()
+      }
 
       // ── 更新分數 ─────────────────────────────────────────────────────────
       const newScores = DEFAULT_NAMES.map(n => {
@@ -348,13 +366,13 @@ export default function GamePage({ embedded = false }: Props) {
 
       {phase === 'ended' && (
         <div className="mt-3 bg-gray-800 rounded-xl px-4 py-2.5">
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center justify-between text-sm gap-2">
             <span className="text-gray-400 font-semibold whitespace-nowrap">🏁 本場結束！</span>
-            <span className="text-gray-300">
-              冠軍：<strong className="text-yellow-300">{winnerName}</strong>
-            </span>
             <span className="text-gray-300 whitespace-nowrap">
               <strong className="text-orange-300">{DEFAULT_NAMES[lowestPlayer]}</strong> 請客 🍽️
+            </span>
+            <span className="text-gray-300 whitespace-nowrap">
+              冠軍：<strong className="text-yellow-300">{winnerName}</strong>
             </span>
           </div>
         </div>
@@ -485,25 +503,24 @@ export default function GamePage({ embedded = false }: Props) {
         <div className="fixed bottom-14 left-0 right-0 z-40 flex justify-center pointer-events-none">
           <div
             className="text-center px-10 py-4 rounded-2xl shadow-2xl border border-red-700/50"
-            style={{
-              background: 'rgba(10,0,0,0.88)',
-              animation: 'gunShot 0.28s ease-out',
-            }}
+            style={{ background: 'rgba(10,0,0,0.88)', animation: 'gunShot 0.28s ease-out' }}
           >
-            <div className="text-5xl mb-1.5">🔫</div>
+            {/* 槍口朝右 */}
+            <div className="text-5xl mb-1.5" style={{ display:'inline-block', transform:'scaleX(-1)' }}>🔫</div>
             <div
               className="text-3xl font-black tracking-widest"
-              style={{
-                color: '#f87171',
-                textShadow: '0 0 22px rgba(239,68,68,0.75)',
-              }}
+              style={{ color: '#f87171', textShadow: '0 0 22px rgba(239,68,68,0.75)' }}
             >
-              打槍！
+              {currentGun.count === 2 ? '打槍兩人！' : '打槍！'}
             </div>
             <div className="text-base text-gray-300 mt-1.5">
               <span className="font-bold text-red-300">{currentGun.winner}</span>
-              <span className="text-gray-500 mx-1.5">轟掉</span>
-              <span className="text-gray-400">{currentGun.loser}</span>
+              {currentGun.count === 1 && (
+                <>
+                  <span className="text-gray-500 mx-1.5">轟掉</span>
+                  <span className="text-gray-400">{currentGun.loser}</span>
+                </>
+              )}
             </div>
           </div>
         </div>
