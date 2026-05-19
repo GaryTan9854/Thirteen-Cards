@@ -251,11 +251,21 @@ def spare_variants(top3: list, mid5: list):
 
 def score_arrangement(h3: Hand3, hm: Hand5, hb: Hand5) -> float:
     """
-    攻擊分 = 頭名次% + 中名次% + 尾名次%，最大 3.0。
-    三墩同等重要；尾墩若弱於 66432（不入尾墩池）計 0。
+    期望得分指標（含打槍加成）：
+
+      score = (p1+p2+p3) + 1.5·p1p2p3 - 1.5·(1-p1)(1-p2)(1-p3)
+
+    推導自 1v1 對決期望得分（打槍/被打槍各有 2× 乘數）：
+      E = 2(p1+p2+p3) - 3 + 3·p1p2p3 - 3·(1-p1)(1-p2)(1-p3)
+
+    - 打槍加成使「三墩均強」獲得額外獎勵（打槍機率高）
+    - 被打槍懲罰使「一墩極強但其他兩墩極弱」受到正確懲罰
+    - 尾墩弱於 66432（不入尾墩池）計 p3=0（必輸）
     """
-    p3 = pct5_bot(hb)
-    return pct3(h3) + pct5_mid(hm) + (p3 if p3 is not None else 0.0)
+    p1 = pct3(h3)
+    p2 = pct5_mid(hm)
+    p3 = pct5_bot(hb) or 0.0
+    return (p1 + p2 + p3) + 1.5 * p1 * p2 * p3 - 1.5 * (1-p1) * (1-p2) * (1-p3)
 
 
 def score_defensive(h3: Hand3, hm: Hand5, hb: Hand5) -> float:
