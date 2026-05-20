@@ -343,9 +343,66 @@ def best_arrangement_simple(handstrs: list):
     ))
 
 
+def _try_four_pairs(handstrs: list):
+    """
+    四輪車 domain rule:  P, P, 2P → [次大P 頭墩] [最大P 中墩] [兩小P 尾墩]
+
+    Fires only when:
+      • exactly 4 ranks with count == 2  (no trips / quads)
+      • exactly 5 ranks with count == 1
+      • no suit has ≥5 cards (i.e. no flush available — let normal scoring
+        handle flush-heavy four-pair hands)
+
+    Kicker policy:
+      • top  ← highest single  (maximise the weakest row)
+      • bot  ← lowest  single  (kicker barely matters in a 2-pair bot)
+      • mid  ← remaining 3 singles
+
+    Returns (Hand3, Hand5, Hand5) or None if conditions not met.
+    """
+    by_rank: dict = defaultdict(list)
+    by_suit: dict = defaultdict(list)
+    for cs in handstrs:
+        by_rank[int(cs[:2])].append(cs)
+        by_suit[cs[2]].append(cs)
+
+    pair_ranks   = sorted([r for r, cs in by_rank.items() if len(cs) == 2], reverse=True)
+    single_ranks = [r for r, cs in by_rank.items() if len(cs) == 1]
+
+    if len(pair_ranks) != 4 or len(single_ranks) != 5:
+        return None
+
+    # If a flush is available, let normal scoring decide (flush > two pair)
+    if any(len(cs) >= 5 for cs in by_suit.values()):
+        return None
+
+    # pair_ranks desc: [p0(largest), p1(2nd), p2(3rd), p3(4th/smallest)]
+    p0, p1, p2, p3 = pair_ranks
+
+    singles = sorted(
+        [cs for r in single_ranks for cs in by_rank[r]],
+        key=lambda cs: -int(cs[:2])
+    )  # singles high → low
+
+    top_cards = by_rank[p1] + [singles[0]]                     # 次大P + highest single
+    mid_cards = by_rank[p0] + singles[1:4]                     # 最大P + middle 3 singles
+    bot_cards = by_rank[p2] + by_rank[p3] + [singles[4]]       # 兩小P + lowest single
+
+    h3 = Hand3(top_cards);  h3.score_hand()
+    hm = Hand5(mid_cards);  hm.score_hand()
+    hb = Hand5(bot_cards);  hb.score_hand()
+
+    if h3.score <= hm.score <= hb.score:
+        return (h3, hm, hb)
+    return None  # shouldn't happen for valid 4-pair hands
+
+
 def best_arrangement(handstrs: list):
     """
     Rule-Base 攻守：雙模式評分選最佳排列。
+
+    特殊牌型優先：
+      • 四輪車（恰好4對+5單張，無同花）→ 固定排法 [次大P] [最大P] [兩小P]
 
     攻牌模式觸發條件（兩者皆需）：
       1. 任一候選可 eval_attack
@@ -358,6 +415,11 @@ def best_arrangement(handstrs: list):
     防守模式：score = -(1-p1)(1-p2)(1-p3)
     同時獎勵「穿透策略」（一墩接近0%輸）和「均衡策略」（三墩各≈60%）。
     """
+    # ── 四輪車 special rule ──────────────────────────────────────────────
+    fp = _try_four_pairs(handstrs)
+    if fp:
+        return fp
+
     candidates = enumerate_arrangements(handstrs)
     if not candidates:
         return None
