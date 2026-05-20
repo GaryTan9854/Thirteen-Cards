@@ -309,12 +309,15 @@ def score_arrangement(h3: Hand3, hm: Hand5, hb: Hand5) -> float:
 
 def score_defensive(h3: Hand3, hm: Hand5, hb: Hand5) -> float:
     """
-    防守分 = -(1-p1)(1-p2)(1-p3)。最小化「三墩全輸（被打槍）」機率。
+    防守分 = p1+p2+p3 - 1.5*(1-p1)(1-p2)(1-p3)。
+    兼顧兩個目標：① 最大化各墩個別勝率之和，② 懲罰三墩全輸（打槍）機率。
+    舊公式 -(1-p1)(1-p2)(1-p3) 只看乘積，會被單一超強位置（如 p2≈0.985 的三條10）
+    主宰，使弱葫蘆留在尾墩、強葫蘆機會被浪費。
     """
     p1 = winrate3(h3)
     p2 = winrate5_mid(hm)
     p3 = _bot_strength(hb)
-    return -(1 - p1) * (1 - p2) * (1 - p3)
+    return p1 + p2 + p3 - 1.5 * (1 - p1) * (1 - p2) * (1 - p3)
 
 
 def best_arrangement_simple(handstrs: list):
