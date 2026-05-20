@@ -1,6 +1,6 @@
 import secrets
 
-Suits = {"H": "♡", "S": "♠", "D": "♢", "C": "♣"}
+Suits = {"H": "♥", "S": "♠", "D": "♦", "C": "♣"}
 Values = {**{i: str(i) for i in range(2, 11)}, **{11: "J", 12: "Q", 13: "K", 14: "A"}}
 
 HandCat = {

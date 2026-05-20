@@ -9,7 +9,7 @@ import os
 from game.game import play_one_game
 from game.hands import Hand13
 
-APP_VERSION = "3.20"
+APP_VERSION = "4.0"
 
 app = FastAPI(title="ThirteenCards", version=APP_VERSION)
 
@@ -277,9 +277,9 @@ def manual_arrange_info(req: ManualInfoRequest):
 
     def _arr_to_dict(h3, hm, hb):
         return {
-            "top":      [c.cardstr() for c in h3.cards],
-            "mid":      [c.cardstr() for c in hm.cards],
-            "bot":      [c.cardstr() for c in hb.cards],
+            "top":      [c.cardstr() for c in h3],
+            "mid":      [c.cardstr() for c in hm],
+            "bot":      [c.cardstr() for c in hb],
             "top_type": _row_label(h3.handtype_val),
             "mid_type": _row_label(hm.handtype_val),
             "bot_type": _row_label(hb.handtype_val),

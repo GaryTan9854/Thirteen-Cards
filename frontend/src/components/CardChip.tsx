@@ -3,7 +3,7 @@ interface Props {
 }
 
 export default function CardChip({ card }: Props) {
-  const isRed = card.startsWith('♡') || card.startsWith('♢')
+  const isRed = card.startsWith('♥') || card.startsWith('♦')
   return (
     <span
       className={`inline-flex items-center justify-center w-10 h-14 rounded-lg border-2 text-sm font-bold shadow-sm select-none
