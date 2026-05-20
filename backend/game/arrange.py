@@ -426,16 +426,15 @@ def best_arrangement(handstrs: list):
 
     best_def = max(candidates, key=lambda t: score_defensive(*t))
 
-    can_attack = any(eval_attack(*c) for c in candidates)
-    if can_attack:
-        best_att = max(candidates, key=lambda t: score_arrangement(*t))
-        # 尾墩需達同花以上才算真正攻牌；否則退回防守模式
-        if best_att[2].handtype_val >= 5:  # 5 = 同花，尾墩需達同花以上才算攻牌
-            # 如果防守最佳排列的尾墩牌型比攻擊最佳排列更強（例如葫蘆 > 同花），
-            # 優先選防守排列：更強的尾墩意味著更低的被打槍風險，不應為均衡性放棄。
-            if best_def[2].handtype_val > best_att[2].handtype_val:
-                return best_def
-            return best_att
+    # 攻擊候選：三墩同時通過 eval_attack 門檻（頭≥AJ2 中≥JJ33+2 尾≥23457同花）
+    # best_att 只從這些候選中選，確保選出的攻擊排列本身也符合門檻。
+    attack_cands = [c for c in candidates if eval_attack(*c)]
+    if attack_cands:
+        best_att = max(attack_cands, key=lambda t: score_arrangement(*t))
+        # 防守最佳排列若尾墩牌型更強（例如葫蘆 > 同花），優先選防守排列。
+        if best_def[2].handtype_val > best_att[2].handtype_val:
+            return best_def
+        return best_att
 
     return best_def
 
