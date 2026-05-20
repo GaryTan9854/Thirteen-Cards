@@ -2,15 +2,17 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { GameResult } from '../types/game'
 import PlayerPanel from '../components/PlayerPanel'
 import BattleLog from '../components/BattleLog'
+import ManualArrange from '../components/ManualArrange'
 
 const DEFAULT_NAMES = ['Glory', 'Jack', 'Ian', 'Gary']
-const STRATEGIES = ['rule_base_1', 'rule_base_as', 'monte_carlo', 'ai_model', 'random']
+const STRATEGIES = ['rule_base_1', 'rule_base_as', 'monte_carlo', 'ai_model', 'random', 'manual']
 const STRATEGY_LABEL: Record<string, string> = {
   rule_base_1:  'Rule-Base 1 (Σ%)',
   rule_base_as: 'Rule-Base 攻守',
   monte_carlo:  'Monte Carlo',
   ai_model:     'AI 神經網路',
   random:       '隨機',
+  manual:       '自己排牌',
 }
 
 const ROUNDS_NORMAL = 16
@@ -207,7 +209,20 @@ export default function GamePage({ embedded = false }: Props) {
   const [multiplier, setMultiplier]         = useState(1)       // 無聊局倍率 1/2/3…
   const [roundMultipliers, setRoundMultipliers] = useState<number[]>([])  // 每局實際倍率
   const [historyView, setHistoryView]       = useState<0|1|2>(0)  // 0=收起 1=單場 2=累計
-  const [appealerPerRound, setAppealerPerRound] = useState<number[]>([])  // 每申訴局的申訴者
+  // circleMarks[roundIdx] = 要圈起的玩家 index
+  // 僅標記：第16局（正式賽結束）& 最後一局（申訴結束）
+  const [circleMarks, setCircleMarks]       = useState<Record<number,number>>({})
+
+  // ── 自己排牌 state ────────────────────────────────────────────────────────
+  // manualPlayer: 正在人工排牌的玩家 index（-1 = 無）
+  const [manualPlayer, setManualPlayer]     = useState(-1)
+  // manualConflict: 多人選自排時詢問 user 要給誰
+  const [manualConflict, setManualConflict] = useState(false)
+  // pendingHand: 等待人工排牌的原始手牌（cardstrs）
+  const pendingHandRef = useRef<string[] | null>(null)
+  // pendingResolve: 排牌完成後呼叫，注入結果繼續發牌
+  const pendingResolveRef = useRef<((top:string[],mid:string[],bot:string[])=>void)|null>(null)
+  const [showManualUI, setShowManualUI]     = useState(false)
 
   // 全壘打：顯示 5 s 後自動關閉，並念出
   useEffect(() => {
@@ -239,7 +254,15 @@ export default function GamePage({ embedded = false }: Props) {
   const lowestPlayer = lowestIdx(totalScores)
 
   function setStrategy(idx: number, val: string) {
-    setStrategies(prev => prev.map((s, i) => i === idx ? val : s))
+    setStrategies(prev => {
+      const next = prev.map((s, i) => i === idx ? val : s)
+      // 若超過一人選「自己排牌」→ 跳出衝突選人對話框
+      const manuals = next.reduce((acc, s, i) => s === 'manual' ? [...acc, i] : acc, [] as number[])
+      if (manuals.length > 1) setManualConflict(true)
+      else if (manuals.length === 1) setManualPlayer(manuals[0])
+      else setManualPlayer(-1)
+      return next
+    })
   }
 
   function resetTournament() {
@@ -247,7 +270,8 @@ export default function GamePage({ embedded = false }: Props) {
     setAppealLoser(-1); setResult(null); setError(null)
     setGrandSlammer(null); setCurrentGun(null); gunQueueRef.current = []
     setAppealGeneration(0); setIsTiebreaking(false); setMultiplier(1); setRoundMultipliers([])
-    setAppealerPerRound([])
+    setCircleMarks({})
+    setShowManualUI(false); pendingHandRef.current = null; pendingResolveRef.current = null
   }
 
   function startAppeal() {
@@ -282,10 +306,40 @@ export default function GamePage({ embedded = false }: Props) {
     setCurrentGun(null); gunQueueRef.current = []
     window.speechSynthesis?.cancel()               // 清掉上一局殘留 TTS
     try {
+      // ── 自己排牌：先發牌，等人工排完再送出 ──────────────────────────
+      let preDelt: string[][] | null = null
+      let manualOverride: { player: number; top: string[]; mid: string[]; bot: string[] } | null = null
+
+      if (manualPlayer >= 0) {
+        // Step 1: deal
+        const dealRes = await fetch('/api/game/deal', { method: 'POST' })
+        if (!dealRes.ok) throw new Error(`Deal HTTP ${dealRes.status}`)
+        const dealData: { hands: string[][] } = await dealRes.json()
+        preDelt = dealData.hands
+
+        // Step 2: show manual arrange UI and wait
+        const myHand = dealData.hands[manualPlayer]
+        pendingHandRef.current = myHand
+        setShowManualUI(true)
+        setLoading(false)
+
+        const arranged = await new Promise<{ top: string[]; mid: string[]; bot: string[] }>(resolve => {
+          pendingResolveRef.current = (top, mid, bot) => resolve({ top, mid, bot })
+        })
+        setShowManualUI(false)
+        setLoading(true)
+        manualOverride = { player: manualPlayer, ...arranged }
+      }
+
       const res = await fetch('/api/game/play', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ player_names: DEFAULT_NAMES, strategies }),
+        body: JSON.stringify({
+          player_names: DEFAULT_NAMES,
+          strategies,
+          ...(preDelt   ? { pre_dealt: preDelt }                : {}),
+          ...(manualOverride ? { overrides: [manualOverride] }  : {}),
+        }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data: GameResult = await res.json()
@@ -347,7 +401,10 @@ export default function GamePage({ embedded = false }: Props) {
       const newHistory = [...history, scaledScores]
       setHistory(newHistory)
       setRoundMultipliers(prev => [...prev, multiplier])   // 記錄本局倍率
-      if (phase === 'in_appeal') setAppealerPerRound(prev => [...prev, appealLoser])
+      // 第16局結束（正式賽最後一局）→ 圈起當下輸家
+      if (phase === 'normal' && newHistory.length === ROUNDS_NORMAL) {
+        setCircleMarks(prev => ({ ...prev, [ROUNDS_NORMAL - 1]: lowestIdx(newTotals) }))
+      }
 
       // 無聊局偵測（所有人得分絕對值 ≤ 1）→ 下局倍率 +1，且在本局所有 TTS 結束後播報
       const isBoring = rawScores.every(s => Math.abs(s) <= 1)
@@ -384,6 +441,8 @@ export default function GamePage({ embedded = false }: Props) {
         // ── 申訴局結算（共用 helper）────────────────────────────────────
         const endGame = (totals: number[]) => {
           setPhase('ended')
+          // 申訴最後一局（第20局或加賽最後一局）→ 圈起最終輸家
+          setCircleMarks(prev => ({ ...prev, [newHistory.length - 1]: lowestIdx(totals) }))
           const endWinner = DEFAULT_NAMES[totals.indexOf(Math.max(...totals))]
           const endLoser  = DEFAULT_NAMES[lowestIdx(totals)]
           if (voiceRef.current)
@@ -484,25 +543,23 @@ export default function GamePage({ embedded = false }: Props) {
         {rounds.map((scores, i) => {
           const roundIdx = base + i          // 0-based global round index
           const mul = roundMultipliers[roundIdx] ?? 1
-          // 申訴局：appealerPerRound[roundIdx - ROUNDS_NORMAL] 記錄申訴者
-          const isAppealRound = roundIdx >= ROUNDS_NORMAL
-          const appealer = isAppealRound ? (appealerPerRound[roundIdx - ROUNDS_NORMAL] ?? -1) : -1
+          const circledPlayer = circleMarks[roundIdx] ?? -1
           return (
             <div key={i} className="flex items-center">
-              <span className={`w-11 shrink-0 text-sm leading-tight ${isAppealRound ? 'text-orange-400' : 'text-gray-500'}`}>
+              <span className="w-11 shrink-0 text-gray-500 text-sm leading-tight">
                 {roundIdx + 1}
                 {mul > 1 && (
                   <span className="text-orange-400 font-bold text-xs ml-0.5">×{mul}</span>
                 )}
               </span>
-              {scores.map((s, j) => {
-                const circle = isAppealRound && j === appealer
-                return (
-                  <span key={j} className={`flex-1 text-center text-sm ${scoreColor(s)} ${circle ? 'outline outline-1 outline-orange-400 rounded-full mx-0.5' : ''}`}>
-                    {fmt(s)}
-                  </span>
-                )
-              })}
+              {scores.map((s, j) => (
+                <span key={j} className="flex-1 flex justify-center items-center text-sm">
+                  {j === circledPlayer
+                    ? <span className={`${scoreColor(s)} outline outline-1 outline-orange-400 rounded-full inline-flex items-center justify-center min-w-[1.4rem] h-[1.4rem] text-xs leading-none px-0.5`}>{fmt(s)}</span>
+                    : <span className={scoreColor(s)}>{fmt(s)}</span>
+                  }
+                </span>
+              ))}
             </div>
           )
         })}
@@ -628,6 +685,47 @@ export default function GamePage({ embedded = false }: Props) {
 
   return (
     <div className={embedded ? '' : 'min-h-screen bg-green-950 text-white'}>
+
+      {/* ── 自己排牌 overlay ──────────────────────────────────────────────── */}
+      {showManualUI && pendingHandRef.current && (
+        <ManualArrange
+          hand={pendingHandRef.current}
+          onConfirm={(top, mid, bot) => {
+            pendingResolveRef.current?.(top, mid, bot)
+            pendingResolveRef.current = null
+          }}
+          onCancel={() => {
+            setShowManualUI(false)
+            setLoading(false)
+            pendingResolveRef.current = null
+          }}
+        />
+      )}
+
+      {/* ── 多人選自排衝突對話框 ─────────────────────────────────────────── */}
+      {manualConflict && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 rounded-2xl p-6 w-72 shadow-2xl text-center">
+            <p className="text-sm text-gray-300 mb-4">
+              目前暫只允許選一家來人工排牌，你想選誰的牌？
+            </p>
+            <div className="flex flex-col gap-2">
+              {DEFAULT_NAMES.map((name, i) => (
+                <button key={i}
+                  onClick={() => {
+                    setManualPlayer(i)
+                    setStrategies(prev => prev.map((s, j) => j === i ? 'manual' : s === 'manual' ? 'rule_base_as' : s))
+                    setManualConflict(false)
+                  }}
+                  className="px-4 py-2 rounded-lg bg-yellow-400 text-gray-900 font-bold text-sm hover:bg-yellow-300"
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {!embedded && (
         <div className="px-6 py-3 bg-green-900 shadow">

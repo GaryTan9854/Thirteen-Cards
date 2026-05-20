@@ -133,17 +133,40 @@ def _arrange(hand_cards, strategy: str) -> 'Hand13':
     return h
 
 
-def play_one_game(player_names=None, strategies=None):
+def deal_game() -> list:
+    """Deal 4 hands and return them as list of cardstr lists (not Card objects)."""
+    deck = Deck()
+    raw = deck.distribute()   # list of 4 Card-object lists
+    return [[c.cardstr() for c in hand] for hand in raw]
+
+
+def play_one_game(player_names=None, strategies=None,
+                  pre_dealt=None, overrides=None):
+    """
+    pre_dealt  : [[cardstrs]*13]*4  – use these dealt hands instead of dealing fresh
+    overrides  : [{player:int, top:[cs], mid:[cs], bot:[cs]}]
+                 – skip arrangement for the listed players; use the given rows instead
+    """
     if player_names is None:
         player_names = ["Glory", "Jack", "Ian", "Gary"]
     if strategies is None:
         strategies = ['rule_base'] * 4
 
     myDeck = Deck()
-    hands = myDeck.distribute()
+    if pre_dealt:
+        # Convert cardstr lists back to Card-object lists
+        hands = [[c for c in Hand13(h)] for h in pre_dealt]
+    else:
+        hands = myDeck.distribute()
 
     players_data = []
     hand13_list = []
+
+    # Build override lookup {player_idx: {top, mid, bot}}
+    override_map = {}
+    if overrides:
+        for ov in overrides:
+            override_map[ov['player']] = ov
 
     for idx, name in enumerate(player_names):
         strategy = strategies[idx] if idx < len(strategies) else 'rule_base'
@@ -151,13 +174,23 @@ def play_one_game(player_names=None, strategies=None):
         sp = h13.chk_special()
         h13.specialhand = sp
         if sp == "normal":
-            arranged = _arrange(hands[idx], strategy)
-            h13.htop = arranged.htop
-            h13.hmid = arranged.hmid
-            h13.hbot = arranged.hbot
-            h13.ss   = arranged.ss
-            h13.totalscore = arranged.totalscore
-            h13.CanAttack  = getattr(arranged, 'CanAttack', False)
+            if idx in override_map:
+                # Manual arrangement: build Hand3/Hand5 from submitted cardstrs
+                ov = override_map[idx]
+                h13.htop = Hand3(ov['top']); h13.htop.score_hand()
+                h13.hmid = Hand5(ov['mid']); h13.hmid.score_hand()
+                h13.hbot = Hand5(ov['bot']); h13.hbot.score_hand()
+                h13.ss   = [h13.htop.score, h13.hmid.score, h13.hbot.score]
+                h13.totalscore = sum(h13.ss)
+                h13.CanAttack  = False
+            else:
+                arranged = _arrange(hands[idx], strategy)
+                h13.htop = arranged.htop
+                h13.hmid = arranged.hmid
+                h13.hbot = arranged.hbot
+                h13.ss   = arranged.ss
+                h13.totalscore = arranged.totalscore
+                h13.CanAttack  = getattr(arranged, 'CanAttack', False)
         hand13_list.append(h13)
 
         original_display = [c.show() for c in sorted(hands[idx])]
