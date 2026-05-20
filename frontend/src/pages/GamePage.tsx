@@ -206,7 +206,8 @@ export default function GamePage({ embedded = false }: Props) {
   const [isTiebreaking, setIsTiebreaking]   = useState(false)  // 申訴後平局加賽
   const [multiplier, setMultiplier]         = useState(1)       // 無聊局倍率 1/2/3…
   const [roundMultipliers, setRoundMultipliers] = useState<number[]>([])  // 每局實際倍率
-  const [showHistory, setShowHistory]       = useState(false)
+  const [historyView, setHistoryView]       = useState<0|1|2>(0)  // 0=收起 1=單場 2=累計
+  const [appealerPerRound, setAppealerPerRound] = useState<number[]>([])  // 每申訴局的申訴者
 
   // 全壘打：顯示 5 s 後自動關閉，並念出
   useEffect(() => {
@@ -246,6 +247,7 @@ export default function GamePage({ embedded = false }: Props) {
     setAppealLoser(-1); setResult(null); setError(null)
     setGrandSlammer(null); setCurrentGun(null); gunQueueRef.current = []
     setAppealGeneration(0); setIsTiebreaking(false); setMultiplier(1); setRoundMultipliers([])
+    setAppealerPerRound([])
   }
 
   function startAppeal() {
@@ -345,6 +347,7 @@ export default function GamePage({ embedded = false }: Props) {
       const newHistory = [...history, scaledScores]
       setHistory(newHistory)
       setRoundMultipliers(prev => [...prev, multiplier])   // 記錄本局倍率
+      if (phase === 'in_appeal') setAppealerPerRound(prev => [...prev, appealLoser])
 
       // 無聊局偵測（所有人得分絕對值 ≤ 1）→ 下局倍率 +1，且在本局所有 TTS 結束後播報
       const isBoring = rawScores.every(s => Math.abs(s) <= 1)
@@ -457,8 +460,15 @@ export default function GamePage({ embedded = false }: Props) {
   // ── Score history panel（左右兩欄，最多各 10 局，字體放大）────────────────
   const HistoryPanel = () => {
     const SPLIT = 10
-    const leftRounds  = history.slice(0, SPLIT)
-    const rightRounds = history.slice(SPLIT)
+    // 累計模式：每局結束後的累積分
+    const runningTotals = useMemo(
+      () => history.map((_, i) => computeTotals(history.slice(0, i + 1))),
+      [history]
+    )
+    const displayRows = historyView === 2 ? runningTotals : history
+
+    const leftRounds  = displayRows.slice(0, SPLIT)
+    const rightRounds = displayRows.slice(SPLIT)
 
     const ColHeader = () => (
       <div className="flex mb-1">
@@ -468,21 +478,31 @@ export default function GamePage({ embedded = false }: Props) {
         ))}
       </div>
     )
+
     const ColRows = ({ rounds, base }: { rounds: number[][], base: number }) => (
       <>
         {rounds.map((scores, i) => {
-          const mul = roundMultipliers[base + i] ?? 1
+          const roundIdx = base + i          // 0-based global round index
+          const mul = roundMultipliers[roundIdx] ?? 1
+          // 申訴局：appealerPerRound[roundIdx - ROUNDS_NORMAL] 記錄申訴者
+          const isAppealRound = roundIdx >= ROUNDS_NORMAL
+          const appealer = isAppealRound ? (appealerPerRound[roundIdx - ROUNDS_NORMAL] ?? -1) : -1
           return (
             <div key={i} className="flex items-center">
-              <span className="w-11 shrink-0 text-gray-500 text-sm leading-tight">
-                {base + i + 1}
+              <span className={`w-11 shrink-0 text-sm leading-tight ${isAppealRound ? 'text-orange-400' : 'text-gray-500'}`}>
+                {roundIdx + 1}
                 {mul > 1 && (
                   <span className="text-orange-400 font-bold text-xs ml-0.5">×{mul}</span>
                 )}
               </span>
-              {scores.map((s, j) => (
-                <span key={j} className={`flex-1 text-center text-sm ${scoreColor(s)}`}>{fmt(s)}</span>
-              ))}
+              {scores.map((s, j) => {
+                const circle = isAppealRound && j === appealer
+                return (
+                  <span key={j} className={`flex-1 text-center text-sm ${scoreColor(s)} ${circle ? 'outline outline-1 outline-orange-400 rounded-full mx-0.5' : ''}`}>
+                    {fmt(s)}
+                  </span>
+                )
+              })}
             </div>
           )
         })}
@@ -545,8 +565,8 @@ export default function GamePage({ embedded = false }: Props) {
           title={voiceOn ? '語音開啟（點擊關閉）' : '語音關閉（點擊開啟）'}>
           {voiceOn ? '🔊' : '🔇'}
         </button>
-        <button onClick={() => setShowHistory(v => !v)} className={BTN}>
-          {showHistory ? '▾' : '▸'} 成績表
+        <button onClick={() => setHistoryView(v => ((v + 1) % 3) as 0|1|2)} className={BTN}>
+          {historyView === 0 ? '▸ 成績表' : historyView === 1 ? '▾ 單場' : '▾ 累計'}
         </button>
         <button onClick={resetTournament}
           className={`text-xs px-3 py-1 rounded-full text-gray-900 font-bold active:scale-95 transition whitespace-nowrap ${phase === 'ended' ? 'bg-orange-400 hover:bg-orange-300 animate-pulse' : 'bg-yellow-400 hover:bg-yellow-300'}`}>
@@ -601,7 +621,7 @@ export default function GamePage({ embedded = false }: Props) {
           </div>
         )}
 
-        {showHistory && <HistoryPanel />}
+        {historyView > 0 && <HistoryPanel />}
       </div>
     </div>
   )
