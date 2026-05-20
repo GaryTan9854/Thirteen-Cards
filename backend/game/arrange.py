@@ -26,6 +26,18 @@ from .hand_lookup import (pct3, pct5_mid, pct5_bot, rank5_bot, eval_attack,
                           winrate3, winrate5_mid, winrate5_bot)
 
 
+def _bot_strength(hb: Hand5) -> float:
+    """
+    Bot position score: use rank percentile (pct5_bot) instead of combinatorial
+    winrate to correctly rank same-type hands (e.g. K葫蘆 >> 2葫蘆).
+    The C(52,5) winrate compresses all 葫蘆 to 99.8–100%, masking the critical
+    rank difference (2葫蘆 loses to 3~A full; K葫蘆 only loses to A full+).
+    Falls back to winrate5_bot if not in the bot pool (shouldn't happen normally).
+    """
+    p = pct5_bot(hb)
+    return p if p is not None else winrate5_bot(hb)
+
+
 # ─── Inventory analysis ───────────────────────────────────────────────────────
 
 def analyze_inventory(handstrs: list) -> dict:
@@ -164,13 +176,14 @@ def generate_5card_options(available: list) -> list:
                         options.append(alt5)
 
     # ── 葫蘆 H ───────────────────────────────────────────────────────────
-    # Rule: BEST trip + MINIMUM available pair  (H strength = trip rank only)
+    # Generate ALL (trip, pair) combinations so the arrangement search can pick
+    # the best valid split — e.g. K-K-K+5-5 in bot, 2-2-2+3-7 in mid.
     trip_ranks = sorted([r for r, c in cnt.items() if c >= 3], reverse=True)
-    pair_srcs  = sorted([r for r, c in cnt.items() if c >= 2])   # ascending → pick min
+    pair_srcs  = sorted([r for r, c in cnt.items() if c >= 2])   # all available pairs
     for tr in trip_ranks:
-        min_pair = next((r for r in pair_srcs if r != tr), None)
-        if min_pair is not None:
-            options.append(by_rank[tr][:3] + by_rank[min_pair][:2])
+        for pair_r in pair_srcs:
+            if pair_r != tr:
+                options.append(by_rank[tr][:3] + by_rank[pair_r][:2])
 
     # ── 順 S ─────────────────────────────────────────────────────────────
     for hi in range(14, 5, -1):
@@ -288,30 +301,27 @@ def spare_variants(top3: list, mid5: list):
 
 def score_arrangement(h3: Hand3, hm: Hand5, hb: Hand5) -> float:
     """
-    攻擊分（千萬位勝率 + 打槍加成）：
+    攻擊分（+ 打槍加成）：
 
       score = (p1+p2+p3) + 1.5·p1p2p3 - 1.5·(1-p1)(1-p2)(1-p3)
 
-    p 使用千萬位勝率（能打敗 C(52,k) 中多少比例的組合），
-    使順子/葫蘆等強牌的真實強度被正確反映（約 99%+，而非名次% 的 70%）。
+    p1/p2：千萬位勝率（top/mid 在 C(52,k) 中排名）
+    p3：rank percentile（bot 在 5305 種 bot 牌型中的名次%），
+        正確反映 K葫蘆 vs 2葫蘆 等同型不同等級的真實差距。
     """
     p1 = winrate3(h3)
     p2 = winrate5_mid(hm)
-    p3 = winrate5_bot(hb)
+    p3 = _bot_strength(hb)
     return (p1 + p2 + p3) + 1.5 * p1 * p2 * p3 - 1.5 * (1-p1) * (1-p2) * (1-p3)
 
 
 def score_defensive(h3: Hand3, hm: Hand5, hb: Hand5) -> float:
     """
-    防守分 = -(1-p1)(1-p2)(1-p3)。
-
-    最小化「三墩全輸（被打槍）」機率。
-    p 使用千萬位勝率：中尾墩的順子/葫蘆正確反映為 99%+ 的極難打破防線，
-    使 (1-p) 極小，排列選擇聚焦在「最難被打槍」的組合。
+    防守分 = -(1-p1)(1-p2)(1-p3)。最小化「三墩全輸（被打槍）」機率。
     """
     p1 = winrate3(h3)
     p2 = winrate5_mid(hm)
-    p3 = winrate5_bot(hb)
+    p3 = _bot_strength(hb)
     return -(1 - p1) * (1 - p2) * (1 - p3)
 
 

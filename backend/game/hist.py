@@ -120,6 +120,29 @@ class Hist_Cards13(Hist_Cards):
             return False
         return (max(ranks) <= 9 and min(ranks) >= 1) or (max(ranks) <= 10 and min(ranks) >= 2)
 
+    def chk_3flush(self) -> bool:
+        """
+        Check if 13 cards can be split 3+5+5 with each group being a flush,
+        using three DISTINCT suits (one per group).
+        2-suit hands are already caught by 兩花色 which gives more points.
+        """
+        cnt: dict = {}
+        for c in self.h13:
+            cnt[c.suit] = cnt.get(c.suit, 0) + 1
+        suits = list(cnt.keys())
+        if len(suits) < 3:
+            return False
+        for ts in suits:
+            if cnt[ts] < 3:
+                continue
+            for ms in suits:
+                if ms == ts or cnt[ms] < 5:
+                    continue
+                for bs in suits:
+                    if bs != ts and bs != ms and cnt[bs] >= 5:
+                        return True
+        return False
+
     def chk_special(self):
         if self.chk_dragon():
             return "清龍" if self.is_flush else "一條龍"
@@ -132,6 +155,8 @@ class Hist_Cards13(Hist_Cards):
         ss = self.has_3straight()
         if ss:
             return "三同花順" if self.has_3straightflush(ss) else "三順子"
+        if self.chk_3flush():
+            return "三同花"
         if self.check_sets(2, 2, 2, 2, 2, 2):
             return "六對半帶葫蘆" if max(self.values()) == 3 else "六對半"
         if self.h13.isAllBlack():
