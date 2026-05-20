@@ -309,20 +309,21 @@ def score_arrangement(h3: Hand3, hm: Hand5, hb: Hand5) -> float:
 
 def score_defensive(h3: Hand3, hm: Hand5, hb: Hand5) -> float:
     """
-    防守分 = p1 + p2 + 2*p3 - 3*(1-p1)(1-p2)(1-p3)。
+    防守分 = -(1-p1)(1-p2)(1-p3)。
 
-    兩個設計原則：
-    ① 尾墩雙倍加權（係數 2.0）：防守局首要目標是鎖住尾墩。
-      有近乎不敗的牌型（葫蘆Q 只輸 K/A 葫蘆與怪物）應優先置尾。
-      等權公式會因頭墩改善（亂→一對）的 +0.5 效益蓋過尾墩升級，誤選弱尾墩。
-    ② 被打槍懲罰係數 3.0（原 1.5）：被打槍代價 -6 以上，
-      是正常失一墩的 6 倍，具強烈不對稱性。
-      3.0 係數對應「三墩全輸代價 ≈ 2× 正常失墩總和」的現實成本。
+    防止被打槍的兩種策略，此公式均能正確獎勵：
+    ① 穿透策略：讓其中一墩接近 0% 輸（老司機 90分↑），如順在中使 (1-p2)≈0.004，
+      即使頭尾普普，乘積依然極小。
+    ② 均衡策略：三墩各達 60分（(1-p)≈0.4），乘積≈ 0.064，也在合理範圍。
+
+    三墩同等重要，不需要額外位置加權。
+    被打槍不對稱懲罰已隱含在乘積結構中：
+    任一墩穿透（(1-p)→0），整個乘積趨近 0，自然反映打槍風險消除。
     """
     p1 = winrate3(h3)
     p2 = winrate5_mid(hm)
     p3 = _bot_strength(hb)
-    return p1 + p2 + 2.0 * p3 - 3.0 * (1 - p1) * (1 - p2) * (1 - p3)
+    return -(1 - p1) * (1 - p2) * (1 - p3)
 
 
 def best_arrangement_simple(handstrs: list):
@@ -346,12 +347,16 @@ def best_arrangement(handstrs: list):
     """
     Rule-Base 攻守：雙模式評分選最佳排列。
 
-    - 攻牌模式（任一候選可 eval_attack）：含打槍加成
-        score = (p1+p2+p3) + 1.5·p1p2p3 - 1.5·(1-p1)(1-p2)(1-p3)
-    - 防守模式（無候選可攻）：去掉打槍加成，只留被打槍懲罰
-        score = (p1+p2+p3) - 1.5·(1-p1)(1-p2)(1-p3)
+    攻牌模式觸發條件（兩者皆需）：
+      1. 任一候選可 eval_attack
+      2. score_arrangement 選出的最佳攻擊排列，其尾墩必須達到同花以上
 
-    防守不用舊式 -(1-p1)(1-p2)(1-p3)（會被超強尾墩誤導）。
+    若最佳攻擊排列的尾墩僅為順或以下，視為防守牌（例如：整手牌
+    三墩組合最強尾墩也只有順，即便湊出同花的次優排法讓 eval_attack 觸發，
+    也不應切換到攻擊模式）。
+
+    防守模式：score = -(1-p1)(1-p2)(1-p3)
+    同時獎勵「穿透策略」（一墩接近0%輸）和「均衡策略」（三墩各≈60%）。
     """
     candidates = enumerate_arrangements(handstrs)
     if not candidates:
@@ -359,9 +364,12 @@ def best_arrangement(handstrs: list):
 
     can_attack = any(eval_attack(*c) for c in candidates)
     if can_attack:
-        return max(candidates, key=lambda t: score_arrangement(*t))
-    else:
-        return max(candidates, key=lambda t: score_defensive(*t))
+        best_att = max(candidates, key=lambda t: score_arrangement(*t))
+        # 尾墩需達同花以上才算真正攻牌；否則退回防守模式
+        if best_att[2].handtype_val >= 5:  # 5 = 同花，尾墩需達同花以上才算攻牌
+            return best_att
+
+    return max(candidates, key=lambda t: score_defensive(*t))
 
 
 # ─── Main enumeration ─────────────────────────────────────────────────────────
