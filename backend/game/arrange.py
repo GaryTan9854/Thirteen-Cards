@@ -145,35 +145,27 @@ def generate_5card_options(available: list) -> list:
                 options.append(by_rank[r][:4] + kicker)
 
     # ── 同花 F ───────────────────────────────────────────────────────────
+    # For 5-card suits: one candidate (best5).
+    # For 6+ card suits: enumerate ALL C(n,5) combinations so that any subset
+    # of paired/tripped cards can be freed for other rows (e.g. 7-heart hand
+    # where A♥ and 6♥ both have pairs in other suits — must exclude both to
+    # find the optimal flush subset; single-exclusion logic misses this).
     for suit, scards in by_suit.items():
         if len(scards) < 5:
             continue
-        best5 = sorted(scards, key=lambda cs: -int(cs[:2]))[:5]
-        ranks = [int(cs[:2]) for cs in best5]
-        is_sf = len(set(ranks)) == 5 and (
-            max(ranks) - min(ranks) == 4 or set(ranks) == {14, 2, 3, 4, 5})
-        if not is_sf:
-            options.append(best5)
-
-        # Variant: for each card in best5 whose rank also appears in another suit
-        # (i.e., it can form a pair/trip outside the flush), also generate a flush
-        # that excludes it — frees the paired card for mid/top rows.
-        # e.g., 9♣ in a club flush when 9♠ also exists → try K♣Q♣7♣4♣2♣ so
-        # 9♣ stays available and 99 pair can be formed in mid.
-        if len(scards) >= 6:
-            suit_rank_set = {int(cs[:2]) for cs in scards}
-            outside_ranks = {int(cs[:2]) for cs in available
-                             if cs[2] != suit and int(cs[:2]) in suit_rank_set}
-            for exc_card in best5:
-                if int(exc_card[:2]) in outside_ranks:
-                    alt = [cs for cs in scards if cs != exc_card]
-                    alt5 = sorted(alt, key=lambda cs: -int(cs[:2]))[:5]
-                    alt_ranks = [int(cs[:2]) for cs in alt5]
-                    alt_is_sf = len(set(alt_ranks)) == 5 and (
-                        max(alt_ranks) - min(alt_ranks) == 4
-                        or set(alt_ranks) == {14, 2, 3, 4, 5})
-                    if not alt_is_sf:
-                        options.append(alt5)
+        scards_sorted = sorted(scards, key=lambda cs: -int(cs[:2]))
+        flush_combos = (
+            [scards_sorted[:5]]               # exactly 5 → only one combo
+            if len(scards_sorted) == 5
+            else list(_comb(scards_sorted, 5))  # 6+ → all C(n,5) subsets
+        )
+        for combo in flush_combos:
+            five = list(combo)
+            ranks = [int(cs[:2]) for cs in five]
+            is_sf = len(set(ranks)) == 5 and (
+                max(ranks) - min(ranks) == 4 or set(ranks) == {14, 2, 3, 4, 5})
+            if not is_sf:
+                options.append(five)
 
     # ── 葫蘆 H ───────────────────────────────────────────────────────────
     # Generate ALL (trip, pair) combinations so the arrangement search can pick
