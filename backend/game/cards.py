@@ -1,4 +1,4 @@
-import random
+import secrets
 
 Suits = {"H": "♡", "S": "♠", "D": "♢", "C": "♣"}
 Values = {**{i: str(i) for i in range(2, 11)}, **{11: "J", 12: "Q", 13: "K", 14: "A"}}
@@ -75,14 +75,11 @@ class Deck(list):
             for s in ["C", "D", "H", "S"]:
                 self.append(Card(s, i))
 
-    def shuffle(self, num=1):
-        length = len(self)
-        for _ in range(num):
-            for i in range(length - 1, 0, -1):
-                randi = random.randint(0, i)
-                if i != randi:
-                    self[i], self[randi] = self[randi], self[i]
+    def shuffle(self):
+        # Fisher-Yates with OS-level CSPRNG (hardware entropy, same standard as
+        # online poker platforms). One pass is sufficient and provably uniform.
+        secrets.SystemRandom().shuffle(self)
 
     def distribute(self):
-        self.shuffle(3)
+        self.shuffle()
         return [self[:13], self[13:26], self[26:39], self[39:]]
