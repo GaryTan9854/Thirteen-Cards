@@ -167,12 +167,11 @@ interface ArrangeInfo {
 }
 
 // Model comparison
-const MODEL_STRATEGIES = ['rule_base_as','rule_base_1','monte_carlo'] as const
+const MODEL_STRATEGIES = ['rule_base_as','rule_base_1'] as const
 type ModelStrategy = typeof MODEL_STRATEGIES[number]
 const MODEL_LABEL: Record<ModelStrategy,string> = {
   rule_base_as: 'RB-攻守',
   rule_base_1:  'RB-Σ%',
-  monte_carlo:  'Monte Carlo',
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -323,7 +322,7 @@ export default function ManualArrange({ hand, onConfirm, onCancel }: Props) {
                 ? <div className="text-xs text-orange-400">特殊牌型：{info.special.name}</div>
                 : (
                   <div className="flex flex-wrap gap-1.5">
-                    {info.groups.map((g,gi)=>{
+                    {info.groups.slice(0,5).map((g,gi)=>{
                       const active = gi===selGroup
                       const cnt = g.variants.length
                       return (

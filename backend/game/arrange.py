@@ -138,11 +138,14 @@ def generate_5card_options(available: list) -> list:
                                   key=lambda x: -int(x[:2])))
 
     # ── 鐵支 QD ──────────────────────────────────────────────────────────
+    # Kicker = LOWEST remaining card; this frees the highest card (e.g. K) for
+    # the top row per the "散牌最大的往最上" domain rule.
     for r, c in cnt.items():
         if c >= 4:
-            kicker = _top_n(available, 1, {r})
-            if kicker:
-                options.append(by_rank[r][:4] + kicker)
+            non_quad = sorted([cs for cs in available if int(cs[:2]) != r],
+                              key=lambda cs: int(cs[:2]))
+            if non_quad:
+                options.append(by_rank[r][:4] + [non_quad[0]])
 
     # ── 同花 F ───────────────────────────────────────────────────────────
     # For 5-card suits: one candidate (best5).
