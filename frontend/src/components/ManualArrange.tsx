@@ -59,7 +59,7 @@ function sortCards(cards: string[], mode: SortMode): string[] {
 // ─── CardTile ─────────────────────────────────────────────────────────────────
 
 function CardTile({ cs, size='md' }: { cs:string; size?:'sm'|'md'|'lg' }) {
-  const dim = size==='lg' ? 'w-14 h-20 text-base' : size==='md' ? 'w-11 h-15 text-sm' : 'w-9 h-12 text-xs'
+  const dim = size==='lg' ? 'w-14 h-20 text-base' : size==='md' ? 'w-11 h-16 text-sm' : 'w-9 h-12 text-xs'
   return (
     <span className={`inline-flex items-center justify-center rounded-lg border-2 font-bold shadow select-none
       ${dim} ${isRed(cs) ? 'border-red-300 bg-white text-red-600' : 'border-gray-400 bg-white text-gray-900'}`}>
@@ -118,14 +118,14 @@ function StatsPanel({ stats, special }: { stats?:StatsData; special?:SpecialData
   ]
 
   return (
-    <div className="w-56 shrink-0 text-xs">
+    <div className="w-72 shrink-0 text-[18px]">
       <table className="w-full">
         <tbody>
           {rows.map(r=>(
             <tr key={r.label} className="border-b border-gray-800">
               <td className="py-0.5 pr-2 text-gray-400 whitespace-nowrap">{r.label}</td>
-              <td className="py-0.5 px-1 text-yellow-300 font-bold text-center w-5">{r.v}</td>
-              <td className="py-0.5 text-gray-500 text-[10px] leading-tight">{r.d||'—'}</td>
+              <td className="py-0.5 px-1 text-yellow-300 font-bold text-center w-7">{r.v}</td>
+              <td className="py-0.5 text-gray-500 text-[15px] leading-tight">{r.d||'—'}</td>
             </tr>
           ))}
           <tr>
@@ -140,7 +140,7 @@ function StatsPanel({ stats, special }: { stats?:StatsData; special?:SpecialData
         </tbody>
       </table>
       {showBaodao && special && (
-        <div className="mt-1 max-h-44 overflow-y-auto bg-black/40 rounded p-2 text-[10px]">
+        <div className="mt-1 max-h-52 overflow-y-auto bg-black/40 rounded p-2 text-[15px]">
           {special.baodao_list.map(b=>(
             <div key={b.name}
               className={`flex justify-between py-0.5 ${b.achieved?'text-green-400 font-bold':'text-gray-600'}`}>

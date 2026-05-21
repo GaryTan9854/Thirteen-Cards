@@ -402,6 +402,18 @@ export default function OnlinePage() {
           </div>
         )}
 
+        {/* Gary admin bar — always visible */}
+        {isGary && (
+          <div className="flex justify-end">
+            <button
+              onClick={async () => { await fetch('/api/online/reset', { method: 'POST' }) }}
+              className="text-xs text-gray-600 hover:text-red-400 px-2 py-0.5 rounded transition"
+              title="強制重置房間（Gary 限定）">
+              ⚙ 重置
+            </button>
+          </div>
+        )}
+
         {renderPhase()}
       </div>
 

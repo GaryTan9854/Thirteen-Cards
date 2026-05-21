@@ -11,7 +11,7 @@ from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 
-APP_VERSION = "4.16"
+APP_VERSION = "4.17"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -617,19 +617,30 @@ async def ws_endpoint(player_name: str, websocket: WebSocket):
         manager.disconnect(player_name)
         online = manager.online_players()
 
-        if player_name in room.players and room.phase in (Phase.PLAYING, Phase.ROUND_END):
+        if player_name in room.players and room.phase in (
+                Phase.PLAYING, Phase.ROUND_END, Phase.ENDED):
             await manager.broadcast({
                 "type":           "player_disconnected",
                 "player":         player_name,
                 "online_players": online,
             })
-            # If in a round and everyone else already submitted, resolve now
-            if room.phase == Phase.PLAYING:
-                room.players = [p for p in room.players if p != player_name]
-                room.seats.pop(player_name, None)
-                if room.players and set(room.arrangements.keys()) >= set(room.players):
-                    await room.resolve_round(manager)
+            # Remove the leaving player from the active game
+            room.players = [p for p in room.players if p != player_name]
+            room.seats.pop(player_name, None)
+            # Transfer host if needed
+            if room.host == player_name:
+                room.host = room.players[0] if room.players else None
+            # If mid-round and all remaining players have now submitted → resolve
+            if room.phase == Phase.PLAYING and room.players and \
+                    set(room.arrangements.keys()) >= set(room.players):
+                await room.resolve_round(manager)
+
         elif player_name == room.host and room.phase in (Phase.SETUP, Phase.INVITING, Phase.SEATING):
+            room.reset()
+            await manager.broadcast({"type": "room_update", "room": room.snapshot()})
+
+        # Auto-cleanup: if all human players have left an active session → reset to lobby
+        if room.phase not in (Phase.LOBBY,) and not room.players:
             room.reset()
             await manager.broadcast({"type": "room_update", "room": room.snapshot()})
 
