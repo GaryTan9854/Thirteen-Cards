@@ -108,7 +108,7 @@ export default function OnlinePage() {
 
   // ── WebSocket ──
   const wsRef    = useRef<WebSocket | null>(null)
-  const [_connected, setConnected] = useState(false)
+  const [connected, setConnected] = useState(false)
 
   // ── Lobby / room state ──
   const [onlinePlayers, setOnlinePlayers] = useState<string[]>(() => player ? [player] : [])
@@ -135,17 +135,34 @@ export default function OnlinePage() {
 
   useEffect(() => {
     if (!player) return
-    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const ws = new WebSocket(`${proto}//${window.location.host}/ws/${encodeURIComponent(player)}`)
-    wsRef.current = ws
+    let dead = false          // set true on cleanup so reconnect doesn't fire after unmount
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
 
-    ws.onopen  = () => setConnected(true)
-    ws.onclose = () => { setConnected(false); wsRef.current = null }
-    ws.onerror = () => setConnected(false)
-    ws.onmessage = e => {
-      try { handleMsg(JSON.parse(e.data)) } catch {}
+    function connect() {
+      if (dead) return
+      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const ws = new WebSocket(`${proto}//${window.location.host}/ws/${encodeURIComponent(player)}`)
+      wsRef.current = ws
+
+      ws.onopen  = () => setConnected(true)
+      ws.onclose = () => {
+        setConnected(false)
+        wsRef.current = null
+        // Auto-reconnect after 2 s (handles Cloudflare idle-timeout drops)
+        if (!dead) retryTimer = setTimeout(connect, 2000)
+      }
+      ws.onerror = () => setConnected(false)
+      ws.onmessage = e => {
+        try { handleMsg(JSON.parse(e.data)) } catch {}
+      }
     }
-    return () => ws.close()
+
+    connect()
+    return () => {
+      dead = true
+      if (retryTimer) clearTimeout(retryTimer)
+      wsRef.current?.close()
+    }
   }, [player])
 
   function send(msg: object) {
@@ -263,6 +280,14 @@ export default function OnlinePage() {
       <div className="space-y-4 max-w-3xl">
         <OnlineBar players={onlinePlayers} self={player} />
 
+        {/* Reconnecting banner */}
+        {!connected && (
+          <div className="text-xs text-yellow-300 bg-yellow-900/40 px-3 py-1.5 rounded-lg
+                          animate-pulse text-center">
+            🔄 重新連線中…
+          </div>
+        )}
+
         {/* Join/leave notices */}
         {notices.length > 0 && (
           <div className="space-y-1">
@@ -308,7 +333,7 @@ export default function OnlinePage() {
       case 'inviting':  return renderInviting()
       case 'seating':   return renderSeating()
       case 'playing':   return renderSpectator()
-      case 'round_end': return renderRoundEnd()
+      case 'round_end': return renderRoundEnd()  // always show; non-players see "等待 host..."
       case 'ended':     return renderGameEnd()
       default:          return renderLobby()
     }
@@ -319,7 +344,21 @@ export default function OnlinePage() {
   function renderLobby() {
     return (
       <div className="bg-green-900/30 rounded-xl p-6 space-y-5">
-        <div className="text-xl font-bold text-yellow-300">🏠 大廳</div>
+        <div className="flex items-center justify-between">
+          <div className="text-xl font-bold text-yellow-300">🏠 大廳</div>
+          {/* Gary-only: force reset any stuck room */}
+          {isGary && (
+            <button
+              onClick={async () => {
+                await fetch('/api/online/reset', { method: 'POST' })
+              }}
+              className="text-xs text-gray-500 hover:text-red-400 px-2 py-1 rounded transition"
+              title="強制重置房間（管理員用）"
+            >
+              ⚙ 重置
+            </button>
+          )}
+        </div>
 
         <button
           onClick={() => send({ type: 'new_game' })}
@@ -574,6 +613,11 @@ export default function OnlinePage() {
             第 {res.round} / {room?.total_rounds ?? '?'} 局結果
             {res.round > (room?.rounds_normal ?? 999) ? '【申訴】' : ''}
           </span>
+          {isGary && (
+            <button onClick={async () => { await fetch('/api/online/reset', { method: 'POST' }) }}
+              className="text-xs text-gray-500 hover:text-red-400 px-2 py-1 rounded transition"
+              title="強制重置">⚙ 重置</button>
+          )}
         </div>
 
         {/* Same display as GamePage */}

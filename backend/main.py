@@ -11,7 +11,7 @@ from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 
-APP_VERSION = "4.11"
+APP_VERSION = "4.12"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -444,6 +444,14 @@ def online_players():
 @app.get("/api/online/status")
 def online_status():
     return {"online": manager.online_players(), "room": room.snapshot()}
+
+
+@app.post("/api/online/reset")
+async def force_reset():
+    """Force-reset the room to lobby. Emergency use only."""
+    room.reset()
+    await manager.broadcast({"type": "room_update", "room": room.snapshot()})
+    return {"ok": True}
 
 
 # ── Online: WebSocket endpoint ────────────────────────
