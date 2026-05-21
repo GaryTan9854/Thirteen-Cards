@@ -67,9 +67,9 @@ export default function TournamentPanel({
 
   const ColHeader = () => (
     <div className="flex mb-1">
-      <span className="w-11 shrink-0" />
+      <span className="w-14 shrink-0" />
       {names.map(n => (
-        <span key={n} className="flex-1 text-center text-green-400 font-semibold text-sm truncate">{n}</span>
+        <span key={n} className="flex-1 text-center text-green-400 font-semibold text-base truncate">{n}</span>
       ))}
     </div>
   )
@@ -84,20 +84,20 @@ export default function TournamentPanel({
         return (
           <div key={i} className="flex items-start">
             <div className="w-14 shrink-0 flex flex-col gap-0.5 pt-0.5">
-              <span className="text-gray-500 text-sm leading-tight">
+              <span className="text-gray-400 text-base leading-tight">
                 {roundIdx + 1}
-                {mul > 1 && <span className="text-orange-400 font-bold text-xs ml-0.5">×{mul}</span>}
+                {mul > 1 && <span className="text-orange-400 font-bold text-sm ml-0.5">×{mul}</span>}
               </span>
               {badges.map(b => (
-                <span key={b} className="text-[9px] px-1 rounded bg-purple-900/70 text-purple-300 font-bold leading-tight whitespace-nowrap">
+                <span key={b} className="text-[10px] px-1 rounded bg-purple-900/70 text-purple-300 font-bold leading-tight whitespace-nowrap">
                   {b}
                 </span>
               ))}
             </div>
             {scores.map((s, j) => (
-              <span key={j} className="flex-1 flex justify-center items-start pt-0.5 text-sm">
+              <span key={j} className="flex-1 flex justify-center items-start pt-0.5 text-base">
                 {j === circledPlayer
-                  ? <span className={`${scoreColor(s)} outline outline-1 outline-orange-400 rounded-full inline-flex items-center justify-center min-w-[1.4rem] h-[1.4rem] text-xs leading-none px-0.5`}>{fmt(s)}</span>
+                  ? <span className={`${scoreColor(s)} outline outline-1 outline-orange-400 rounded-full inline-flex items-center justify-center min-w-[1.6rem] h-[1.6rem] text-sm leading-none px-0.5`}>{fmt(s)}</span>
                   : <span className={scoreColor(s)}>{fmt(s)}</span>
                 }
               </span>
@@ -127,9 +127,9 @@ export default function TournamentPanel({
       </div>
       {roundCount > 0 && (
         <div className="flex mt-2 pt-2 border-t border-gray-600 font-bold">
-          <span className="w-8 shrink-0 text-gray-400 text-sm">合計</span>
+          <span className="w-14 shrink-0 text-gray-400 text-base">合計</span>
           {totalScores.map((s, j) => (
-            <span key={j} className={`flex-1 text-center text-sm ${scoreColor(s)}`}>{fmt(s)}</span>
+            <span key={j} className={`flex-1 text-center text-base ${scoreColor(s)}`}>{fmt(s)}</span>
           ))}
         </div>
       )}
@@ -158,22 +158,22 @@ export default function TournamentPanel({
 
       {/* ── 累積比分綠框 ── */}
       <div className="bg-green-900 rounded-2xl p-4 shadow-inner">
-        <div className="text-xs text-green-400 mb-2 font-semibold text-center">累積比分</div>
+        <div className="text-sm text-green-400 mb-2 font-semibold text-center">累積比分</div>
         <div className="grid grid-cols-4 gap-3">
           {names.map((name, i) => (
             <div key={name} className="flex flex-col items-center">
-              <span className="text-sm text-green-300">{name}</span>
-              <span className={`text-xl font-bold ${scoreColor(totalScores[i])}`}>
+              <span className="text-base text-green-300">{name}</span>
+              <span className={`text-2xl font-bold ${scoreColor(totalScores[i])}`}>
                 {fmt(totalScores[i])}
               </span>
               {roundCount > 0 && i === lowestPlayer && !isEnded && (
-                <span className="text-xs text-orange-400 mt-0.5">▼ 最低</span>
+                <span className="text-sm text-orange-400 mt-0.5">▼ 最低</span>
               )}
               {isEnded && i === winnerIdx && (
-                <span className="text-xs text-yellow-400 mt-0.5">🏆 冠軍</span>
+                <span className="text-sm text-yellow-400 mt-0.5">🏆 冠軍</span>
               )}
               {isEnded && i === lowestPlayer && (
-                <span className="text-xs text-orange-400 mt-0.5">🍽️ 請客</span>
+                <span className="text-sm text-orange-400 mt-0.5">🍽️ 請客</span>
               )}
             </div>
           ))}

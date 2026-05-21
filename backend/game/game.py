@@ -214,9 +214,9 @@ def play_one_game(player_names=None, strategies=None,
                 "total_score": SpecialHand[sp],
             }
         else:
-            top_cards = [c.show() for c in h13.htop]
-            mid_cards = [c.show() for c in h13.hmid]
-            bot_cards = [c.show() for c in h13.hbot]
+            top_cards = [c.show() for c in h13.htop.display_order()]
+            mid_cards = [c.show() for c in h13.hmid.display_order()]
+            bot_cards = [c.show() for c in h13.hbot.display_order()]
             player_info = {
                 "name": name,
                 "original_hand": original_display,

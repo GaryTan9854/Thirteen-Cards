@@ -91,6 +91,18 @@ class Hand3(Hand):
         self.p = self.numbers[:]
         return self.p[2] + self.p[1] / 100 + self.p[0] / 1000
 
+    def display_order(self):
+        """Return cards in display order: grouped by hand type, high→low."""
+        ht = self.handtype
+        if ht == "三條":
+            return list(self)  # all same value
+        elif ht == "一對":
+            pairs = [c for c in self if c.value == self.p[0]]
+            rest  = sorted([c for c in self if c.value != self.p[0]], key=lambda c: c.value, reverse=True)
+            return pairs + rest
+        else:
+            return sorted(self, key=lambda c: c.value, reverse=True)
+
     def hand_dscp(self):
         ht = self.handtype
         if ht == "三條":
@@ -226,6 +238,42 @@ class Hand5(Hand):
         n = sorted(self.numbers, reverse=True)
         self.p = n
         return n[0] + n[1] / 100 + n[2] / 1000 + n[3] / 10000 + (n[4] / 100000 if len(n) > 4 else 0)
+
+    def display_order(self):
+        """Return cards in display order: grouped by hand type, high→low."""
+        ht = self.handtype
+        if ht in ("同花", "散牌", ""):
+            return sorted(self, key=lambda c: c.value, reverse=True)
+        elif ht == "一對":
+            pairs = [c for c in self if c.value == self.p[0]]
+            rest  = sorted([c for c in self if c.value != self.p[0]], key=lambda c: c.value, reverse=True)
+            return pairs + rest
+        elif ht == "兩對":
+            big   = [c for c in self if c.value == self.p[0]]
+            small = [c for c in self if c.value == self.p[1]]
+            rest  = [c for c in self if c.value not in (self.p[0], self.p[1])]
+            return big + small + rest
+        elif ht == "三條":
+            trips = [c for c in self if c.value == self.p[0]]
+            rest  = sorted([c for c in self if c.value != self.p[0]], key=lambda c: c.value, reverse=True)
+            return trips + rest
+        elif ht in ("順", "同花順", "同花次大順", "同花大順"):
+            # A2345: p[0]==1 → show A first, then 2,3,4,5
+            if self.p[0] == 1:
+                ace  = [c for c in self if c.value == 14]
+                rest = sorted([c for c in self if c.value != 14], key=lambda c: c.value)
+                return ace + rest
+            return sorted(self, key=lambda c: c.value, reverse=True)
+        elif ht == "葫蘆":
+            trips = [c for c in self if c.value == self.p[0]]
+            pairs = [c for c in self if c.value == self.p[1]]
+            return trips + pairs
+        elif ht == "鐵支":
+            quads = [c for c in self if c.value == self.p[0]]
+            rest  = [c for c in self if c.value != self.p[0]]
+            return quads + rest
+        else:
+            return sorted(self, key=lambda c: c.value, reverse=True)
 
     def hand_dscp(self):
         hh = self.handtype
