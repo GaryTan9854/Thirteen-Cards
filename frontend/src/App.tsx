@@ -112,7 +112,7 @@ function AppInner() {
       </header>
 
       {/* Page content */}
-      <main className="flex-1 w-full max-w-4xl mx-auto px-3 py-4 sm:px-6 sm:py-6">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-6">
         {/*
           OnlinePage is ALWAYS mounted so the WebSocket stays connected.
           The ManualArrange overlay renders via ReactDOM.createPortal to
