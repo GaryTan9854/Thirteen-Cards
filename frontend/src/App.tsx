@@ -9,7 +9,7 @@ import OnlinePage from './pages/OnlinePage'
 
 function AppInner() {
   const { player, logout } = useAuth()
-  const [tab, setTab]       = useState('online')
+  const [tab, setTab]       = useState('game')
   const [version, setVersion] = useState('')
 
   useEffect(() => {
@@ -81,9 +81,18 @@ function AppInner() {
 
       {/* Page content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
-        {tab === 'online' && <OnlinePage />}
-        {tab === 'game'   && <GamePage embedded />}
-        {tab === 'duel'   && isGary && <DuelPage />}
+        {/*
+          OnlinePage is ALWAYS mounted so the WebSocket stays connected.
+          The ManualArrange overlay renders via ReactDOM.createPortal to
+          document.body, so it appears on top even when this div is hidden.
+        */}
+        <div className={tab === 'online' ? '' : 'hidden'}>
+          <OnlinePage />
+        </div>
+
+        {/* Game + Duel are conditionally mounted (no persistence needed) */}
+        {tab === 'game' && <GamePage embedded />}
+        {isGary && tab === 'duel' && <DuelPage />}
       </div>
     </div>
   )

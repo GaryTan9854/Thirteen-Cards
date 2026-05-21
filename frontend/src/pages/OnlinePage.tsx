@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '../contexts/AuthContext'
 import ManualArrange from '../components/ManualArrange'
 
@@ -226,39 +227,48 @@ export default function OnlinePage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  if (!connected) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-3">
-        <div className="text-3xl animate-pulse">🔌</div>
-        <div>連接伺服器中…</div>
-      </div>
-    )
-  }
+  // ── Disconnected state: show inline (no early-return — portal must always render) ──
 
-  // ── Full-screen ManualArrange during arrangement phase ──
-  if (myHand && !submitted && phase === 'playing') {
-    return (
-      <ManualArrange
-        hand={myHand}
-        onConfirm={handleConfirm}
-        onCancel={() => {}}         // cannot cancel in online mode
-        countdown={countdown ?? undefined}
-        submittedCount={submittedList.length}
-        totalPlayers={room?.players.length ?? 1}
-      />
-    )
-  }
+  // ── ManualArrange overlay via portal ──────────────────────────────────────
+  // Renders to document.body so it appears on top even when this component
+  // is inside a display:none wrapper (e.g. user switched to 遊戲模擬 tab).
+  const arrangePortal = myHand && !submitted && phase === 'playing'
+    ? createPortal(
+        <ManualArrange
+          hand={myHand}
+          onConfirm={handleConfirm}
+          onCancel={() => {}}         // cannot cancel in online mode
+          countdown={countdown ?? undefined}
+          submittedCount={submittedList.length}
+          totalPlayers={room?.players.length ?? 1}
+        />,
+        document.body
+      )
+    : null
 
   return (
-    <div className="space-y-4 max-w-3xl">
-      <OnlineBar players={onlinePlayers} self={player} connected={connected} />
-      {renderPhase()}
-    </div>
+    <>
+      {arrangePortal}
+      <div className="space-y-4 max-w-3xl">
+        <OnlineBar players={onlinePlayers} self={player} connected={connected} />
+        {renderPhase()}
+      </div>
+    </>
   )
 
   // ── Phase renderers ────────────────────────────────────────────────────────
 
   function renderPhase() {
+    // Not yet connected
+    if (!connected) {
+      return (
+        <div className="flex flex-col items-center justify-center h-40 text-gray-500 gap-3">
+          <div className="text-2xl animate-pulse">🔌</div>
+          <div className="text-sm">連接伺服器中…</div>
+        </div>
+      )
+    }
+
     // Submitted — waiting for others / timer
     if (submitted && phase === 'playing') {
       return (
