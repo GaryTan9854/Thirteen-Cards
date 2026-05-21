@@ -178,7 +178,7 @@ const MODEL_LABEL: Record<ModelStrategy,string> = {
 
 interface Props {
   hand:                  string[]
-  onConfirm:             (top:string[], mid:string[], bot:string[]) => void
+  onConfirm:             (top:string[], mid:string[], bot:string[], isBaodao?: boolean) => void
   onCancel:              () => void
   countdown?:            number    // if provided, show timer; auto-submit at 0
   submittedCount?:       number    // how many players have submitted (online mode)
@@ -314,16 +314,30 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
     if (countdown === 0) {
       const a = arrRef.current
       if (a.top.length === 3 && a.mid.length === 5 && a.bot.length === 5) {
-        onConfirm(a.top, a.mid, a.bot)
+        onConfirm(a.top, a.mid, a.bot, true)   // auto-submit as 報到 if applicable
       }
     }
   }, [countdown])
+
+  // ── 報到 detection ──
+  const isBaodaoHand = !!(info && info.special && info.special.name !== 'normal')
+  const [baodaoConfirmPending, setBaodaoConfirmPending] = useState(false)
+
+  function handleNormalSubmit() {
+    if (!canConfirm) return
+    if (isBaodaoHand) {
+      setBaodaoConfirmPending(true)   // show confirmation dialog
+    } else {
+      onConfirm(arr.top, arr.mid, arr.bot, false)
+    }
+  }
 
   const currentModel = MODEL_STRATEGIES[modelIdx]
   const curVariant = info && selGroup>=0 ? info.groups[selGroup]?.variants[varIdx] : null
   const canConfirm = arr.top.length===3 && arr.mid.length===5 && arr.bot.length===5
 
   return (
+    <>
     <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center">
       <div className="bg-gray-900 rounded-2xl shadow-2xl flex flex-col gap-4 p-5 overflow-y-auto"
         style={{width:'90vw', maxHeight:'92vh'}}>
@@ -436,7 +450,19 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
               className="px-4 py-2 rounded-lg bg-gray-700 text-gray-300 text-sm hover:bg-gray-600">
               取消
             </button>
-            <button onClick={()=>onConfirm(arr.top, arr.mid, arr.bot)}
+
+            {/* 報到 button — only shown when special hand detected */}
+            {isBaodaoHand && (
+              <button
+                onClick={() => onConfirm(arr.top, arr.mid, arr.bot, true)}
+                className="px-5 py-2 rounded-lg bg-red-600 text-white font-bold text-sm
+                           hover:bg-red-500 active:scale-95 transition-all animate-pulse"
+              >
+                🀄 報到！
+              </button>
+            )}
+
+            <button onClick={handleNormalSubmit}
               disabled={!canConfirm}
               className="px-7 py-2 rounded-lg bg-orange-500 text-white font-bold text-sm
                          hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed">
@@ -447,5 +473,34 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
 
       </div>
     </div>
+
+    {/* ── 報到 手玩正常比牌確認 modal ── */}
+    {baodaoConfirmPending && (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70">
+        <div className="bg-gray-900 border border-yellow-500 rounded-2xl p-7 max-w-xs w-full mx-4 text-center shadow-2xl space-y-4">
+          <div className="text-3xl">⚠️</div>
+          <div className="text-base font-bold text-yellow-300">你這把是報到</div>
+          <div className="text-sm text-gray-300">
+            確定要以現行組合攤牌比牌嗎？<br/>
+            <span className="text-xs text-gray-500 mt-1 block">正常比有時分數更高，但風險自負</span>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => { setBaodaoConfirmPending(false); onConfirm(arr.top, arr.mid, arr.bot, false) }}
+              className="flex-1 py-2.5 rounded-xl bg-orange-500 text-white font-bold hover:bg-orange-400 active:scale-95 transition"
+            >
+              正常比牌
+            </button>
+            <button
+              onClick={() => setBaodaoConfirmPending(false)}
+              className="flex-1 py-2.5 rounded-xl bg-gray-700 text-gray-300 hover:bg-gray-600 transition"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+  </>
   )
 }

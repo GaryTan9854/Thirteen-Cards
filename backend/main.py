@@ -11,7 +11,7 @@ from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 
-APP_VERSION = "4.9"
+APP_VERSION = "4.10"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -561,10 +561,11 @@ async def ws_endpoint(player_name: str, websocket: WebSocket):
             elif t == "submit_arrangement":
                 if room.phase != Phase.PLAYING or player_name not in room.players:
                     continue
-                top = data.get("top", [])
-                mid = data.get("mid", [])
-                bot = data.get("bot", [])
-                all_in = room.submit(player_name, top, mid, bot)
+                top    = data.get("top", [])
+                mid    = data.get("mid", [])
+                bot    = data.get("bot", [])
+                baodao = bool(data.get("baodao", True))
+                all_in = room.submit(player_name, top, mid, bot, baodao)
 
                 await manager.broadcast({
                     "type":      "arrangement_ready",

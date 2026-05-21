@@ -173,6 +173,13 @@ def play_one_game(player_names=None, strategies=None,
         h13 = Hand13(hands[idx])
         sp = h13.chk_special()
         h13.specialhand = sp
+
+        # If player has a 報到 hand but explicitly opted out (baodao=False), treat as normal
+        ov_pre = override_map.get(idx)
+        if sp != "normal" and ov_pre is not None and not ov_pre.get('baodao', True):
+            sp = "normal"
+            h13.specialhand = "normal"
+
         if sp == "normal":
             if idx in override_map:
                 # Manual arrangement: build Hand3/Hand5 from submitted cardstrs

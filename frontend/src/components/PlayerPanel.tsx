@@ -16,6 +16,7 @@ const STRATEGY_LABEL: Record<string, string> = {
   monte_carlo:  'Monte Carlo',
   ai_model:     'AI',
   random:       '隨機',
+  manual:       '手動',
 }
 
 export default function PlayerPanel({ player, finalScore, strategy = 'rule_base_as' }: Props) {

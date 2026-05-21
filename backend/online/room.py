@@ -191,9 +191,10 @@ class Room:
 
         await mgr.broadcast({"type": "room_update", "room": self.snapshot()})
 
-    def submit(self, player: str, top: list, mid: list, bot: list) -> bool:
+    def submit(self, player: str, top: list, mid: list, bot: list,
+               baodao: bool = True) -> bool:
         """Record arrangement. Returns True when all human players have submitted."""
-        self.arrangements[player] = {"top": top, "mid": mid, "bot": bot}
+        self.arrangements[player] = {"top": top, "mid": mid, "bot": bot, "baodao": baodao}
         return set(self.arrangements.keys()) >= set(self.players)
 
 

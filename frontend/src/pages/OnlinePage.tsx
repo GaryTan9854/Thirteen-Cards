@@ -9,6 +9,8 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../contexts/AuthContext'
 import ManualArrange from '../components/ManualArrange'
+import PlayerPanel from '../components/PlayerPanel'
+import BattleLog from '../components/BattleLog'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -221,10 +223,10 @@ export default function OnlinePage() {
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
-  function handleConfirm(top: string[], mid: string[], bot: string[]) {
+  function handleConfirm(top: string[], mid: string[], bot: string[], isBaodao?: boolean) {
     if (submitted) return
     setSubmitted(true)
-    send({ type: 'submit_arrangement', top, mid, bot })
+    send({ type: 'submit_arrangement', top, mid, bot, baodao: isBaodao !== false })
   }
 
   // ── Derived state ──────────────────────────────────────────────────────────
@@ -554,70 +556,70 @@ export default function OnlinePage() {
   // ── Round end ─────────────────────────────────────────────────────────────
 
   function renderRoundEnd() {
-    const result = lastResult
-    if (!result) return renderWait('載入中…')
+    const res = lastResult
+    if (!res) return renderWait('載入中…')
 
-    const finalScores: { name: string; score: number }[] = result.result?.final_scores ?? []
-    const history    = result.history ?? room?.history ?? []
-    const totals     = history.reduce(
-      (acc: number[], row: number[]) => acc.map((v, i) => v + (row[i] ?? 0)),
-      new Array(4).fill(0)
-    )
+    const gameResult  = res.result
+    const finalScores: { name: string; score: number }[] = gameResult?.final_scores ?? []
+    const scoreMap    = Object.fromEntries(finalScores.map((fs: any) => [fs.name, fs.score]))
+    const seatNames   = res.seat_names ?? room?.seat_names ?? []
+    const aiStrategy  = room?.ai_strategy ?? 'rule_base_as'
 
     return (
-      <div className="bg-green-900/30 rounded-xl p-6 space-y-4">
+      <div className="space-y-4">
+        {/* Header row */}
         <div className="flex items-center justify-between">
           <div className="text-xl font-bold text-yellow-300">
-            第 {result.round} 局結果
-            {result.round > (room?.rounds_normal ?? 16) ? ' 【申訴局】' : ''}
+            第 {res.round} 局結果
+            {res.round > (room?.rounds_normal ?? 16) ? ' 【申訴局】' : ''}
           </div>
           <div className="text-xs text-gray-500">
-            {result.round}/{room?.total_rounds ?? '?'}局
+            {res.round}/{room?.total_rounds ?? '?'}局
           </div>
         </div>
 
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-gray-500 text-xs border-b border-gray-700">
-              <th className="text-left py-1 font-normal">玩家</th>
-              <th className="text-right py-1 font-normal">本局</th>
-              <th className="text-right py-1 font-normal">累計</th>
-            </tr>
-          </thead>
-          <tbody>
-            {finalScores.map((fs, i) => (
-              <tr key={i} className={`border-b border-gray-800
-                ${fs.name === player ? 'font-semibold' : ''}`}>
-                <td className={`py-2 ${fs.name === player ? 'text-yellow-300' : 'text-gray-200'}`}>
-                  {fs.name}
-                </td>
-                <td className={`py-2 text-right ${scoreColor(fs.score)}`}>
-                  {fmt(fs.score)}
-                </td>
-                <td className={`py-2 text-right text-xs ${scoreColor(totals[i] ?? 0)}`}>
-                  {fmt(totals[i] ?? 0)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {/* Battle detail toggle */}
-        <details className="text-xs">
-          <summary className="text-gray-500 cursor-pointer hover:text-gray-300 py-1">
-            ▸ 出牌明細
-          </summary>
-          <div className="mt-2 space-y-1 text-gray-400">
-            {(result.result?.battles ?? []).map((b: any, i: number) => (
-              <div key={i} className="flex justify-between bg-black/20 rounded px-2 py-1">
-                <span>{b.p1} vs {b.p2}</span>
-                <span className={b.total > 0 ? 'text-yellow-300' : b.total < 0 ? 'text-red-400' : 'text-gray-500'}>
-                  {b.gun !== 0 ? (b.gun === 1 ? `💥 ${b.p1} 打槍` : `💥 ${b.p2} 打槍`) : b.desc}
+        {/* Score summary strip */}
+        <div className="bg-green-900 rounded-2xl p-4 shadow-inner">
+          <div className="text-xs text-green-400 mb-2 font-semibold text-center">本局比分</div>
+          <div className="grid grid-cols-4 gap-3">
+            {seatNames.map((name: string) => (
+              <div key={name} className="flex flex-col items-center">
+                <span className={`text-sm ${name === player ? 'text-yellow-300 font-bold' : 'text-green-300'}`}>
+                  {name}
+                </span>
+                <span className={`text-xl font-bold ${scoreColor(scoreMap[name] ?? 0)}`}>
+                  {fmt(scoreMap[name] ?? 0)}
                 </span>
               </div>
             ))}
           </div>
-        </details>
+        </div>
+
+        {/* Player hands (same as GamePage) */}
+        {gameResult?.players && (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            {gameResult.players.map((p: any) => (
+              <PlayerPanel
+                key={p.name}
+                player={p}
+                finalScore={scoreMap[p.name] ?? 0}
+                strategy={room?.players.includes(p.name) ? 'manual' : aiStrategy}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Battle log (same as GamePage) */}
+        {gameResult?.battles && <BattleLog battles={gameResult.battles} />}
+
+        {/* Cumulative score table */}
+        {(res.history ?? room?.history ?? []).length > 0 && (
+          <ScoreTable
+            history={res.history ?? room?.history ?? []}
+            seatNames={seatNames}
+            self={player}
+          />
+        )}
 
         {isHost ? (
           <button onClick={() => send({ type: 'next_round' })}
@@ -637,8 +639,9 @@ export default function OnlinePage() {
   // ── Game end ──────────────────────────────────────────────────────────────
 
   function renderGameEnd() {
-    const history   = lastResult?.history ?? room?.history ?? []
-    const seatNames = lastResult?.seat_names ?? room?.seat_names ?? []
+    const res       = lastResult
+    const history   = res?.history ?? room?.history ?? []
+    const seatNames = res?.seat_names ?? room?.seat_names ?? []
     const totals    = history.reduce(
       (acc: number[], row: number[]) => acc.map((v, i) => v + (row[i] ?? 0)),
       new Array(4).fill(0)
@@ -648,10 +651,16 @@ export default function OnlinePage() {
       .sort((a: any, b: any) => b.total - a.total)
     const medals = ['🥇', '🥈', '🥉', '4th']
 
+    const gameResult  = res?.result
+    const finalScores: { name: string; score: number }[] = gameResult?.final_scores ?? []
+    const scoreMap    = Object.fromEntries(finalScores.map((fs: any) => [fs.name, fs.score]))
+    const aiStrategy  = room?.ai_strategy ?? 'rule_base_as'
+
     return (
-      <div className="bg-green-900/30 rounded-xl p-6 space-y-5">
+      <div className="space-y-4">
         <div className="text-2xl font-bold text-yellow-300 text-center">🏆 比賽結束！</div>
 
+        {/* Final ranking */}
         <div className="space-y-2">
           {sorted.map((p: any, rank: number) => (
             <div key={p.name} className={`flex items-center gap-3 px-4 py-3 rounded-xl
@@ -668,6 +677,22 @@ export default function OnlinePage() {
             </div>
           ))}
         </div>
+
+        {/* Last round hands */}
+        {gameResult?.players && (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            {gameResult.players.map((p: any) => (
+              <PlayerPanel
+                key={p.name}
+                player={p}
+                finalScore={scoreMap[p.name] ?? 0}
+                strategy={room?.players.includes(p.name) ? 'manual' : aiStrategy}
+              />
+            ))}
+          </div>
+        )}
+
+        {gameResult?.battles && <BattleLog battles={gameResult.battles} />}
 
         <ScoreTable history={history} seatNames={seatNames} self={player} />
 
