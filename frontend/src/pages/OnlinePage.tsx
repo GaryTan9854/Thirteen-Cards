@@ -155,6 +155,7 @@ export default function OnlinePage() {
   const [inRoom,      setInRoom]      = useState(false)
 
   // ── Solo mode ──
+  const [soloSetupMode, setSoloSetupMode] = useState(false)   // setup screen before solo game
   const [soloActive,  setSoloActive]  = useState(false)
   const [soloPhase,   setSoloPhase]   = useState<string>('lobby')
   const soloStateRef = useRef<SoloState | null>(null)
@@ -947,8 +948,10 @@ export default function OnlinePage() {
 
       <div className="space-y-4">
         {/* Pre-lobby entry screen */}
-        {!inRoom && !soloActive
+        {!inRoom && !soloActive && !soloSetupMode
           ? renderEnterLobby()
+          : soloSetupMode && !soloActive
+          ? renderSoloSetup()
           : <>
               {inRoom && <OnlineBar players={onlinePlayers} self={player} onLeave={() => {
                 setSoloActive(false)
@@ -1031,15 +1034,96 @@ export default function OnlinePage() {
           進入大廳
         </button>
         <button
-          onClick={() => startSoloGame({
-            roundsNormal: cfgNormal,
-            roundsAppeal: cfgAppeal,
-            aiStrategy:   cfgAiStrategy,
-            aiNames:      cfgAiNames,
-          })}
+          onClick={() => setSoloSetupMode(true)}
           className="px-10 py-3 rounded-xl bg-green-600 text-white font-bold text-lg
                      hover:bg-green-500 active:scale-95 transition-all shadow-lg">
           獨自練功
+        </button>
+      </div>
+    )
+  }
+
+  // ── Solo setup screen (no WS, no OnlineBar) ───────────────────────────────
+
+  function renderSoloSetup() {
+    const aiOptions = [
+      { value: 'rule_base_as', label: 'RB-攻守（推薦）' },
+      { value: 'rule_base_1',  label: 'RB-Σ%' },
+    ]
+    return (
+      <div className="bg-green-900/30 rounded-xl p-6 space-y-5">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setSoloSetupMode(false)}
+            className="text-sm text-gray-400 hover:text-white transition">
+            ← 返回
+          </button>
+          <div className="text-xl font-bold text-green-300">🥋 獨自練功設定</div>
+        </div>
+
+        {/* 局數設定 */}
+        <div className="grid grid-cols-2 gap-4">
+          {[
+            { label: '比賽局數', val: cfgNormal, set: setCfgNormal, min: 1, max: 40 },
+            { label: '申訴局數', val: cfgAppeal, set: setCfgAppeal, min: 0, max: 10 },
+          ].map(({ label, val, set, min, max }) => (
+            <label key={label} className="space-y-1">
+              <span className="text-xs text-gray-400">{label}</span>
+              <NumInput
+                value={val} onChange={set} min={min} max={max}
+                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2
+                           text-white text-center font-bold focus:outline-none focus:border-green-400"
+              />
+            </label>
+          ))}
+        </div>
+
+        {/* AI 玩家名稱 */}
+        <div className="space-y-2">
+          <div className="text-sm text-gray-400">AI 陪打名稱</div>
+          <div className="grid grid-cols-3 gap-2">
+            {cfgAiNames.map((name, i) => (
+              <label key={i} className="space-y-1">
+                <span className="text-xs text-gray-500">AI {i + 1}</span>
+                <select
+                  value={name}
+                  onChange={e => setCfgAiNames(prev => prev.map((n, j) => j === i ? e.target.value : n))}
+                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5
+                             text-white text-sm focus:outline-none focus:border-green-400 cursor-pointer"
+                >
+                  {BEAUTIES.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* AI 模型 */}
+        <label className="flex items-center gap-3">
+          <span className="text-sm text-gray-400 whitespace-nowrap">AI 模型：</span>
+          <select
+            value={cfgAiStrategy}
+            onChange={e => setCfgAiStrategy(e.target.value)}
+            className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
+                       focus:outline-none focus:border-green-400 cursor-pointer"
+          >
+            {aiOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </label>
+
+        <button
+          onClick={() => {
+            setSoloSetupMode(false)
+            startSoloGame({
+              roundsNormal: cfgNormal,
+              roundsAppeal: cfgAppeal,
+              aiStrategy:   cfgAiStrategy,
+              aiNames:      cfgAiNames,
+            })
+          }}
+          className="w-full py-3 rounded-xl bg-green-500 text-white font-bold text-lg
+                     hover:bg-green-400 active:scale-95 transition-all shadow-lg">
+          🥋 開始練功
         </button>
       </div>
     )
