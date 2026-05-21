@@ -202,6 +202,9 @@ def generate_5card_options(available: list) -> list:
     # ── 三條 TR ──────────────────────────────────────────────────────────
     # Try top-2 kickers (greedy) AND bottom-2 kickers (frees high cards for
     # top/mid rows — e.g. 888+AK bot wastes A,K that could form AKQ top).
+    # Also try kickers that skip other trip ranks so that pure 三條 can form
+    # when the hand has multiple trips (otherwise kickers always pick another
+    # trip forming a 葫蘆, and 三條·三條·三條 never appears).
     for tr in trip_ranks:
         non_trip = sorted([cs for cs in available if int(cs[:2]) != tr],
                           key=lambda cs: -int(cs[:2]))
@@ -210,6 +213,17 @@ def generate_5card_options(available: list) -> list:
             bot2 = non_trip[-2:]                               # bottom-2 kickers
             if set(bot2) != set(non_trip[:2]):
                 options.append(by_rank[tr][:3] + bot2)
+        # Skip other trip ranks → allows pure 三條 kickers
+        other_trips = set(trip_ranks) - {tr}
+        if other_trips:
+            nt_skip = sorted([cs for cs in available
+                              if int(cs[:2]) != tr and int(cs[:2]) not in other_trips],
+                             key=lambda cs: -int(cs[:2]))
+            if len(nt_skip) >= 2:
+                options.append(by_rank[tr][:3] + nt_skip[:2])
+                bot2s = nt_skip[-2:]
+                if set(bot2s) != set(nt_skip[:2]):
+                    options.append(by_rank[tr][:3] + bot2s)
 
     # ── 一對 P ───────────────────────────────────────────────────────────
     # Try top-3 AND bottom-3 kickers (same logic as 三條): high single cards
