@@ -16,6 +16,8 @@ import asyncio
 import random
 from typing import Dict, List, Optional
 
+BEAUTIES = ['西施', '王昭君', '貂蟬', '楊貴妃', '妺喜', '妲己', '褒姒', '驪姬']
+
 
 class Phase:
     LOBBY     = "lobby"
@@ -49,13 +51,22 @@ class Room:
         self.arrangements  = {}                  # type: Dict[str, dict]
         self.history       = []                  # type: List[List[int]]
         self.ai_strategy   = "rule_base_as"      # type: str
+        self.ai_names      = random.sample(BEAUTIES, 3)  # type: List[str]
         self._timer:        Optional[asyncio.Task] = None
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     def seat_names(self) -> List[str]:
-        """Names in seat order 0–3; unfilled seats named 'AI-{i}'."""
-        names = [f"AI-{i}" for i in range(4)]
+        """Names in seat order 0–3; unfilled seats use configured beauty names."""
+        human_seats = set(self.seats.values())
+        ai_idx = 0
+        names = []
+        for seat in range(4):
+            if seat in human_seats:
+                names.append("?")          # filled in below
+            else:
+                names.append(self.ai_names[ai_idx] if ai_idx < len(self.ai_names) else f"AI-{seat}")
+                ai_idx += 1
         for p, s in self.seats.items():
             names[s] = p
         return names
@@ -91,6 +102,7 @@ class Room:
             "history":        self.history,
             "submitted":      list(self.arrangements.keys()),
             "ai_strategy":    self.ai_strategy,
+            "ai_names":       self.ai_names,
         }
 
     # ── Game actions ──────────────────────────────────────────────────────────

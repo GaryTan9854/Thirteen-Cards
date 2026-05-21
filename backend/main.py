@@ -11,7 +11,7 @@ from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 
-APP_VERSION = "4.14"
+APP_VERSION = "4.15"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -503,6 +503,11 @@ async def ws_endpoint(player_name: str, websocket: WebSocket):
                 _valid_ai = {"rule_base_as", "rule_base_1"}
                 room.ai_strategy   = data.get("ai_strategy", "rule_base_as") \
                                      if data.get("ai_strategy") in _valid_ai else "rule_base_as"
+                from online.room import BEAUTIES
+                raw_names = data.get("ai_names", [])
+                if (isinstance(raw_names, list) and len(raw_names) == 3
+                        and all(n in BEAUTIES for n in raw_names)):
+                    room.ai_names = raw_names
                 invite_list        = [p for p in data.get("invite_players", [])
                                       if manager.is_online(p)]
 

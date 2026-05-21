@@ -35,11 +35,26 @@ interface RoomSnapshot {
   history:        number[][]
   submitted:      string[]
   ai_strategy:    string
+  ai_names:       string[]
 }
 
 interface InviteInfo {
   from:   string
   config: { rounds_normal: number; rounds_appeal: number; time_limit: number }
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const BEAUTIES = ['西施', '王昭君', '貂蟬', '楊貴妃', '妺喜', '妲己', '褒姒', '驪姬']
+
+function randomBeauties(): string[] {
+  const pool = [...BEAUTIES]
+  const out: string[] = []
+  for (let i = 0; i < 3; i++) {
+    const idx = Math.floor(Math.random() * pool.length)
+    out.push(pool.splice(idx, 1)[0])
+  }
+  return out
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -78,11 +93,12 @@ export default function OnlinePage() {
   const [notices,       setNotices]       = useState<string[]>([])
 
   // ── Setup form (host only) ──
-  const [cfgNormal,     setCfgNormal]     = useState(16)
-  const [cfgAppeal,     setCfgAppeal]     = useState(4)
+  const [cfgNormal,     setCfgNormal]     = useState(4)
+  const [cfgAppeal,     setCfgAppeal]     = useState(0)
   const [cfgTimeLimit,  setCfgTimeLimit]  = useState(30)
   const [cfgInvitees,   setCfgInvitees]   = useState<string[]>([])
   const [cfgAiStrategy, setCfgAiStrategy] = useState('rule_base_as')
+  const [cfgAiNames,    setCfgAiNames]    = useState<string[]>(() => randomBeauties())
 
   // ── Round state ──
   const [myHand,          setMyHand]          = useState<string[] | null>(null)
@@ -177,6 +193,7 @@ export default function OnlinePage() {
       case 'welcome':
         setOnlinePlayers(msg.online_players ?? [])
         setRoom(msg.room ?? null)
+        if (msg.room?.ai_names?.length === 3) setCfgAiNames(msg.room.ai_names)
         break
       case 'online_update':
         setOnlinePlayers(msg.online_players ?? [])
@@ -442,32 +459,31 @@ export default function OnlinePage() {
   // ── Lobby ─────────────────────────────────────────────────────────────────
 
   function renderLobby() {
+    const seatNames = room?.seat_names ?? cfgAiNames.concat([player ?? '']).slice(0, 4)
+    const history   = room?.history ?? []
     return (
-      <div className="bg-green-900/30 rounded-xl p-6 space-y-5">
-        <div className="flex items-center justify-between">
-          <div className="text-xl font-bold text-yellow-300">🏠 大廳</div>
-          {/* Gary-only: force reset any stuck room */}
-          {isGary && (
+      <div className="flex flex-col gap-6">
+        <TournamentPanel
+          names={seatNames}
+          history={history}
+          isEnded={false}
+          roundLabel={history.length === 0 ? '準備開始' : `上場共 ${history.length} 局`}
+          voiceOn={voiceOn}
+          onToggleVoice={toggleVoice}
+          actionButtons={<>
+            {isGary && (
+              <button onClick={async () => { await fetch('/api/online/reset', { method: 'POST' }) }}
+                className="text-xs text-gray-500 hover:text-red-400 px-2 py-1 rounded transition"
+                title="強制重置">⚙ 重置</button>
+            )}
             <button
-              onClick={async () => {
-                await fetch('/api/online/reset', { method: 'POST' })
-              }}
-              className="text-xs text-gray-500 hover:text-red-400 px-2 py-1 rounded transition"
-              title="強制重置房間（管理員用）"
-            >
-              ⚙ 重置
+              onClick={() => send({ type: 'new_game' })}
+              className="text-xs px-3 py-1 rounded-full bg-orange-400 text-gray-900 font-bold
+                         hover:bg-orange-300 active:scale-95 transition whitespace-nowrap animate-pulse">
+              ＋ 新一場比賽
             </button>
-          )}
-        </div>
-
-        <button
-          onClick={() => send({ type: 'new_game' })}
-          className="px-6 py-3 rounded-xl bg-yellow-400 text-gray-900 font-bold
-                     hover:bg-yellow-300 active:scale-95 transition-all"
-        >
-          ＋ 新一場比賽
-        </button>
-
+          </>}
+        />
         {invited && renderInvitePrompt()}
       </div>
     )
@@ -533,6 +549,28 @@ export default function OnlinePage() {
           ))}
         </div>
 
+        {/* AI names (3 beauties) */}
+        <div className="space-y-2">
+          <div className="text-sm text-gray-400">AI 玩家名稱</div>
+          <div className="grid grid-cols-3 gap-2">
+            {cfgAiNames.map((name, i) => (
+              <label key={i} className="space-y-1">
+                <span className="text-xs text-gray-500">AI {i + 1}</span>
+                <select
+                  value={name}
+                  onChange={e => setCfgAiNames(prev => prev.map((n, j) => j === i ? e.target.value : n))}
+                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5
+                             text-white text-sm focus:outline-none focus:border-yellow-400 cursor-pointer"
+                >
+                  {BEAUTIES.map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+        </div>
+
         {/* AI model selector */}
         <label className="flex items-center gap-3">
           <span className="text-sm text-gray-400 whitespace-nowrap">AI 模型：</span>
@@ -580,6 +618,7 @@ export default function OnlinePage() {
             time_limit:     cfgTimeLimit,
             invite_players: cfgInvitees,
             ai_strategy:    cfgAiStrategy,
+            ai_names:       cfgAiNames,
           })}
           className="px-6 py-3 rounded-xl bg-yellow-400 text-gray-900 font-bold
                      hover:bg-yellow-300 active:scale-95 transition-all"
@@ -695,7 +734,8 @@ export default function OnlinePage() {
 
   function renderResult(isEnded: boolean) {
     const res        = lastResult
-    if (!res) return renderWait('載入中…')
+    // No result yet (e.g. reconnected mid-phase) → show lobby
+    if (!res) return renderLobby()
 
     const gameResult = res.result
     const seatNames  = (res.seat_names ?? room?.seat_names ?? []) as string[]
