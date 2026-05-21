@@ -9,8 +9,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../contexts/AuthContext'
 import ManualArrange from '../components/ManualArrange'
-import PlayerPanel from '../components/PlayerPanel'
-import BattleLog from '../components/BattleLog'
+import GameResultDisplay from '../components/GameResultDisplay'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -559,60 +558,30 @@ export default function OnlinePage() {
     const res = lastResult
     if (!res) return renderWait('載入中…')
 
-    const gameResult  = res.result
-    const finalScores: { name: string; score: number }[] = gameResult?.final_scores ?? []
-    const scoreMap    = Object.fromEntries(finalScores.map((fs: any) => [fs.name, fs.score]))
-    const seatNames   = res.seat_names ?? room?.seat_names ?? []
-    const aiStrategy  = room?.ai_strategy ?? 'rule_base_as'
+    const gameResult = res.result
+    const seatNames  = res.seat_names ?? room?.seat_names ?? []
+    const aiStrategy = room?.ai_strategy ?? 'rule_base_as'
+    const strategies = seatNames.map((n: string) =>
+      room?.players.includes(n) ? 'manual' : aiStrategy
+    )
 
     return (
-      <div className="space-y-4">
-        {/* Header row */}
+      <div className="flex flex-col gap-6">
+
+        {/* Round header */}
         <div className="flex items-center justify-between">
-          <div className="text-xl font-bold text-yellow-300">
-            第 {res.round} 局結果
-            {res.round > (room?.rounds_normal ?? 16) ? ' 【申訴局】' : ''}
-          </div>
-          <div className="text-xs text-gray-500">
-            {res.round}/{room?.total_rounds ?? '?'}局
-          </div>
+          <span className="text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold">
+            第 {res.round} / {room?.total_rounds ?? '?'} 局結果
+            {res.round > (room?.rounds_normal ?? 999) ? '【申訴】' : ''}
+          </span>
         </div>
 
-        {/* Score summary strip */}
-        <div className="bg-green-900 rounded-2xl p-4 shadow-inner">
-          <div className="text-xs text-green-400 mb-2 font-semibold text-center">本局比分</div>
-          <div className="grid grid-cols-4 gap-3">
-            {seatNames.map((name: string) => (
-              <div key={name} className="flex flex-col items-center">
-                <span className={`text-sm ${name === player ? 'text-yellow-300 font-bold' : 'text-green-300'}`}>
-                  {name}
-                </span>
-                <span className={`text-xl font-bold ${scoreColor(scoreMap[name] ?? 0)}`}>
-                  {fmt(scoreMap[name] ?? 0)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Player hands (same as GamePage) */}
-        {gameResult?.players && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            {gameResult.players.map((p: any) => (
-              <PlayerPanel
-                key={p.name}
-                player={p}
-                finalScore={scoreMap[p.name] ?? 0}
-                strategy={room?.players.includes(p.name) ? 'manual' : aiStrategy}
-              />
-            ))}
-          </div>
+        {/* Same display as GamePage */}
+        {gameResult && (
+          <GameResultDisplay result={gameResult} strategies={strategies} />
         )}
 
-        {/* Battle log (same as GamePage) */}
-        {gameResult?.battles && <BattleLog battles={gameResult.battles} />}
-
-        {/* Cumulative score table */}
+        {/* Cumulative history */}
         {(res.history ?? room?.history ?? []).length > 0 && (
           <ScoreTable
             history={res.history ?? room?.history ?? []}
@@ -646,61 +615,44 @@ export default function OnlinePage() {
       (acc: number[], row: number[]) => acc.map((v, i) => v + (row[i] ?? 0)),
       new Array(4).fill(0)
     )
-    const sorted = seatNames
+    const sorted    = seatNames
       .map((name: string, i: number) => ({ name, total: totals[i] ?? 0 }))
       .sort((a: any, b: any) => b.total - a.total)
-    const medals = ['🥇', '🥈', '🥉', '4th']
-
-    const gameResult  = res?.result
-    const finalScores: { name: string; score: number }[] = gameResult?.final_scores ?? []
-    const scoreMap    = Object.fromEntries(finalScores.map((fs: any) => [fs.name, fs.score]))
-    const aiStrategy  = room?.ai_strategy ?? 'rule_base_as'
+    const medals    = ['🥇', '🥈', '🥉', '4th']
+    const gameResult = res?.result
+    const aiStrategy = room?.ai_strategy ?? 'rule_base_as'
+    const strategies = seatNames.map((n: string) =>
+      room?.players.includes(n) ? 'manual' : aiStrategy
+    )
 
     return (
-      <div className="space-y-4">
+      <div className="flex flex-col gap-6">
         <div className="text-2xl font-bold text-yellow-300 text-center">🏆 比賽結束！</div>
 
         {/* Final ranking */}
         <div className="space-y-2">
           {sorted.map((p: any, rank: number) => (
             <div key={p.name} className={`flex items-center gap-3 px-4 py-3 rounded-xl
-              ${rank === 0
-                ? 'bg-yellow-400/20 border border-yellow-400'
-                : 'bg-gray-800'}`}>
+              ${rank === 0 ? 'bg-yellow-400/20 border border-yellow-400' : 'bg-gray-800'}`}>
               <span className="text-xl w-8 text-center">{medals[rank]}</span>
               <span className={`font-bold text-lg flex-1 ${p.name === player ? 'text-yellow-300' : 'text-white'}`}>
                 {p.name}
               </span>
-              <span className={`text-xl font-bold ${scoreColor(p.total)}`}>
-                {fmt(p.total)}
-              </span>
+              <span className={`text-xl font-bold ${scoreColor(p.total)}`}>{fmt(p.total)}</span>
             </div>
           ))}
         </div>
 
-        {/* Last round hands */}
-        {gameResult?.players && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            {gameResult.players.map((p: any) => (
-              <PlayerPanel
-                key={p.name}
-                player={p}
-                finalScore={scoreMap[p.name] ?? 0}
-                strategy={room?.players.includes(p.name) ? 'manual' : aiStrategy}
-              />
-            ))}
-          </div>
+        {/* Last round display — identical to GamePage */}
+        {gameResult && (
+          <GameResultDisplay result={gameResult} strategies={strategies} />
         )}
-
-        {gameResult?.battles && <BattleLog battles={gameResult.battles} />}
 
         <ScoreTable history={history} seatNames={seatNames} self={player} />
 
-        <button
-          onClick={() => send({ type: 'new_game' })}
+        <button onClick={() => send({ type: 'new_game' })}
           className="w-full py-3 rounded-xl bg-yellow-400 text-gray-900 font-bold
-                     hover:bg-yellow-300 active:scale-95 transition-all"
-        >
+                     hover:bg-yellow-300 active:scale-95 transition-all">
           再來一場
         </button>
       </div>

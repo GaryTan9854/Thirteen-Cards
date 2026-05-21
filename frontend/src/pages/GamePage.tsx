@@ -1,8 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { GameResult } from '../types/game'
-import PlayerPanel from '../components/PlayerPanel'
-import BattleLog from '../components/BattleLog'
 import ManualArrange from '../components/ManualArrange'
+import GameResultDisplay from '../components/GameResultDisplay'
 
 const DEFAULT_NAMES = ['Glory', 'Jack', 'Ian', 'Gary']
 const STRATEGIES = ['rule_base_1', 'rule_base_as', 'monte_carlo', 'ai_model', 'random', 'manual']
@@ -512,10 +511,6 @@ export default function GamePage({ embedded = false }: Props) {
 
   const winnerName = DEFAULT_NAMES[totalScores.indexOf(Math.max(...totalScores))]
 
-  const scoreMap = result
-    ? Object.fromEntries(result.final_scores.map((s: any) => [s.name, s.score]))
-    : {}
-
   // ── Score history panel（左右兩欄，最多各 10 局，字體放大）────────────────
   const HistoryPanel = () => {
     const SPLIT = 10
@@ -779,42 +774,11 @@ export default function GamePage({ embedded = false }: Props) {
         )}
 
         {result && !loading && (
-          <>
-            <div className="bg-green-900 rounded-2xl p-4 shadow-inner">
-              <div className="text-xs text-green-400 mb-2 font-semibold text-center">本局比分</div>
-              {(() => {
-                const curMul = roundMultipliers[roundMultipliers.length - 1] ?? 1
-                return (
-                  <div className="grid grid-cols-4 gap-3">
-                    {result.final_scores.map((fs: any) => (
-                      <div key={fs.name} className="flex flex-col items-center">
-                        <span className="text-sm text-green-300">{fs.name}</span>
-                        <span className={`text-xl font-bold ${scoreColor(fs.score)}`}>
-                          {fmt(fs.score)}
-                        </span>
-                        {curMul > 1 && (
-                          <>
-                            <span className="text-xs text-orange-400 font-bold leading-tight">×{curMul}</span>
-                            <span className={`text-lg font-bold ${scoreColor(Math.round(fs.score * curMul))}`}>
-                              {fmt(Math.round(fs.score * curMul))}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )
-              })()}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-              {result.players.map((p: any, i: number) => (
-                <PlayerPanel key={p.name} player={p} finalScore={scoreMap[p.name] ?? 0} strategy={strategies[i]} />
-              ))}
-            </div>
-
-            <BattleLog battles={result.battles} />
-          </>
+          <GameResultDisplay
+            result={result}
+            strategies={strategies}
+            multiplier={roundMultipliers[roundMultipliers.length - 1] ?? 1}
+          />
         )}
       </div>
 

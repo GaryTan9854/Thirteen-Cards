@@ -148,6 +148,9 @@ class Room:
         if self._timer and not self._timer.done():
             self._timer.cancel()
 
+        # Brief pause so all players see "已送出排法" screen before results appear
+        await _aio.sleep(1.5)
+
         overrides = [
             {"player": self.seats[p], **arr}
             for p, arr in self.arrangements.items()
