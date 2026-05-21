@@ -41,7 +41,7 @@ function AppInner() {
           {/* Logo */}
           <div className="flex items-baseline gap-2">
             <h1 className="text-lg font-bold tracking-wide leading-none">
-              🃏 <span className="hidden xs:inline">Thirteen </span>Cards
+              🃏 Thirteen Cards
             </h1>
             {version && (
               <span className="text-xs font-normal text-green-400 leading-none">v{version}</span>

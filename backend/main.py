@@ -11,7 +11,7 @@ from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 
-APP_VERSION = "6.3"
+APP_VERSION = "6.4"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -171,39 +171,33 @@ def manual_arrange_info(req: ManualInfoRequest):
     sp_name  = hist.chk_special()
     sp_score = 0
     if sp_name != "normal":
-        tier = SpecialHand.get(sp_name, 0)
-        if sp_name in SpecialChargeByName:
-            sp_score = SpecialChargeByName[sp_name]
-        elif tier >= 700:
-            sp_score = SpecialCharge["sp5"]
-        elif tier >= 590:
-            sp_score = SpecialCharge["sp4"]
-        elif tier >= 500:
-            sp_score = SpecialCharge["sp3"]
-        elif tier >= 1:
-            sp_score = SpecialCharge["sp1"]
+        sp_score = SpecialChargeByName.get(sp_name, SpecialCharge["sp1"])
 
-    # 完整報到項目清單（每家收幾分）
+    # 完整報到項目清單（每家收幾分）—— 依新計分排列
     ALL_SPECIAL = [
-        ("全黑一張紅", "sp1"), ("全紅一張黑", "sp1"),
-        ("全大", "sp1"), ("全小", "sp1"),
-        ("單pair", "sp1"), ("單三條", "sp1"),
-        ("雙pair無花無順", None), ("兩花色", None),
-        ("三同花", "sp3"), ("三順子", "sp3"),
-        ("六對半", "sp3"),
-        ("全黑一點紅", "sp4"), ("全紅一點黑", "sp4"),
-        ("全紅", "sp4"), ("全黑", "sp4"),
-        ("大全小", "sp4"), ("大全大", "sp4"),
-        ("六對半帶葫蘆", "sp5"), ("四套三條", "sp5"),
-        ("三分天下", "sp5"), ("三同花順", "sp5"),
-        ("十二皇族", "sp5"), ("一條龍", "sp5"), ("清龍", "sp5"),
+        # 6分
+        "三同花", "三順子", "六對半",
+        "全黑一張紅", "全紅一張黑",
+        "全大", "全小",
+        "單pair", "單三條",
+        # 9分
+        "雙報到",
+        # 12分
+        "雙pair無花無順", "兩花色",
+        # 18分
+        "全黑一點紅", "全紅一點黑",
+        "全紅", "全黑",
+        "大全小", "大全大", "六對半帶葫蘆",
+        # 39分
+        "一條龍",
+        # 45分
+        "四套三條", "三分天下", "三同花順", "十二皇族",
+        # 100分
+        "清龍",
     ]
     baodao_list = []
-    for name, tier_key in ALL_SPECIAL:
-        if tier_key is None:
-            score = SpecialChargeByName.get(name, 0)
-        else:
-            score = SpecialCharge.get(tier_key, 0)
+    for name in ALL_SPECIAL:
+        score = SpecialChargeByName.get(name, 0)
         baodao_list.append({
             "name": name,
             "score": score,

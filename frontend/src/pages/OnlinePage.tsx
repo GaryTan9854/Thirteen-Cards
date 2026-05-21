@@ -612,7 +612,7 @@ export default function OnlinePage() {
     }
   }
 
-  async function resolveSoloRound(top: string[], mid: string[], bot: string[]) {
+  async function resolveSoloRound(top: string[], mid: string[], bot: string[], isBaodao?: boolean) {
     const state = soloStateRef.current!
     const seatNames = state.seatNames
 
@@ -625,7 +625,7 @@ export default function OnlinePage() {
         player_names: seatNames,
         strategies,
         pre_dealt:    state.preDelt,
-        overrides:    [{ player: 0, top, mid, bot }],
+        overrides:    [{ player: 0, top, mid, bot, baodao: isBaodao !== false }],
       }),
     }).then(r => r.json())
 
@@ -816,7 +816,7 @@ export default function OnlinePage() {
     setSubmitted(true)
     if (soloActive) {
       // Solo mode: resolve locally
-      resolveSoloRound(top, mid, bot)
+      resolveSoloRound(top, mid, bot, isBaodao)
     } else {
       send({ type: 'submit_arrangement', top, mid, bot, baodao: isBaodao !== false })
     }
@@ -1029,6 +1029,17 @@ export default function OnlinePage() {
           className="px-10 py-3 rounded-xl bg-yellow-400 text-gray-900 font-bold text-lg
                      hover:bg-yellow-300 active:scale-95 transition-all shadow-lg">
           進入大廳
+        </button>
+        <button
+          onClick={() => startSoloGame({
+            roundsNormal: cfgNormal,
+            roundsAppeal: cfgAppeal,
+            aiStrategy:   cfgAiStrategy,
+            aiNames:      cfgAiNames,
+          })}
+          className="px-10 py-3 rounded-xl bg-green-600 text-white font-bold text-lg
+                     hover:bg-green-500 active:scale-95 transition-all shadow-lg">
+          獨自練功
         </button>
       </div>
     )

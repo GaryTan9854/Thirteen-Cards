@@ -143,6 +143,42 @@ class Hist_Cards13(Hist_Cards):
                         return True
         return False
 
+    def chk_all_6pt(self):
+        """Return list of all 6-point special hand types that apply to this hand.
+        Excludes conditions that would be superseded by an 18-pt higher-tier type."""
+        found = []
+        # 三同花
+        if self.chk_3flush():
+            found.append("三同花")
+        # 三順子 (but not 三同花順, which is a 45-pt hand)
+        ss = self.has_3straight()
+        if ss and not self.has_3straightflush(ss):
+            found.append("三順子")
+        # 六對半: 6 pairs + 1 singleton, no trips
+        if self.check_sets(2, 2, 2, 2, 2, 2) and max(self.values()) == 2:
+            found.append("六對半")
+        # 全黑一張紅: 12 black + 1 non-ace red
+        br = self.h13.isAllButOneRed()
+        if br > 0 and br != 14:
+            found.append("全黑一張紅")
+        # 全紅一張黑: 12 red + 1 non-ace black
+        br2 = self.h13.isAllButOneBlack()
+        if br2 > 0 and br2 != 14:
+            found.append("全紅一張黑")
+        # 全大 — exclude if also 大全大 (18pts) to avoid overriding with 雙報到 (9pts)
+        if self.chk_allbig() and not self.chk_bigallbig():
+            found.append("全大")
+        # 全小 — exclude if also 大全小 (18pts) for same reason
+        if self.chk_allsmall() and not self.chk_bigallsmall():
+            found.append("全小")
+        # 單pair: exactly 1 pair, rest singles, no trips/quads
+        if self.check_sets(2, 1) and max(self.values()) == 2:
+            found.append("單pair")
+        # 單三條: exactly 1 trip, rest singles
+        if max(self.values()) == 3 and self.check_sets(3, 1):
+            found.append("單三條")
+        return found
+
     def chk_special(self):
         if self.chk_dragon():
             return "清龍" if self.is_flush else "一條龍"
@@ -152,6 +188,10 @@ class Hist_Cards13(Hist_Cards):
             return "四套三條"
         if self.check_sets(4, 4, 4):
             return "三分天下"
+        # 雙報到: two distinct 6-point types present simultaneously
+        six_pt = self.chk_all_6pt()
+        if len(six_pt) >= 2:
+            return "雙報到"
         ss = self.has_3straight()
         if ss:
             return "三同花順" if self.has_3straightflush(ss) else "三順子"
