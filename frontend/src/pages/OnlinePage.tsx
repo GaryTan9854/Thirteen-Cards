@@ -5,11 +5,16 @@
  *   lobby → setup → inviting → seating → playing → round_end → ended
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../contexts/AuthContext'
 import ManualArrange from '../components/ManualArrange'
 import GameResultDisplay from '../components/GameResultDisplay'
+import {
+  GunNotif, GUN_NOTIF_MS,
+  detectGrandSlam, buildGunNotifs, buildSpecialTTS,
+  speak, speakSequence,
+} from '../utils/gameEffects'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,8 +50,8 @@ function fmt(n: number) { return (n > 0 ? '+' : '') + n }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function OnlineBar({ players, self: self_ }: {
-  players: string[]; self: string | null
+function OnlineBar({ players, self: self_, voiceOn, onToggleVoice }: {
+  players: string[]; self: string | null; voiceOn: boolean; onToggleVoice: () => void
 }) {
   return (
     <div className="flex items-center gap-2 flex-wrap py-1">
@@ -59,6 +64,12 @@ function OnlineBar({ players, self: self_ }: {
           {p}
         </span>
       ))}
+      <button onClick={onToggleVoice}
+        className={`ml-auto text-xs px-2 py-0.5 rounded-full transition
+          ${voiceOn ? 'bg-green-700 text-green-200' : 'bg-gray-700 text-gray-400'}`}
+        title={voiceOn ? '關閉語音' : '開啟語音'}>
+        {voiceOn ? '🔊 語音' : '🔇 靜音'}
+      </button>
     </div>
   )
 }
@@ -131,17 +142,54 @@ export default function OnlinePage() {
   const [submittedList,   setSubmittedList]   = useState<string[]>([])
   const [lastResult,      setLastResult]      = useState<any | null>(null)
 
+  // ── Effects: 打槍 / 全壘打 / 語音 ──
+  const [grandSlammer, setGrandSlammer]     = useState<string | null>(null)
+  const [currentGun,   setCurrentGun]       = useState<GunNotif | null>(null)
+  const gunQueueRef  = useRef<GunNotif[]>([])
+  const [voiceOn,      setVoiceOn]          = useState(true)
+  const voiceRef     = useRef(true)
+  const ttsGenRef    = useRef(0)
+
+  function toggleVoice() {
+    const next = !voiceRef.current
+    voiceRef.current = next
+    setVoiceOn(next)
+  }
+
+  const processNextGun = useCallback(() => {
+    const q = gunQueueRef.current
+    if (q.length === 0) { setCurrentGun(null); return }
+    const [next, ...rest] = q
+    gunQueueRef.current = rest
+    setCurrentGun(next)
+    if (voiceRef.current) {
+      speak(next.count === 2
+        ? `${next.winner} 打槍兩人！${next.losers[0]} 和 ${next.losers[1]}`
+        : `${next.winner} 打槍 ${next.losers[0]}`)
+    }
+    setTimeout(processNextGun, GUN_NOTIF_MS)
+  }, [])
+
+  // 全壘打：顯示 5 s 後自動關閉，並念出
+  useEffect(() => {
+    if (!grandSlammer) return
+    if (voiceRef.current) speak(`${grandSlammer}，全壘打！打爆三家！`, 0.88)
+    const t = setTimeout(() => setGrandSlammer(null), 5000)
+    return () => clearTimeout(t)
+  }, [grandSlammer])
+
   // ── Connection ─────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!player) return
+    const playerName = player    // capture non-null for nested function
     let dead = false          // set true on cleanup so reconnect doesn't fire after unmount
     let retryTimer: ReturnType<typeof setTimeout> | null = null
 
     function connect() {
       if (dead) return
       const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const ws = new WebSocket(`${proto}//${window.location.host}/ws/${encodeURIComponent(player)}`)
+      const ws = new WebSocket(`${proto}//${window.location.host}/ws/${encodeURIComponent(playerName)}`)
       wsRef.current = ws
 
       ws.onopen  = () => setConnected(true)
@@ -223,17 +271,64 @@ export default function OnlinePage() {
         setRoom(prev => prev ? {
           ...prev, phase: 'round_end', current_round: msg.round, history: msg.history
         } : prev)
+        fireRoundEffects(msg.result ?? {})
         break
       case 'game_ended':
         setMyHand(null)
         setCountdown(null)
         setLastResult(msg)
         setRoom(prev => prev ? { ...prev, phase: 'ended' } : prev)
+        fireRoundEffects(msg.result ?? {})
         break
       case 'player_disconnected':
         if (msg.online_players) setOnlinePlayers(msg.online_players)
         if (msg.room) setRoom(msg.room)
         break
+    }
+  }
+
+  // ── Fire round effects (slam / guns / voice) ───────────────────────────────
+
+  function fireRoundEffects(result: any) {
+    window.speechSynthesis?.cancel()
+    const slam      = detectGrandSlam(result.battles ?? [])
+    const gunNotifs = buildGunNotifs(result.battles ?? [], slam)
+    setGrandSlammer(slam)
+    setCurrentGun(null)
+    gunQueueRef.current = []
+
+    const { baodao: baodaoLines, monsters: monsterLines } = buildSpecialTTS(result.players ?? [])
+    const myGen = ++ttsGenRef.current
+
+    const startGuns = () => {
+      if (ttsGenRef.current !== myGen) return
+      if (gunNotifs.length > 0) {
+        gunQueueRef.current = gunNotifs
+        processNextGun()
+        if (monsterLines.length > 0) {
+          setTimeout(() => {
+            if (ttsGenRef.current !== myGen || !voiceRef.current) return
+            speakSequence(monsterLines)
+          }, gunNotifs.length * GUN_NOTIF_MS + 800)
+        }
+      } else if (monsterLines.length > 0 && voiceRef.current) {
+        speakSequence(monsterLines)
+      }
+    }
+
+    if (slam) {
+      setTimeout(() => {
+        if (ttsGenRef.current !== myGen || !voiceRef.current) return
+        if (baodaoLines.length > 0) {
+          speakSequence(baodaoLines, () => {
+            if (ttsGenRef.current !== myGen || !voiceRef.current) return
+            if (monsterLines.length > 0) speakSequence(monsterLines)
+          })
+        } else if (monsterLines.length > 0) speakSequence(monsterLines)
+      }, 4500)
+    } else {
+      if (baodaoLines.length > 0 && voiceRef.current) speakSequence(baodaoLines, startGuns)
+      else startGuns()
     }
   }
 
@@ -277,8 +372,48 @@ export default function OnlinePage() {
   return (
     <>
       {arrangePortal}
-      <div className="space-y-4 max-w-3xl">
-        <OnlineBar players={onlinePlayers} self={player} />
+
+      {/* ── 全壘打 Overlay ── */}
+      {grandSlammer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center cursor-pointer"
+             style={{ background: 'rgba(0,0,0,0.72)' }}
+             onClick={() => setGrandSlammer(null)}>
+          <div className="text-center select-none px-8" style={{ animation: 'grandSlam 0.4s ease-out' }}>
+            <div className="text-8xl mb-4" style={{ filter: 'drop-shadow(0 0 24px #facc15)' }}>🎯</div>
+            <div className="text-7xl font-black tracking-widest mb-3"
+                 style={{ color:'#FFD700', textShadow:'0 0 40px #FFD700, 0 0 80px #FF8C00, 3px 3px 0 #7c2d12', letterSpacing:'0.08em' }}>
+              全壘打！！
+            </div>
+            <div className="text-3xl font-bold text-white mb-1">🏆 {grandSlammer} 打爆三家！</div>
+            <div className="text-base text-yellow-300 opacity-70 mt-4">點擊關閉</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 打槍 Toast ── */}
+      {currentGun && !grandSlammer && (
+        <div className="fixed bottom-14 left-0 right-0 z-40 flex justify-center pointer-events-none">
+          <div className="text-center px-10 py-4 rounded-2xl shadow-2xl border border-red-700/50"
+               style={{ background:'rgba(10,0,0,0.88)', animation:'gunShot 0.28s ease-out' }}>
+            <div className="text-5xl mb-1.5" style={{ display:'inline-block', transform:'scaleX(-1)' }}>🔫</div>
+            <div className="text-3xl font-black tracking-widest"
+                 style={{ color:'#f87171', textShadow:'0 0 22px rgba(239,68,68,0.75)' }}>
+              {currentGun.count === 2 ? '打槍兩人！' : '打槍！'}
+            </div>
+            <div className="text-base text-gray-300 mt-1.5">
+              <span className="font-bold text-red-300">{currentGun.winner}</span>
+              {currentGun.count === 1 ? (
+                <><span className="text-gray-500 mx-1.5">轟掉</span><span className="text-gray-400">{currentGun.losers[0]}</span></>
+              ) : (
+                <><span className="text-gray-500 mx-1.5">：</span><span className="text-gray-400">{currentGun.losers[0]} &amp; {currentGun.losers[1]}</span></>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-4">
+        <OnlineBar players={onlinePlayers} self={player} voiceOn={voiceOn} onToggleVoice={toggleVoice} />
 
         {/* Reconnecting banner */}
         {!connected && (
@@ -302,6 +437,21 @@ export default function OnlinePage() {
 
         {renderPhase()}
       </div>
+
+      <style>{`
+        @keyframes grandSlam {
+          0%   { transform: scale(0.3) rotate(-8deg); opacity: 0; }
+          60%  { transform: scale(1.12) rotate(2deg); opacity: 1; }
+          80%  { transform: scale(0.96) rotate(-1deg); }
+          100% { transform: scale(1) rotate(0deg); }
+        }
+        @keyframes gunShot {
+          0%   { transform: scale(0.55) translateY(18px); opacity: 0; }
+          55%  { transform: scale(1.06) translateY(-4px); opacity: 1; }
+          80%  { transform: scale(0.97) translateY(0);    opacity: 1; }
+          100% { transform: scale(1)    translateY(0);    opacity: 1; }
+        }
+      `}</style>
     </>
   )
 

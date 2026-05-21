@@ -2,6 +2,11 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { GameResult } from '../types/game'
 import ManualArrange from '../components/ManualArrange'
 import GameResultDisplay from '../components/GameResultDisplay'
+import {
+  GunNotif, GUN_NOTIF_MS,
+  detectGrandSlam, buildGunNotifs, buildSpecialTTS,
+  speak, speakSequence,
+} from '../utils/gameEffects'
 
 const DEFAULT_NAMES = ['Glory', 'Jack', 'Ian', 'Gary']
 const STRATEGIES = ['rule_base_1', 'rule_base_as', 'monte_carlo', 'ai_model', 'random', 'manual']
@@ -16,16 +21,8 @@ const STRATEGY_LABEL: Record<string, string> = {
 
 const ROUNDS_NORMAL = 16
 const ROUNDS_APPEAL = 4
-const GUN_NOTIF_MS  = 2400   // 每個打槍通知顯示時間
 
 type Phase = 'normal' | 'appeal_pending' | 'in_appeal' | 'ended'
-
-interface GunNotif {
-  id:     number
-  winner: string
-  losers: string[]   // length 1 = 打槍, length 2 = 打槍兩人
-  count:  1 | 2
-}
 
 interface Props {
   embedded?: boolean
@@ -42,124 +39,7 @@ function scoreColor(n: number) {
   return n > 0 ? 'text-yellow-300' : n < 0 ? 'text-red-400' : 'text-gray-400'
 }
 
-// ── Grand Slam detection ──────────────────────────────────────────────────────
-function detectGrandSlam(battles: any[]): string | null {
-  const gunCount: Record<string, number> = {}
-  for (const b of battles) {
-    if (b.gun === 1)       gunCount[b.p1] = (gunCount[b.p1] || 0) + 1
-    else if (b.gun === -1) gunCount[b.p2] = (gunCount[b.p2] || 0) + 1
-  }
-  const entry = Object.entries(gunCount).find(([, c]) => c === 3)
-  return entry ? entry[0] : null
-}
-
-// ── 打槍 event builder（同一人打兩人 → 合併成打槍兩人）─────────────────────
-function buildGunNotifs(battles: any[], slam: string | null): GunNotif[] {
-  const byWinner: Record<string, string[]> = {}
-  for (const b of battles) {
-    if      (b.gun === 1)  { byWinner[b.p1] = [...(byWinner[b.p1] ?? []), b.p2] }
-    else if (b.gun === -1) { byWinner[b.p2] = [...(byWinner[b.p2] ?? []), b.p1] }
-  }
-  let id = Date.now()
-  const notifs: GunNotif[] = []
-  for (const [winner, losers] of Object.entries(byWinner)) {
-    if (winner === slam) continue            // grand slam 已獨立處理
-    if      (losers.length === 1) notifs.push({ id: id++, winner, losers,             count: 1 })
-    else if (losers.length === 2) notifs.push({ id: id++, winner, losers,             count: 2 })
-  }
-  return notifs
-}
-
-// ── 特殊牌型 TTS 建構（分兩批：報到 / 怪物牌型）────────────────────────────
-function buildSpecialTTS(players: any[]): { baodao: string[]; monsters: string[] } {
-  const baodao:   string[] = []
-  const monsters: string[] = []
-  for (const p of players) {
-    const name = p.name as string
-    // 特殊手牌（六對半、全大全小、三同花、兩花色…）→ 報到批
-    if (p.special_hand && p.special_hand !== 'normal') {
-      baodao.push(`${name}，${p.special_hand} 報到！`)
-      continue
-    }
-    // 逐墩掃描怪物牌型 → 怪物批
-    if (p.top) {
-      if (p.top.hand_type === '三條') {
-        monsters.push(`${name}，原子頭！${p.top.description}！`)
-      } else if (p.top.hand_type === '一對') {
-        const aces = (p.top.cards as string[]).filter((c: string) => parseInt(c) === 14).length
-        if (aces >= 2) monsters.push(`${name}，柳丁！老A 撐頭！`)
-      }
-    }
-    if (p.mid) {
-      if (p.mid.hand_type === '鐵支') {
-        monsters.push(`${name}，中墩鐵支！${p.mid.description}！`)
-      } else if (p.mid.hand_type === '葫蘆') {
-        monsters.push(`${name}，中墩葫蘆！${p.mid.description}！`)
-      } else if (['同花順', '同花次大順', '同花大順'].includes(p.mid.hand_type)) {
-        monsters.push(`${name}，中墩同花順！${p.mid.description}！`)
-      }
-    }
-    if (p.bot) {
-      if (p.bot.hand_type === '鐵支') {
-        monsters.push(`${name}，尾墩鐵支！${p.bot.description}！`)
-      } else if (['同花順', '同花次大順', '同花大順'].includes(p.bot.hand_type)) {
-        monsters.push(`${name}，尾墩同花順！${p.bot.description}！`)
-      }
-    }
-  }
-  return { baodao, monsters }
-}
-
-// ── 女聲 TTS（Web Speech API，優先 zh-TW）────────────────────────────────────
-function speak(text: string, rate = 1.05) {
-  const synth = window.speechSynthesis
-  if (!synth) return
-  synth.cancel()
-
-  const utter = new SpeechSynthesisUtterance(text)
-  utter.lang  = 'zh-TW'
-  utter.rate  = rate
-  utter.pitch = 1.2
-
-  const doSpeak = () => {
-    const voices  = synth.getVoices()
-    const zh      = voices.filter(v => v.lang.startsWith('zh'))
-    // 優先找有女聲名稱的（macOS: 美嘉/Sin-ji；iOS: 雅雯…）
-    const female  =
-      zh.find(v => /meijia|美嘉|sin[\s-]?ji|sinji|ya[\s-]?wen|雅雯/i.test(v.name)) ||
-      zh.find(v => /tingting|ting[\s-]?ting/i.test(v.name)) ||
-      zh.find(v => v.lang === 'zh-TW') ||
-      zh[0]
-    if (female) utter.voice = female
-    synth.speak(utter)
-  }
-
-  if (synth.getVoices().length > 0) doSpeak()
-  else synth.addEventListener('voiceschanged', doSpeak, { once: true })
-}
-
-// ── 連續多行 TTS（onend 鏈接，每句說完才說下一句；全部說完觸發 onDone）────
-function speakSequence(lines: string[], onDone?: () => void, rate = 1.05) {
-  if (lines.length === 0) { onDone?.(); return }
-  const synth = window.speechSynthesis
-  if (!synth) { onDone?.(); return }
-  const voices = synth.getVoices()
-  const zh     = voices.filter(v => v.lang.startsWith('zh'))
-  const female =
-    zh.find(v => /meijia|美嘉|sin[\s-]?ji|sinji|ya[\s-]?wen|雅雯/i.test(v.name)) ||
-    zh.find(v => /tingting|ting[\s-]?ting/i.test(v.name))                         ||
-    zh.find(v => v.lang === 'zh-TW') || zh[0]
-  let idx = 0
-  const playNext = () => {
-    if (idx >= lines.length) { onDone?.(); return }
-    const utter = new SpeechSynthesisUtterance(lines[idx++])
-    utter.lang = 'zh-TW'; utter.rate = rate; utter.pitch = 1.2
-    if (female) utter.voice = female
-    utter.onend = playNext
-    synth.speak(utter)
-  }
-  playNext()
-}
+// (detectGrandSlam, buildGunNotifs, buildSpecialTTS, speak, speakSequence imported from utils/gameEffects)
 
 export default function GamePage({ embedded = false }: Props) {
   const [result, setResult]     = useState<GameResult | null>(null)
