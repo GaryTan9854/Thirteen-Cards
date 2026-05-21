@@ -32,7 +32,7 @@ const SORT_LABEL: Record<SortMode,string> = {
   A2:   'A→2(A低)',
   suit: '依同花(♠♥♦♣)',
 }
-const SUIT_ORDER: Record<string,number> = { S:0, H:1, D:2, C:3 }
+const SUIT_ORDER: Record<string,number> = { S:0, H:1, C:2, D:3 }  // black-red-black-red alternating
 
 function sortCards(cards: string[], mode: SortMode): string[] {
   return [...cards].sort((a,b) => {
@@ -141,12 +141,25 @@ function StatsPanel({ stats, special }: { stats?:StatsData; special?:SpecialData
         </tbody>
       </table>
       {showBaodao && special && (
-        <div className="mt-1 max-h-52 overflow-y-auto bg-black/40 rounded p-2 text-[15px]">
-          {special.baodao_list.map(b=>(
-            <div key={b.name}
-              className={`flex justify-between py-0.5 ${b.achieved?'text-green-400 font-bold':'text-gray-600'}`}>
-              <span>{b.achieved?'✅ ':'— '}{b.name}</span>
-              <span>{b.score>0?`×3每家 +${b.score}`:''}</span>
+        <div className="mt-1 max-h-64 overflow-y-auto bg-black/40 rounded p-2 text-[14px]">
+          {Object.entries(
+            special.baodao_list.reduce((acc: Record<number, typeof special.baodao_list>, b) => {
+              if (!acc[b.score]) acc[b.score] = []
+              acc[b.score].push(b)
+              return acc
+            }, {})
+          )
+          .sort(([a],[b])=>Number(a)-Number(b))
+          .map(([score, items])=>(
+            <div key={score} className="mb-2">
+              <div className="text-gray-400 font-bold text-[12px] mb-0.5">{score} 分</div>
+              <div className="grid grid-cols-2 gap-x-3">
+                {items.map(b=>(
+                  <span key={b.name} className={b.achieved?'text-green-400 font-bold':'text-gray-600'}>
+                    {b.achieved?'✅ ':'— '}{b.name}
+                  </span>
+                ))}
+              </div>
             </div>
           ))}
         </div>
@@ -365,64 +378,66 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
                 </button>
               )}
             </div>
-            <div className="flex flex-wrap gap-1 sm:gap-1.5 transition-opacity duration-200"
+            <div className="flex flex-nowrap gap-1 overflow-x-auto pb-1 transition-opacity duration-200"
               style={{opacity: fade ? 0 : 1}}>
-              {displayHand.map((cs,i)=><CardTile key={cs+i} cs={cs} size="md" />)}
+              {displayHand.map((cs,i)=><CardTile key={cs+i} cs={cs} size="sm" />)}
             </div>
           </div>
 
-          {/* Right panel: Stats + Group buttons */}
-          <div className="w-full sm:w-[420px] shrink-0 flex flex-col gap-3">
-            <StatsPanel stats={info?.stats} special={info?.special} />
-            {/* Group buttons in 2-column grid */}
-            <div>
-              <div className="text-xs text-gray-500 mb-1.5">牌型排法（點同一按鈕切換此型的不同排法）</div>
-              {apiError
-                ? <div className="text-xs text-red-400">⚠ {apiError}</div>
-                : !info
-                  ? <div className="text-xs text-gray-500">分析中…</div>
-                  : info.groups.length===0
-                    ? <div className="text-xs text-orange-400">特殊牌型：{info.special.name}</div>
-                    : (
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {info.groups.slice(0,10).map((g,gi)=>{
-                          const active  = gi===selGroup
-                          const matched = gi===matchedGroup && gi!==selGroup
-                          const cnt = g.variants.length
-                          return (
-                            <button key={gi} onClick={()=>pickGroup(gi)}
-                              className={`text-[16px] px-2 py-1.5 rounded-lg border transition-colors text-left
-                                ${active
-                                  ?'bg-yellow-400 text-gray-900 border-yellow-400 font-bold'
-                                  : matched
-                                    ?'bg-gray-800 text-gray-200 border-orange-500 font-semibold'
-                                    :'bg-gray-800 text-gray-300 border-gray-600 hover:border-yellow-500'}`}>
-                              {g.label}
-                              {active && cnt>1 && <span className="ml-1 opacity-70 text-sm">{varIdx+1}/{cnt}</span>}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )
-              }
-            </div>
-          </div>
+          {/* Stats panel (right side of Row 1) */}
+          <StatsPanel stats={info?.stats} special={info?.special} />
         </div>
 
-        {/* ── Row 3: Arrangement area ── */}
-        <div className="bg-black/30 rounded-xl px-4 py-2">
-          {curVariant && (
-            <div className="flex gap-4 text-[10px] text-gray-500 mb-2 flex-wrap">
-              <span>頭：{curVariant.top_desc}</span>
-              <span className="mx-1">·</span>
-              <span>中：{curVariant.mid_desc}</span>
-              <span className="mx-1">·</span>
-              <span>尾：{curVariant.bot_desc}</span>
-            </div>
-          )}
-          <RowDisplay label="頭墩 (3)" cards={arr.top} slots={3} />
-          <RowDisplay label="中墩 (5)" cards={arr.mid} slots={5} />
-          <RowDisplay label="尾墩 (5)" cards={arr.bot} slots={5} />
+        {/* ── Row 2: Arrangement (left) | Group buttons (right) ── */}
+        <div className="flex flex-col sm:flex-row sm:gap-4 gap-3 sm:items-start">
+          {/* Arrangement area */}
+          <div className="flex-1 min-w-0 bg-black/30 rounded-xl px-4 py-2">
+            {curVariant && (
+              <div className="flex gap-4 text-[10px] text-gray-500 mb-2 flex-wrap">
+                <span>頭：{curVariant.top_desc}</span>
+                <span className="mx-1">·</span>
+                <span>中：{curVariant.mid_desc}</span>
+                <span className="mx-1">·</span>
+                <span>尾：{curVariant.bot_desc}</span>
+              </div>
+            )}
+            <RowDisplay label="頭墩 (3)" cards={arr.top} slots={3} />
+            <RowDisplay label="中墩 (5)" cards={arr.mid} slots={5} />
+            <RowDisplay label="尾墩 (5)" cards={arr.bot} slots={5} />
+          </div>
+
+          {/* Group buttons panel (right) */}
+          <div className="w-full sm:w-[380px] shrink-0">
+            <div className="text-xs text-gray-500 mb-1.5">牌型排法（點同一按鈕切換此型的不同排法）</div>
+            {apiError
+              ? <div className="text-xs text-red-400">⚠ {apiError}</div>
+              : !info
+                ? <div className="text-xs text-gray-500">分析中…</div>
+                : info.groups.length===0
+                  ? <div className="text-xs text-orange-400">特殊牌型：{info.special.name}</div>
+                  : (
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {info.groups.slice(0,10).map((g,gi)=>{
+                        const active  = gi===selGroup
+                        const matched = gi===matchedGroup && gi!==selGroup
+                        const cnt = g.variants.length
+                        return (
+                          <button key={gi} onClick={()=>pickGroup(gi)}
+                            className={`text-[16px] px-2 py-1.5 rounded-lg border transition-colors text-left
+                              ${active
+                                ?'bg-yellow-400 text-gray-900 border-yellow-400 font-bold'
+                                : matched
+                                  ?'bg-gray-800 text-gray-200 border-orange-500 font-semibold'
+                                  :'bg-gray-800 text-gray-300 border-gray-600 hover:border-yellow-500'}`}>
+                            {g.label}
+                            {active && cnt>1 && <span className="ml-1 opacity-70 text-sm">{varIdx+1}/{cnt}</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )
+            }
+          </div>
         </div>
 
         {/* ── Row 4: Countdown (online mode) ── */}

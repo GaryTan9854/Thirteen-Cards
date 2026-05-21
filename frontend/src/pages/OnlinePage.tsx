@@ -488,10 +488,23 @@ export default function OnlinePage() {
     )
     const winnerIdx = totals.indexOf(Math.max(...totals))
     const loserIdx  = totals.indexOf(Math.min(...totals))
+    // Calculate delay based on last-round complexity so announcement comes in tight
+    let delay = 1500
+    if (msg.from_appeal_decline) {
+      delay = 800
+    } else {
+      const result = msg.result ?? {}
+      const gunCount = (result.battles ?? []).filter((b: any) => b.gun !== 0).length
+      const hasSpecial = (result.players ?? []).some((p: any) => p.special_hand && p.special_hand !== 'normal')
+      const hasMonsters = (result.battles ?? []).some((b: any) => b.p1_top || b.p1_mid || b.p1_bot || b.p2_mid || b.p2_bot)
+      if (gunCount > 0) delay = gunCount * 3200 + 1000
+      else if (hasSpecial || hasMonsters) delay = 3000
+      else delay = 1500
+    }
     setTimeout(() => {
       if (voiceRef.current)
         speak(`本場結束！冠軍 ${seatNames[winnerIdx]}！${seatNames[loserIdx]} 請客！`, 0.92)
-    }, msg.from_appeal_decline ? 800 : 7000)
+    }, delay)
   }
 
   // ── Fire round effects (slam / guns / voice) ───────────────────────────────
