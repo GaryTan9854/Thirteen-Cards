@@ -196,7 +196,7 @@ export default function OnlinePage() {
     const players: any[] = result.players ?? []
     return players.map((p: any) => {
       const b: string[] = []
-      if (p.special_hand && p.special_hand !== 'normal') b.push('報到')
+      if (p.special_hand && p.special_hand !== 'normal') b.push(p.special_hand)
       if (TOP_M.has(p.top?.hand_type))  b.push(ML[p.top.hand_type])
       if (MID_M.has(p.mid?.hand_type))  b.push(ML[p.mid.hand_type])
       if (BOT_M.has(p.bot?.hand_type))  b.push(ML[p.bot.hand_type])

@@ -69,7 +69,7 @@ export default function TournamentPanel({
     <div className="flex mb-1">
       <span className="w-14 shrink-0" />
       {names.map(n => (
-        <span key={n} className="flex-1 text-center text-green-400 font-semibold text-base truncate">{n}</span>
+        <span key={n} className="flex-1 text-center text-green-400 font-semibold text-lg truncate">{n}</span>
       ))}
     </div>
   )
@@ -84,21 +84,21 @@ export default function TournamentPanel({
         return (
           <div key={i} className="flex items-start">
             <div className="w-14 shrink-0 pt-0.5">
-              <span className="text-gray-400 text-base leading-tight">
+              <span className="text-gray-400 text-lg leading-tight">
                 {roundIdx + 1}
-                {mul > 1 && <span className="text-orange-400 font-bold text-sm ml-0.5">×{mul}</span>}
+                {mul > 1 && <span className="text-orange-400 font-bold text-base ml-0.5">×{mul}</span>}
               </span>
             </div>
             {scores.map((s, j) => {
               const pBadges = badgesPerSeat[j] ?? []
               return (
-                <span key={j} className="flex-1 flex flex-col items-center pt-0.5">
+                <span key={j} className="flex-1 flex flex-row items-center justify-center gap-1 pt-0.5 flex-wrap">
                   {j === circledPlayer
-                    ? <span className={`${scoreColor(s)} text-base outline outline-1 outline-orange-400 rounded-full inline-flex items-center justify-center min-w-[1.6rem] h-[1.6rem] text-sm leading-none px-0.5`}>{fmt(s)}</span>
-                    : <span className={`${scoreColor(s)} text-base`}>{fmt(s)}</span>
+                    ? <span className={`${scoreColor(s)} text-lg outline outline-1 outline-orange-400 rounded-full inline-flex items-center justify-center min-w-[1.8rem] h-[1.8rem] leading-none px-0.5`}>{fmt(s)}</span>
+                    : <span className={`${scoreColor(s)} text-lg`}>{fmt(s)}</span>
                   }
                   {pBadges.map(b => (
-                    <span key={b} className="text-[10px] px-1 rounded bg-purple-900/70 text-purple-300 font-bold leading-tight whitespace-nowrap mt-0.5">
+                    <span key={b} className="text-[11px] px-1 rounded bg-purple-900/70 text-purple-300 font-bold leading-tight whitespace-nowrap">
                       {b}
                     </span>
                   ))}
@@ -130,9 +130,9 @@ export default function TournamentPanel({
       </div>
       {roundCount > 0 && (
         <div className="flex mt-2 pt-2 border-t border-gray-600 font-bold">
-          <span className="w-14 shrink-0 text-gray-400 text-base">合計</span>
+          <span className="w-14 shrink-0 text-gray-400 text-lg">合計</span>
           {totalScores.map((s, j) => (
-            <span key={j} className={`flex-1 text-center text-base ${scoreColor(s)}`}>{fmt(s)}</span>
+            <span key={j} className={`flex-1 text-center text-lg ${scoreColor(s)}`}>{fmt(s)}</span>
           ))}
         </div>
       )}

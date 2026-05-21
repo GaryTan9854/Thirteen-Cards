@@ -14,11 +14,11 @@ function resIcon(val: number) {
 
 // Labels vary by row — mid and bot have different multipliers
 const TOP_MONSTER_SHORT: Record<string, string> = {
-  '三條': '原子頭 3↑',
+  '三條': '原子頭 3',
 }
 const MID_MONSTER_SHORT: Record<string, string> = {
   '葫蘆':      '葫蘆 2',
-  '鐵支':      '鐵支 8↑',
+  '鐵支':      '鐵支 8',
   '同花順':    '同花順 10',
   '同花次大順':'次大順 12',
   '同花大順':  '大順 14',
