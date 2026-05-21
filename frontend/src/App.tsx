@@ -9,7 +9,7 @@ import OnlinePage from './pages/OnlinePage'
 
 function AppInner() {
   const { player, logout } = useAuth()
-  const [tab, setTab]       = useState('game')
+  const [tab, setTab]       = useState('online')
   const [version, setVersion] = useState('')
 
   useEffect(() => {
@@ -26,8 +26,10 @@ function AppInner() {
 
   const TABS = [
     { id: 'online', label: '🌐 連線遊戲' },
-    { id: 'game',   label: '🃏 遊戲模擬' },
-    ...(isGary ? [{ id: 'duel', label: '⚔️ 策略對決' }] : []),
+    ...(isGary ? [
+      { id: 'game', label: '🃏 遊戲模擬' },
+      { id: 'duel', label: '⚔️ 策略對決' },
+    ] : []),
   ]
 
   return (
@@ -91,7 +93,7 @@ function AppInner() {
         </div>
 
         {/* Game + Duel are conditionally mounted (no persistence needed) */}
-        {tab === 'game' && <GamePage embedded />}
+        {isGary && tab === 'game' && <GamePage embedded />}
         {isGary && tab === 'duel' && <DuelPage />}
       </div>
     </div>

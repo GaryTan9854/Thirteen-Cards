@@ -378,7 +378,7 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
                 ? <div className="text-xs text-orange-400">特殊牌型：{info.special.name}</div>
                 : (
                   <div className="flex flex-wrap gap-1.5">
-                    {info.groups.slice(0,5).map((g,gi)=>{
+                    {info.groups.slice(0,10).map((g,gi)=>{
                       const active = gi===selGroup
                       const cnt = g.variants.length
                       return (
