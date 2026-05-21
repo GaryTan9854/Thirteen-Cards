@@ -11,7 +11,7 @@ from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 
-APP_VERSION = "5.18"
+APP_VERSION = "5.19"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -276,10 +276,7 @@ def manual_arrange_info(req: ManualInfoRequest):
     }
 
     # ── 排列分組 ────────────────────────────────────────────────────────────
-    if sp_name != "normal":
-        return {"stats": stats, "special": {"name": sp_name, "score": sp_score,
-                "baodao_list": baodao_list}, "groups": []}
-
+    # Always enumerate groups even for special hands — user may choose not to 報到
     candidates = enumerate_arrangements(handstrs)
 
     def _row_label(ht: int) -> str:
