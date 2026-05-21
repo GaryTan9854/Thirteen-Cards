@@ -59,11 +59,7 @@ function sortCards(cards: string[], mode: SortMode): string[] {
 // ─── CardTile ─────────────────────────────────────────────────────────────────
 
 function CardTile({ cs, size='md' }: { cs:string; size?:'sm'|'md'|'lg' }) {
-  const dim = size==='lg'
-    ? 'w-10 h-14 text-sm sm:w-14 sm:h-20 sm:text-base'
-    : size==='md'
-    ? 'w-9 h-12 text-xs sm:w-11 sm:h-16 sm:text-sm'
-    : 'w-7 h-10 text-[10px] sm:w-9 sm:h-12 sm:text-xs'
+  const dim = size==='lg' ? 'w-14 h-20 text-base' : size==='md' ? 'w-11 h-16 text-sm' : 'w-9 h-12 text-xs'
   return (
     <span className={`inline-flex items-center justify-center rounded-lg border-2 font-bold shadow select-none
       ${dim} ${isRed(cs) ? 'border-red-300 bg-white text-red-600' : 'border-gray-400 bg-white text-gray-900'}`}>
@@ -76,12 +72,13 @@ function CardTile({ cs, size='md' }: { cs:string; size?:'sm'|'md'|'lg' }) {
 
 function RowDisplay({ label, cards, slots }: { label:string; cards:string[]; slots:number }) {
   return (
-    <div className="flex items-center gap-2 sm:gap-3 py-2 sm:py-3 border-b border-gray-700 last:border-0">
-      <span className="w-14 sm:w-20 text-xs sm:text-sm text-gray-400 shrink-0 leading-tight">{label}</span>
-      <div className="flex gap-1 sm:gap-2 flex-wrap">
+    <div className="flex items-center gap-3 py-3 border-b border-gray-700 last:border-0">
+      <span className="w-20 text-sm text-gray-400 shrink-0">{label}</span>
+      {/* overflow-x-auto so cards scroll on narrow mobile screens without squishing */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
         {cards.map((cs,i) => <CardTile key={i} cs={cs} size="lg" />)}
         {Array.from({length: slots - cards.length}).map((_,i) => (
-          <span key={'e'+i} className="w-10 h-14 sm:w-14 sm:h-20 rounded-lg border-2 border-dashed border-gray-600" />
+          <span key={'e'+i} className="w-14 h-20 shrink-0 rounded-lg border-2 border-dashed border-gray-600" />
         ))}
       </div>
     </div>
@@ -122,14 +119,14 @@ function StatsPanel({ stats, special }: { stats?:StatsData; special?:SpecialData
   ]
 
   return (
-    <div className="w-full sm:w-72 shrink-0 text-[14px] sm:text-[18px]">
+    <div className="w-full sm:w-72 shrink-0 text-[18px]">
       <table className="w-full">
         <tbody>
           {rows.map(r=>(
             <tr key={r.label} className="border-b border-gray-800">
               <td className="py-0.5 pr-2 text-gray-400 whitespace-nowrap">{r.label}</td>
-              <td className="py-0.5 px-1 text-yellow-300 font-bold text-center w-6 sm:w-7">{r.v}</td>
-              <td className="py-0.5 text-gray-500 text-[12px] sm:text-[15px] leading-tight">{r.d||'—'}</td>
+              <td className="py-0.5 px-1 text-yellow-300 font-bold text-center w-7">{r.v}</td>
+              <td className="py-0.5 text-gray-500 text-[15px] leading-tight">{r.d||'—'}</td>
             </tr>
           ))}
           <tr>

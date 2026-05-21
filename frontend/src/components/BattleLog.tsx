@@ -13,12 +13,14 @@ function resIcon(val: number) {
 }
 
 const MONSTER_SHORT: Record<string, string> = {
-  '葫蘆':     '葫蘆×2',
-  '鐵支':     '鐵支×8↑',
-  '同花順':   '同花順×10',
-  '同花次大順': '次大順×12',
-  '同花大順': '大順×14',
-  '三條':     '原子頭×3↑',
+  // top (頭墩) only — 原子頭
+  '三條':      '原子頭×3↑',
+  // mid/bot
+  '葫蘆':      '葫蘆×2',
+  '鐵支':      '鐵支×8↑',
+  '同花順':    '同花順×10',
+  '同花次大順':'次大順×12',
+  '同花大順':  '大順×14',
 }
 
 function MonsterBadge({ type }: { type?: string | null }) {
@@ -43,10 +45,10 @@ export default function BattleLog({ battles }: Props) {
               {b.desc}
             </span>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs justify-end">
-              {/* Top */}
+              {/* Top — show 原子頭 badge if either player has 三條 at top */}
               <span className="flex items-center gap-0.5 text-gray-500">
                 頭 {resIcon(b.top)}
-                <MonsterBadge type={b.top > 0 ? b.p1_top : b.top < 0 ? b.p1_top : null} />
+                <MonsterBadge type={b.p1_top} />
               </span>
               {/* Mid */}
               <span className="flex items-center gap-0.5 text-gray-500">

@@ -251,7 +251,10 @@ def play_one_game(player_names=None, strategies=None,
 
     gun_counts = {name: 0 for name in player_names}
 
-    MONSTER_TYPES = {'葫蘆', '鐵支', '同花順', '同花次大順', '同花大順', '三條'}
+    # 三條 bonus only applies to 頭墩 (top row = 原子頭).
+    # 中墩/尾墩 三條 is a normal hand with no special scoring.
+    TOP_MONSTERS    = {'三條'}
+    MID_BOT_MONSTERS = {'葫蘆', '鐵支', '同花順', '同花次大順', '同花大順'}
 
     for i, j in combos:
         res = compete(hand13_list[i], hand13_list[j])
@@ -281,10 +284,10 @@ def play_one_game(player_names=None, strategies=None,
         # Collect monster hand-types for both sides (for UI annotation)
         h1, h2 = hand13_list[i], hand13_list[j]
 
-        def _mtype(h, row):
+        def _mtype(h, row, allowed):
             if h.specialhand != 'normal': return None
             ht = getattr(h, row).handtype
-            return ht if ht in MONSTER_TYPES else None
+            return ht if ht in allowed else None
 
         battles.append({
             "p1": p1_name,
@@ -297,11 +300,12 @@ def play_one_game(player_names=None, strategies=None,
             "total": battle_res[3],
             "gun": res[4],
             "desc": desc,
-            "p1_top": _mtype(h1, 'htop'),
-            "p1_mid": _mtype(h1, 'hmid'),
-            "p1_bot": _mtype(h1, 'hbot'),
-            "p2_mid": _mtype(h2, 'hmid'),
-            "p2_bot": _mtype(h2, 'hbot'),
+            # top: 原子頭(三條) only; mid/bot: 葫蘆/鐵支/同花順 only
+            "p1_top": _mtype(h1, 'htop', TOP_MONSTERS),
+            "p1_mid": _mtype(h1, 'hmid', MID_BOT_MONSTERS),
+            "p1_bot": _mtype(h1, 'hbot', MID_BOT_MONSTERS),
+            "p2_mid": _mtype(h2, 'hmid', MID_BOT_MONSTERS),
+            "p2_bot": _mtype(h2, 'hbot', MID_BOT_MONSTERS),
         })
 
     # Calculate final scores with gun multipliers
