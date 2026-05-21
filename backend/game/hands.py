@@ -257,7 +257,9 @@ class Hand5(Hand):
             trips = [c for c in self if c.value == self.p[0]]
             rest  = sorted([c for c in self if c.value != self.p[0]], key=lambda c: c.value, reverse=True)
             return trips + rest
-        elif ht in ("順", "同花順", "同花次大順", "同花大順"):
+        elif ht in ("同花順", "同花次大順", "同花大順"):
+            return sorted(self, key=lambda c: c.value, reverse=True)
+        elif ht == "順":
             # A2345: show A first, then 2,3,4,5 low→high
             if self.p[0] == 1:
                 ace  = [c for c in self if c.value == 14]
