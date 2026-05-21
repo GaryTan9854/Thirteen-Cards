@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom'
 import { useAuth } from '../contexts/AuthContext'
 import ManualArrange from '../components/ManualArrange'
 import GameResultDisplay from '../components/GameResultDisplay'
+import TournamentPanel from '../components/TournamentPanel'
 import {
   GunNotif, GUN_NOTIF_MS,
   detectGrandSlam, buildGunNotifs, buildSpecialTTS,
@@ -41,17 +42,10 @@ interface InviteInfo {
   config: { rounds_normal: number; rounds_appeal: number; time_limit: number }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function scoreColor(n: number) {
-  return n > 0 ? 'text-yellow-300' : n < 0 ? 'text-red-400' : 'text-gray-400'
-}
-function fmt(n: number) { return (n > 0 ? '+' : '') + n }
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function OnlineBar({ players, self: self_, voiceOn, onToggleVoice }: {
-  players: string[]; self: string | null; voiceOn: boolean; onToggleVoice: () => void
+function OnlineBar({ players, self: self_ }: {
+  players: string[]; self: string | null
 }) {
   return (
     <div className="flex items-center gap-2 flex-wrap py-1">
@@ -64,51 +58,7 @@ function OnlineBar({ players, self: self_, voiceOn, onToggleVoice }: {
           {p}
         </span>
       ))}
-      <button onClick={onToggleVoice}
-        className={`ml-auto text-xs px-2 py-0.5 rounded-full transition
-          ${voiceOn ? 'bg-green-700 text-green-200' : 'bg-gray-700 text-gray-400'}`}
-        title={voiceOn ? '關閉語音' : '開啟語音'}>
-        {voiceOn ? '🔊 語音' : '🔇 靜音'}
-      </button>
     </div>
-  )
-}
-
-function ScoreTable({ history, seatNames, self: self_ }: {
-  history: number[][];  seatNames: string[]; self: string | null
-}) {
-  if (!history.length) return null
-  const totals = history.reduce(
-    (acc, row) => acc.map((v, i) => v + (row[i] ?? 0)),
-    new Array(4).fill(0)
-  )
-  return (
-    <table className="w-full text-sm mt-2">
-      <thead>
-        <tr className="text-gray-500 text-xs border-b border-gray-700">
-          <th className="text-left py-1 font-normal">玩家</th>
-          {history.map((_, r) => (
-            <th key={r} className="text-right py-1 font-normal w-10">局{r + 1}</th>
-          ))}
-          <th className="text-right py-1 font-normal w-14">累計</th>
-        </tr>
-      </thead>
-      <tbody>
-        {seatNames.map((name, si) => (
-          <tr key={si} className={`border-b border-gray-800 ${name === self_ ? 'font-semibold' : ''}`}>
-            <td className={`py-1.5 ${name === self_ ? 'text-yellow-300' : 'text-gray-200'}`}>{name}</td>
-            {history.map((row, r) => (
-              <td key={r} className={`py-1.5 text-right text-xs ${scoreColor(row[si] ?? 0)}`}>
-                {fmt(row[si] ?? 0)}
-              </td>
-            ))}
-            <td className={`py-1.5 text-right font-bold ${scoreColor(totals[si])}`}>
-              {fmt(totals[si])}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
   )
 }
 
@@ -413,7 +363,7 @@ export default function OnlinePage() {
       )}
 
       <div className="space-y-4">
-        <OnlineBar players={onlinePlayers} self={player} voiceOn={voiceOn} onToggleVoice={toggleVoice} />
+        <OnlineBar players={onlinePlayers} self={player} />
 
         {/* Reconnecting banner */}
         {!connected && (
@@ -741,117 +691,70 @@ export default function OnlinePage() {
     )
   }
 
-  // ── Round end ─────────────────────────────────────────────────────────────
+  // ── Shared round/game result renderer ────────────────────────────────────
 
-  function renderRoundEnd() {
-    const res = lastResult
+  function renderResult(isEnded: boolean) {
+    const res        = lastResult
     if (!res) return renderWait('載入中…')
 
     const gameResult = res.result
-    const seatNames  = res.seat_names ?? room?.seat_names ?? []
+    const seatNames  = (res.seat_names ?? room?.seat_names ?? []) as string[]
+    const history    = (res.history ?? room?.history ?? []) as number[][]
     const aiStrategy = room?.ai_strategy ?? 'rule_base_as'
     const strategies = seatNames.map((n: string) =>
-      room?.players.includes(n) ? 'manual' : aiStrategy
+      (room?.players ?? []).includes(n) ? 'manual' : aiStrategy
     )
+    const roundLabel = isEnded
+      ? `本場結束（共 ${history.length} 局）`
+      : `第 ${res.round} / ${room?.total_rounds ?? '?'} 局結果${res.round > (room?.rounds_normal ?? 999) ? '【申訴】' : ''}`
 
     return (
       <div className="flex flex-col gap-6">
 
-        {/* Round header */}
-        <div className="flex items-center justify-between">
-          <span className="text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold">
-            第 {res.round} / {room?.total_rounds ?? '?'} 局結果
-            {res.round > (room?.rounds_normal ?? 999) ? '【申訴】' : ''}
-          </span>
-          {isGary && (
-            <button onClick={async () => { await fetch('/api/online/reset', { method: 'POST' }) }}
-              className="text-xs text-gray-500 hover:text-red-400 px-2 py-1 rounded transition"
-              title="強制重置">⚙ 重置</button>
-          )}
-        </div>
-
-        {/* Same display as GamePage */}
-        {gameResult && (
-          <GameResultDisplay result={gameResult} strategies={strategies} />
-        )}
-
-        {/* Cumulative history */}
-        {(res.history ?? room?.history ?? []).length > 0 && (
-          <ScoreTable
-            history={res.history ?? room?.history ?? []}
-            seatNames={seatNames}
-            self={player}
-          />
-        )}
-
-        {isHost ? (
-          <button onClick={() => send({ type: 'next_round' })}
-            className="w-full py-3 rounded-xl bg-yellow-400 text-gray-900 font-bold
-                       hover:bg-yellow-300 active:scale-95 transition-all">
-            下一局 →
-          </button>
-        ) : (
-          <div className="text-center text-gray-400 text-sm">
-            等待 {room?.host} 開始下一局…
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // ── Game end ──────────────────────────────────────────────────────────────
-
-  function renderGameEnd() {
-    const res       = lastResult
-    const history   = res?.history ?? room?.history ?? []
-    const seatNames = res?.seat_names ?? room?.seat_names ?? []
-    const totals    = history.reduce(
-      (acc: number[], row: number[]) => acc.map((v, i) => v + (row[i] ?? 0)),
-      new Array(4).fill(0)
-    )
-    const sorted    = seatNames
-      .map((name: string, i: number) => ({ name, total: totals[i] ?? 0 }))
-      .sort((a: any, b: any) => b.total - a.total)
-    const medals    = ['🥇', '🥈', '🥉', '4th']
-    const gameResult = res?.result
-    const aiStrategy = room?.ai_strategy ?? 'rule_base_as'
-    const strategies = seatNames.map((n: string) =>
-      room?.players.includes(n) ? 'manual' : aiStrategy
-    )
-
-    return (
-      <div className="flex flex-col gap-6">
-        <div className="text-2xl font-bold text-yellow-300 text-center">🏆 比賽結束！</div>
-
-        {/* Final ranking */}
-        <div className="space-y-2">
-          {sorted.map((p: any, rank: number) => (
-            <div key={p.name} className={`flex items-center gap-3 px-4 py-3 rounded-xl
-              ${rank === 0 ? 'bg-yellow-400/20 border border-yellow-400' : 'bg-gray-800'}`}>
-              <span className="text-xl w-8 text-center">{medals[rank]}</span>
-              <span className={`font-bold text-lg flex-1 ${p.name === player ? 'text-yellow-300' : 'text-white'}`}>
-                {p.name}
+        {/* TournamentPanel — identical to 遊戲模擬 */}
+        <TournamentPanel
+          names={seatNames}
+          history={history}
+          isEnded={isEnded}
+          roundLabel={roundLabel}
+          voiceOn={voiceOn}
+          onToggleVoice={toggleVoice}
+          actionButtons={<>
+            {isGary && (
+              <button onClick={async () => { await fetch('/api/online/reset', { method: 'POST' }) }}
+                className="text-xs text-gray-500 hover:text-red-400 px-2 py-1 rounded transition"
+                title="強制重置">⚙ 重置</button>
+            )}
+            {isEnded ? (
+              <button onClick={() => send({ type: 'new_game' })}
+                className="text-xs px-3 py-1 rounded-full bg-orange-400 text-gray-900 font-bold
+                           hover:bg-orange-300 active:scale-95 transition whitespace-nowrap animate-pulse">
+                再來一場
+              </button>
+            ) : isHost ? (
+              <button onClick={() => send({ type: 'next_round' })}
+                className="text-xs px-3 py-1 rounded-full bg-orange-400 text-gray-900 font-bold
+                           hover:bg-orange-300 active:scale-95 transition whitespace-nowrap animate-pulse">
+                下一局 →
+              </button>
+            ) : (
+              <span className="text-xs text-gray-400 whitespace-nowrap">
+                等待 {room?.host}…
               </span>
-              <span className={`text-xl font-bold ${scoreColor(p.total)}`}>{fmt(p.total)}</span>
-            </div>
-          ))}
-        </div>
+            )}
+          </>}
+        />
 
-        {/* Last round display — identical to GamePage */}
+        {/* 本局比分 + PlayerPanels + BattleLog — identical to 遊戲模擬 */}
         {gameResult && (
           <GameResultDisplay result={gameResult} strategies={strategies} />
         )}
-
-        <ScoreTable history={history} seatNames={seatNames} self={player} />
-
-        <button onClick={() => send({ type: 'new_game' })}
-          className="w-full py-3 rounded-xl bg-yellow-400 text-gray-900 font-bold
-                     hover:bg-yellow-300 active:scale-95 transition-all">
-          再來一場
-        </button>
       </div>
     )
   }
+
+  function renderRoundEnd() { return renderResult(false) }
+  function renderGameEnd()  { return renderResult(true)  }
 
   // ── Generic wait screen ───────────────────────────────────────────────────
 
