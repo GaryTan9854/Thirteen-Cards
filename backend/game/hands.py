@@ -32,17 +32,17 @@ class Hand(list):
         return all(i.isRed() for i in self)
 
     def isAllButOneBlack(self):
+        """12 black + 1 red: returns the lone RED card's value (14=Ace), else 0."""
         reds = [i for i in self if i.isRed()]
-        blacks = [i for i in self if i.isBlack()]
         if len(reds) == 1:
-            return blacks[0].value if blacks else 0
+            return reds[0].value
         return 0
 
     def isAllButOneRed(self):
+        """12 red + 1 black: returns the lone BLACK card's value (14=Ace), else 0."""
         blacks = [i for i in self if i.isBlack()]
-        reds = [i for i in self if i.isRed()]
         if len(blacks) == 1:
-            return reds[0].value if reds else 0
+            return blacks[0].value
         return 0
 
 

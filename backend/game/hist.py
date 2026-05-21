@@ -151,8 +151,7 @@ class Hist_Cards13(Hist_Cards):
         if self.chk_3flush():
             found.append("三同花")
         # 三順子 (but not 三同花順, which is a 45-pt hand)
-        ss = self.has_3straight()
-        if ss and not self.has_3straightflush(ss):
+        if self.has_3straight() and not self.chk_3straightflush():
             found.append("三順子")
         # 六對半: 6 pairs + 1 singleton, no trips
         if self.check_sets(2, 2, 2, 2, 2, 2) and max(self.values()) == 2:
@@ -180,53 +179,94 @@ class Hist_Cards13(Hist_Cards):
         return found
 
     def chk_special(self):
+        # ── 100 pt ────────────────────────────────────────────────────────────
         if self.chk_dragon():
-            return "清龍" if self.is_flush else "一條龍"
-        if min(self.numlist) == 11:
+            if self.is_flush:
+                return "清龍"
+            # 一條龍 (39pt) — but check 45pt hands first below
+
+        # ── 45 pt ─────────────────────────────────────────────────────────────
+        # 十二皇族: exactly 12 J/Q/K cards (4×J + 4×Q + 4×K) + 1 other
+        face_count = sum(1 for v in self.numlist if v in (11, 12, 13))
+        if face_count == 12:
             return "十二皇族"
+        # 四套三條: 4 different three-of-a-kind sets + 1 odd card
         if self.check_sets(3, 3, 3, 3):
             return "四套三條"
+        # 三分天下: 3 four-of-a-kind sets + 1 odd card
         if self.check_sets(4, 4, 4):
             return "三分天下"
-        # 雙報到: two distinct 6-point types present simultaneously
-        six_pt = self.chk_all_6pt()
-        if len(six_pt) >= 2:
-            return "雙報到"
-        ss = self.has_3straight()
-        if ss:
-            return "三同花順" if self.has_3straightflush(ss) else "三順子"
-        if self.chk_3flush():
-            return "三同花"
-        if self.check_sets(2, 2, 2, 2, 2, 2):
-            return "六對半帶葫蘆" if max(self.values()) == 3 else "六對半"
+        # 三同花順: 3 straight-flush groups (2×5-card + 1×3-card)
+        # Must be checked BEFORE 一條龍 (45pt > 39pt); 清龍 already returned above
+        if self.chk_3straightflush():
+            return "三同花順"
+
+        # ── 39 pt ─────────────────────────────────────────────────────────────
+        if self.chk_dragon():
+            return "一條龍"
+
+        # ── 18 pt (must all precede 雙報到 to avoid being swallowed) ──────────
+        # 六對半帶葫蘆: 5 pairs + 1 trip (sets = [3,2,2,2,2,2])
+        if max(self.values()) == 3 and sum(1 for v in self.values() if v == 2) == 5:
+            return "六對半帶葫蘆"
+        # 全黑 / 全紅
         if self.h13.isAllBlack():
             return "全黑"
         if self.h13.isAllRed():
             return "全紅"
-        br = self.h13.isAllButOneBlack()
-        if br > 0:
-            return "全紅一點黑" if br == 14 else "全紅一張黑"
-        br = self.h13.isAllButOneRed()
-        if br > 0:
-            return "全黑一點紅" if br == 14 else "全黑一張紅"
-        # 兩花色：恰好兩種花色（非全黑/全紅已先攔截），不限張數分配
+        # 12 black + 1 red Ace → 全黑一點紅 (18pt)
+        br_black = self.h13.isAllButOneBlack()   # lone RED card's value
+        if br_black == 14:
+            return "全黑一點紅"
+        # 12 red + 1 black Ace → 全紅一點黑 (18pt)
+        br_red = self.h13.isAllButOneRed()       # lone BLACK card's value
+        if br_red == 14:
+            return "全紅一點黑"
+        # 大全大 / 大全小 (18pt)
+        if self.chk_bigallbig():
+            return "大全大"
+        if self.chk_bigallsmall():
+            return "大全小"
+
+        # ── 12 pt ─────────────────────────────────────────────────────────────
+        # 兩花色: exactly 2 suits (全黑/全紅 already caught above)
         all_suits = set(c.suit for c in self.h13)
         if len(all_suits) == 2:
             return "兩花色"
-        if self.chk_bigallbig():
-            return "大全大"
-        if self.chk_allbig():
-            return "全大"
-        if self.chk_bigallsmall():
-            return "大全小"
-        if self.chk_allsmall():
-            return "全小"
+        # 雙pair無花無順: 2 pairs + 9 singles, no straight, no flush
         if max(self.values()) == 2 and self.check_sets(2, 2, 1) and self.no_straight13() and not self.is_flush:
             return "雙pair無花無順"
+
+        # ── 9 pt: 雙報到 (two simultaneous 6-pt types) ───────────────────────
+        six_pt = self.chk_all_6pt()
+        if len(six_pt) >= 2:
+            return "雙報到"
+
+        # ── 6 pt ──────────────────────────────────────────────────────────────
+        # 三順子: 3 straights (not SF) — chk_3straightflush already excluded above
+        ss = self.has_3straight()
+        if ss:
+            return "三順子"
+        if self.chk_3flush():
+            return "三同花"
+        # 六對半: 6 pairs + 1 singleton, no trips
+        if self.check_sets(2, 2, 2, 2, 2, 2) and max(self.values()) == 2:
+            return "六對半"
+        # 12 black + 1 red non-Ace → 全黑一張紅 (6pt)
+        if br_black > 0:
+            return "全黑一張紅"
+        # 12 red + 1 black non-Ace → 全紅一張黑 (6pt)
+        if br_red > 0:
+            return "全紅一張黑"
+        if self.chk_allbig():
+            return "全大"
+        if self.chk_allsmall():
+            return "全小"
         if self.check_sets(2, 1) and max(self.values()) == 2:
             return "單pair"
         if max(self.values()) == 3 and self.check_sets(3, 1):
             return "單三條"
+
         return "normal"
 
     def no_straight13(self):
@@ -238,29 +278,51 @@ class Hist_Cards13(Hist_Cards):
                 return False
         return True
 
-    def has_samesuit(self, num, n):
-        ss = []
-        for j in range(n):
-            cc = [c.suit for c in self.h13 if c.value == (14 if num + j == 1 else num + j)]
-            ss.append(cc)
-        ll = [len(x) for x in ss]
-        zz = sorted(zip(ss, ll), key=lambda x: x[1], reverse=True)
-        for suit in zz[0][0]:
-            if all(suit in i[0] for i in zz[1:]):
-                return True
-        return False
+    def chk_3straightflush(self) -> bool:
+        """Check 三同花順: 13 cards can be partitioned into three straight-flush
+        groups of sizes 5+5+3 (top=3, mid=5, bot=5 in any order).
+        Each group must be same-suit and consecutive ranks."""
+        by_suit: dict = {}
+        for c in self.h13:
+            by_suit.setdefault(c.suit, []).append(c.value)
 
-    def has_3straightflush(self, rr):
-        mode = rr[3]
-        if mode == 355:
-            t1, t2, t3 = rr[0] - 2, rr[1] - 4, rr[2] - 4
-        elif mode == 535:
-            t2, t1, t3 = rr[0] - 4, rr[1] - 2, rr[2] - 4
-        elif mode == 553:
-            t2, t3, t1 = rr[0] - 4, rr[1] - 4, rr[2] - 2
-        else:
-            return False
-        return self.has_samesuit(t1, 3) and self.has_samesuit(t2, 5) and self.has_samesuit(t3, 5)
+        # Collect all valid SF groups of size 3 and size 5
+        sf3, sf5 = [], []
+        for suit, vals in by_suit.items():
+            svals = sorted(vals)
+            for n, container in ((3, sf3), (5, sf5)):
+                for i in range(len(svals) - n + 1):
+                    sub = svals[i:i + n]
+                    if sub[-1] - sub[0] == n - 1:          # consecutive
+                        container.append((suit, frozenset(sub)))
+                # A-low straights (Ace treated as 1)
+                if 14 in vals:
+                    if n == 5 and {2, 3, 4, 5}.issubset(vals):
+                        sf5.append((suit, frozenset([14, 2, 3, 4, 5])))
+                    if n == 3 and {2, 3}.issubset(vals):
+                        sf3.append((suit, frozenset([14, 2, 3])))
+
+        # All (suit, value) pairs in the hand
+        all_pairs = frozenset((c.suit, c.value) for c in self.h13)
+
+        # Try each 3-card group + two 5-card groups that together cover all 13 cards
+        for s3, r3 in sf3:
+            used3 = frozenset((s3, v) for v in r3)
+            if not used3.issubset(all_pairs):
+                continue
+            rem = all_pairs - used3
+            for sa, ra in sf5:
+                used5a = frozenset((sa, v) for v in ra)
+                if not used5a.issubset(rem):
+                    continue
+                rem2 = rem - used5a
+                for sb, rb in sf5:
+                    if (sb, rb) == (sa, ra):
+                        continue
+                    used5b = frozenset((sb, v) for v in rb)
+                    if used5b == rem2:
+                        return True
+        return False
 
     def has_3straight(self):
         ranks = self.copy()
