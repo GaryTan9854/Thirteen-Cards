@@ -59,7 +59,11 @@ function sortCards(cards: string[], mode: SortMode): string[] {
 // ─── CardTile ─────────────────────────────────────────────────────────────────
 
 function CardTile({ cs, size='md' }: { cs:string; size?:'sm'|'md'|'lg' }) {
-  const dim = size==='lg' ? 'w-14 h-20 text-base' : size==='md' ? 'w-11 h-16 text-sm' : 'w-9 h-12 text-xs'
+  const dim = size==='lg'
+    ? 'w-10 h-14 text-sm sm:w-14 sm:h-20 sm:text-base'
+    : size==='md'
+    ? 'w-9 h-12 text-xs sm:w-11 sm:h-16 sm:text-sm'
+    : 'w-7 h-10 text-[10px] sm:w-9 sm:h-12 sm:text-xs'
   return (
     <span className={`inline-flex items-center justify-center rounded-lg border-2 font-bold shadow select-none
       ${dim} ${isRed(cs) ? 'border-red-300 bg-white text-red-600' : 'border-gray-400 bg-white text-gray-900'}`}>
@@ -72,12 +76,12 @@ function CardTile({ cs, size='md' }: { cs:string; size?:'sm'|'md'|'lg' }) {
 
 function RowDisplay({ label, cards, slots }: { label:string; cards:string[]; slots:number }) {
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-gray-700 last:border-0">
-      <span className="w-20 text-sm text-gray-400 shrink-0">{label}</span>
-      <div className="flex gap-2 flex-wrap">
+    <div className="flex items-center gap-2 sm:gap-3 py-2 sm:py-3 border-b border-gray-700 last:border-0">
+      <span className="w-14 sm:w-20 text-xs sm:text-sm text-gray-400 shrink-0 leading-tight">{label}</span>
+      <div className="flex gap-1 sm:gap-2 flex-wrap">
         {cards.map((cs,i) => <CardTile key={i} cs={cs} size="lg" />)}
         {Array.from({length: slots - cards.length}).map((_,i) => (
-          <span key={'e'+i} className="w-14 h-20 rounded-lg border-2 border-dashed border-gray-600" />
+          <span key={'e'+i} className="w-10 h-14 sm:w-14 sm:h-20 rounded-lg border-2 border-dashed border-gray-600" />
         ))}
       </div>
     </div>
@@ -118,14 +122,14 @@ function StatsPanel({ stats, special }: { stats?:StatsData; special?:SpecialData
   ]
 
   return (
-    <div className="w-72 shrink-0 text-[18px]">
+    <div className="w-full sm:w-72 shrink-0 text-[14px] sm:text-[18px]">
       <table className="w-full">
         <tbody>
           {rows.map(r=>(
             <tr key={r.label} className="border-b border-gray-800">
               <td className="py-0.5 pr-2 text-gray-400 whitespace-nowrap">{r.label}</td>
-              <td className="py-0.5 px-1 text-yellow-300 font-bold text-center w-7">{r.v}</td>
-              <td className="py-0.5 text-gray-500 text-[15px] leading-tight">{r.d||'—'}</td>
+              <td className="py-0.5 px-1 text-yellow-300 font-bold text-center w-6 sm:w-7">{r.v}</td>
+              <td className="py-0.5 text-gray-500 text-[12px] sm:text-[15px] leading-tight">{r.d||'—'}</td>
             </tr>
           ))}
           <tr>
@@ -339,31 +343,31 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
   return (
     <>
     <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center">
-      <div className="bg-gray-900 rounded-2xl shadow-2xl flex flex-col gap-4 p-5 overflow-y-auto"
-        style={{width:'90vw', maxHeight:'92vh'}}>
+      <div className="bg-gray-900 rounded-2xl shadow-2xl flex flex-col gap-3 sm:gap-4 p-3 sm:p-5 overflow-y-auto"
+        style={{width:'95vw', maxWidth:'860px', maxHeight:'94vh'}}>
 
-        {/* ── Row 1: Hand + Stats ── */}
-        <div className="flex gap-5 items-start">
-          {/* Left: original hand */}
+        {/* ── Row 1: Hand + Stats (side-by-side on sm+; stacked on mobile) ── */}
+        <div className="flex flex-col sm:flex-row sm:gap-5 sm:items-start gap-3">
+          {/* Hand */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-green-400 font-semibold text-sm">原始手牌</span>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-green-400 font-semibold text-xs sm:text-sm">原始手牌</span>
               {sorted && (
                 <button
                   onClick={()=>setSortIdx(i=>(i+1)%SORT_MODES.length)}
-                  className="text-xs px-2.5 py-1 rounded-full bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-500"
+                  className="text-xs px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-500"
                 >
                   {SORT_LABEL[sortMode]}
                 </button>
               )}
             </div>
-            <div className="flex flex-wrap gap-1.5 transition-opacity duration-200"
+            <div className="flex flex-wrap gap-1 sm:gap-1.5 transition-opacity duration-200"
               style={{opacity: fade ? 0 : 1}}>
               {displayHand.map((cs,i)=><CardTile key={cs+i} cs={cs} size="md" />)}
             </div>
           </div>
 
-          {/* Right: stats */}
+          {/* Stats */}
           <StatsPanel stats={info?.stats} special={info?.special} />
         </div>
 
@@ -431,7 +435,7 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
         )}
 
         {/* ── Row 5: Actions ── */}
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           {/* Model toggle */}
           <button
             onClick={cycleModel}
