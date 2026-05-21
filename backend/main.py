@@ -11,14 +11,14 @@ from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 
-APP_VERSION = "4.3"
+APP_VERSION = "4.4"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
 
 _ALLOWED_FILE = os.path.join(os.path.dirname(__file__), "allowed_players.txt")
 
-def _load_allowed() -> list[str]:
+def _load_allowed() -> List[str]:
     if os.path.exists(_ALLOWED_FILE):
         return [l.strip() for l in open(_ALLOWED_FILE) if l.strip()]
     return ["Gary", "Jack", "Ian", "Glory", "Shawn", "Dan", "Eugene", "Guest"]

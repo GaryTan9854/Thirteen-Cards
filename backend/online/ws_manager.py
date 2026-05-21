@@ -3,7 +3,7 @@ WebSocket connection pool.
 Tracks one WebSocket per player name; provides send / broadcast helpers.
 """
 
-from typing import Dict
+from typing import Dict, List, Optional
 from fastapi import WebSocket
 
 
@@ -32,7 +32,7 @@ class ConnectionManager:
                 pass
         return False
 
-    async def broadcast(self, msg: dict, exclude: str | None = None) -> None:
+    async def broadcast(self, msg: dict, exclude: Optional[str] = None) -> None:
         for player, ws in list(self._conns.items()):
             if player == exclude:
                 continue
@@ -43,7 +43,7 @@ class ConnectionManager:
 
     # ── Queries ───────────────────────────────────────────────────────────────
 
-    def online_players(self) -> list[str]:
+    def online_players(self) -> List[str]:
         return list(self._conns.keys())
 
     def is_online(self, player: str) -> bool:

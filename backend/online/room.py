@@ -14,7 +14,7 @@ ended     → all rounds complete
 
 import asyncio
 import random
-from typing import Optional
+from typing import Dict, List, Optional
 
 
 class Phase:
@@ -34,25 +34,25 @@ class Room:
     # ── Reset ─────────────────────────────────────────────────────────────────
 
     def reset(self):
-        self.phase:         str                  = Phase.LOBBY
-        self.host:          Optional[str]        = None
-        self.players:       list[str]            = []       # human players
-        self.seats:         dict[str, int]       = {}       # player → seat 0–3
-        self.rounds_normal: int                  = 16
-        self.rounds_appeal: int                  = 4
-        self.time_limit:    int                  = 30       # seconds per round
-        self.invites:       dict[str, str]       = {}       # player → pending|accepted|declined
+        self.phase         = Phase.LOBBY         # type: str
+        self.host          = None                # type: Optional[str]
+        self.players       = []                  # type: List[str]
+        self.seats         = {}                  # type: Dict[str, int]
+        self.rounds_normal = 16                  # type: int
+        self.rounds_appeal = 4                   # type: int
+        self.time_limit    = 30                  # type: int
+        self.invites       = {}                  # type: Dict[str, str]
 
         # Per-game
-        self.current_round: int                  = 0
-        self.pre_dealt:     Optional[list]       = None     # [[cardstrs]*13]*4 by seat
-        self.arrangements:  dict[str, dict]      = {}       # player → {top,mid,bot}
-        self.history:       list[list[int]]      = []       # [[score_seat0…3] per round]
+        self.current_round = 0                   # type: int
+        self.pre_dealt     = None                # type: Optional[List]
+        self.arrangements  = {}                  # type: Dict[str, dict]
+        self.history       = []                  # type: List[List[int]]
         self._timer:        Optional[asyncio.Task] = None
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
-    def seat_names(self) -> list[str]:
+    def seat_names(self) -> List[str]:
         """Names in seat order 0–3; unfilled seats named 'AI-{i}'."""
         names = [f"AI-{i}" for i in range(4)]
         for p, s in self.seats.items():
