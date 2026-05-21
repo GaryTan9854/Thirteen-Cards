@@ -184,6 +184,30 @@ export default function OnlinePage() {
   const [submitted,       setSubmitted]       = useState(false)
   const [submittedList,   setSubmittedList]   = useState<string[]>([])
   const [lastResult,      setLastResult]      = useState<any | null>(null)
+  const [historyBadges,   setHistoryBadges]   = useState<string[][]>([])
+
+  // ── Badge extraction ──
+  function extractRoundBadges(result: any): string[] {
+    const badges: string[] = []
+    if ((result.players ?? []).some((p: any) => p.special_hand && p.special_hand !== 'normal'))
+      badges.push('報到')
+    if ((result.battles ?? []).some((b: any) => b.gun !== 0))
+      badges.push('打槍')
+    const mSet = new Set<string>()
+    for (const b of result.battles ?? [])
+      for (const k of ['p1_top','p1_mid','p1_bot','p2_mid','p2_bot'])
+        if (b[k]) mSet.add(b[k])
+    const ML: Record<string,string> = {'三條':'原子頭','葫蘆':'葫蘆','鐵支':'鐵支','同花順':'同花順','同花次大順':'次大順','同花大順':'大順'}
+    for (const [key, label] of Object.entries(ML))
+      if (mSet.has(key)) badges.push(label)
+    return badges
+  }
+  function addRoundBadges(roundNum: number, result: any) {
+    if (!result) return
+    const badges = extractRoundBadges(result)
+    if (badges.length === 0) return
+    setHistoryBadges(prev => { const next = [...prev]; next[roundNum - 1] = badges; return next })
+  }
 
   // ── Score / appeal display state ──
   const [circleMarks,      setCircleMarks]      = useState<Record<number, number>>({})
@@ -315,6 +339,7 @@ export default function OnlinePage() {
         setSubmittedList([])
         setLastResult(null)
         setAppealInfo(null)
+        if (msg.round === 1) setHistoryBadges([])
         // Voice: announce multiplier if > 1
         if ((msg.multiplier ?? 1) > 1 && voiceRef.current) {
           setTimeout(() => speak(`第 ${msg.round} 局，計分乘${msg.multiplier}！`, 1.0), 500)
@@ -341,6 +366,7 @@ export default function OnlinePage() {
         setMyHand(null)
         setCountdown(null)
         setLastResult(msg)
+        addRoundBadges(msg.round, msg.result)
         setRoom(prev => prev ? {
           ...prev, phase: msg.appeal_pending ? 'appeal_pending' : 'round_end',
           current_round: msg.round, history: msg.history
@@ -360,6 +386,7 @@ export default function OnlinePage() {
         setMyHand(null)
         setCountdown(null)
         setLastResult(msg)
+        addRoundBadges(msg.round, msg.result)
         setRoom(prev => prev ? { ...prev, phase: 'ended' } : prev)
         applyRoundMeta(msg)
         setAppealInfo(null)
@@ -543,6 +570,7 @@ export default function OnlinePage() {
     setNextMultiplier(1)
     setAppealInfo(null)
     setLastResult(null)
+    setHistoryBadges([])
     setSoloActive(true)
     setSoloPhase('playing')
     startSoloRound()
@@ -704,6 +732,7 @@ export default function OnlinePage() {
     setMyHand(null)
     setCountdown(null)
     setLastResult(fakeMsg)
+    addRoundBadges(state.currentRound, res)
     setRoundMultipliers([...state.roundMultipliers])
     setNextMultiplier(state.multiplier)
     if (circleSeat >= 0) setCircleMarks(prev => ({ ...prev, [state.currentRound - 1]: circleSeat }))
@@ -987,19 +1016,6 @@ export default function OnlinePage() {
                      hover:bg-yellow-300 active:scale-95 transition-all shadow-lg">
           進入大廳
         </button>
-        <button
-          onClick={() => {
-            // Quick solo practice — skip lobby
-            startSoloGame({
-              roundsNormal: cfgNormal,
-              roundsAppeal: cfgAppeal,
-              aiStrategy:   cfgAiStrategy,
-              aiNames:      cfgAiNames,
-            })
-          }}
-          className="text-sm text-gray-400 hover:text-white underline underline-offset-4 transition">
-          直接開始單人練習
-        </button>
       </div>
     )
   }
@@ -1062,6 +1078,7 @@ export default function OnlinePage() {
           history={history}
           multipliers={rm}
           circleMarks={cm}
+          roundBadges={historyBadges}
           isEnded={false}
           roundLabel={history.length === 0 ? '準備開始' : `上場共 ${history.length} 局`}
           voiceOn={voiceOn}
@@ -1366,6 +1383,7 @@ export default function OnlinePage() {
           history={history}
           multipliers={rm}
           circleMarks={cm}
+          roundBadges={historyBadges}
           isEnded={isEnded}
           roundLabel={roundLabel}
           voiceOn={voiceOn}

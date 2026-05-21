@@ -24,7 +24,7 @@ const MID_MONSTER_SHORT: Record<string, string> = {
   '同花大順':  '大順×14',
 }
 const BOT_MONSTER_SHORT: Record<string, string> = {
-  '鐵支':      '鐵支×4↑',       // ×4 normal, ×8 for quad-4s
+  '鐵支':      '鐵支▲4',         // ×4 normal, ×8 for quad-4s
   '同花順':    '同花順×5',
   '同花次大順':'次大順×6',
   '同花大順':  '大順×7',

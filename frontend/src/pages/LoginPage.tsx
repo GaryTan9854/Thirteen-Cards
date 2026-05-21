@@ -6,8 +6,13 @@ import { useAuth } from '../contexts/AuthContext'
 const PASSKEY_ID_KEY   = 'tc_passkey_id'
 const PASSKEY_NAME_KEY = 'tc_passkey_name'
 
+function isMobileDevice(): boolean {
+  // Only offer biometric on touch-primary devices (phones/tablets), not desktop
+  return window.matchMedia('(pointer: coarse)').matches
+}
+
 function passkeySupported(): boolean {
-  return !!(window.PublicKeyCredential && navigator.credentials?.create)
+  return isMobileDevice() && !!(window.PublicKeyCredential && navigator.credentials?.create)
 }
 
 function hasSavedPasskey(): boolean {

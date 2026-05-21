@@ -105,7 +105,7 @@ function rn(r:number){ return RANK_STR[r] ?? String(r) }
 
 function StatsPanel({ stats, special }: { stats?:StatsData; special?:SpecialData }) {
   const [showBaodao, setShowBaodao] = useState(false)
-  if(!stats) return <div className="w-52 text-gray-500 text-xs pt-2">載入中…</div>
+  if(!stats) return <div className="text-gray-500 text-xs pt-2">載入中…</div>
 
   const hasSpecial = special && special.name !== 'normal'
   const rows = [
@@ -119,7 +119,7 @@ function StatsPanel({ stats, special }: { stats?:StatsData; special?:SpecialData
   ]
 
   return (
-    <div className="w-full sm:w-72 shrink-0 text-[18px]">
+    <div className="shrink-0 text-[18px]">
       <table className="w-full">
         <tbody>
           {rows.map(r=>(
@@ -213,41 +213,42 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
   const [varIdx,   setVarIdx]       = useState(0)
   const [arr,      setArr]          = useState<{top:string[];mid:string[];bot:string[]}>({top:[],mid:[],bot:[]})
 
+  // Helper to convert show-format cards back to cardstrs using hand
+  function makeShowToCs(h: string[]) {
+    return Object.fromEntries(h.map(cs=>[cardShow(cs), cs]))
+  }
+  function applyModelData(d: any, h: string[], strategy: ModelStrategy) {
+    if(d.top && d.mid && d.bot){
+      const stc = makeShowToCs(h)
+      const toCs = (cards:string[]) => cards.map((c:string)=>stc[c]??c)
+      const v = { top:toCs(d.top.cards), mid:toCs(d.mid.cards), bot:toCs(d.bot.cards) }
+      setModelArr(prev=>({...prev,[strategy]:v}))
+      return v
+    }
+    return null
+  }
+
   useEffect(()=>{
     setApiError(null)
-    fetch('/api/manual/arrange_info',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({hand}),
-    })
-    .then(r=>{ if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
-    .then((data:ArrangeInfo)=>{
+    // Fetch arrange_info AND rule_base_as arrangement in parallel
+    Promise.all([
+      fetch('/api/manual/arrange_info',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hand})})
+        .then(r=>{ if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() }),
+      fetch('/api/game/arrange',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hand,strategy:'rule_base_as'})})
+        .then(r=>r.json()).catch(()=>null),
+    ])
+    .then(([data, rbData]:[ArrangeInfo, any])=>{
       setInfo(data)
-      // Set initial arrangement from groups (always load for the groups panel)
-      if(data.groups.length>0){
+      // Apply rule_base_as as default arrangement (not groups[0])
+      const rbv = rbData ? applyModelData(rbData, hand, 'rule_base_as') : null
+      if(rbv){
+        setArr({top:rbv.top,mid:rbv.mid,bot:rbv.bot})
+        setSelGroup(-1)
+      } else if(data.groups.length>0){
+        // Fallback to groups[0] if API fails
         setSelGroup(0); setVarIdx(0)
         const v=data.groups[0].variants[0]
         setArr({top:v.top,mid:v.mid,bot:v.bot})
-      }
-      // If a non-default model is requested, auto-fetch and apply it
-      const dm = defaultModelStrategy as ModelStrategy | undefined
-      if (dm && dm !== 'rule_base_as' && MODEL_STRATEGIES.includes(dm)) {
-        fetch('/api/game/arrange',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({hand, strategy: dm}),
-        })
-        .then(r=>r.json())
-        .then(d=>{
-          if(d.top && d.mid && d.bot){
-            const showToCs = Object.fromEntries(hand.map(cs=>[cardShow(cs), cs]))
-            const toCs = (cards:string[]) => cards.map((c:string)=>showToCs[c]??c)
-            const v = { top:toCs(d.top.cards), mid:toCs(d.mid.cards), bot:toCs(d.bot.cards) }
-            setModelArr(prev=>({...prev,[dm]:v}))
-            setArr({top:v.top,mid:v.mid,bot:v.bot}); setSelGroup(-1)
-          }
-        })
-        .catch(()=>{})
       }
     })
     .catch(e=>setApiError(String(e)))
@@ -294,16 +295,8 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
         body: JSON.stringify({hand, strategy: next}),
       })
       const d = await r.json()
-      if(d.top && d.mid && d.bot){
-        // convert show-format back — but we need cardstrs; use the hand + cardstrs from API
-        // The arrange endpoint returns show-format cards. We need cardstrs.
-        // Workaround: match back from hand using display conversion.
-        const showToCs = Object.fromEntries(hand.map(cs=>[cardShow(cs), cs]))
-        const toCs = (cards:string[]) => cards.map((c:string)=>showToCs[c]??c)
-        const v = { top:toCs(d.top.cards), mid:toCs(d.mid.cards), bot:toCs(d.bot.cards) }
-        setModelArr(prev=>({...prev,[next]:v}))
-        setArr({top:v.top,mid:v.mid,bot:v.bot}); setSelGroup(-1)
-      }
+      const v = applyModelData(d, hand, next)
+      if(v){ setArr({top:v.top,mid:v.mid,bot:v.bot}); setSelGroup(-1) }
     } finally { setModelLoading(false) }
   }
 
@@ -337,13 +330,27 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
   const curVariant = info && selGroup>=0 ? info.groups[selGroup]?.variants[varIdx] : null
   const canConfirm = arr.top.length===3 && arr.mid.length===5 && arr.bot.length===5
 
+  // Find which group the current arrangement belongs to (for orange highlight)
+  function arrsMatch(a: string[], b: string[]) {
+    return [...a].sort().join(',') === [...b].sort().join(',')
+  }
+  const matchedGroup = useMemo(()=>{
+    if(!info) return -1
+    for(let gi=0; gi<Math.min(info.groups.length,10); gi++){
+      for(const v of info.groups[gi].variants){
+        if(arrsMatch(v.top,arr.top) && arrsMatch(v.mid,arr.mid) && arrsMatch(v.bot,arr.bot)) return gi
+      }
+    }
+    return -1
+  },[info, arr])
+
   return (
     <>
     <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center">
       <div className="bg-gray-900 rounded-2xl shadow-2xl flex flex-col gap-3 sm:gap-4 p-3 sm:p-5 overflow-y-auto"
-        style={{width:'95vw', maxWidth:'860px', maxHeight:'94vh'}}>
+        style={{width:'95vw', maxWidth:'1060px', maxHeight:'94vh'}}>
 
-        {/* ── Row 1: Hand + Stats (side-by-side on sm+; stacked on mobile) ── */}
+        {/* ── Row 1: Hand (left) + Right panel: Stats & Groups (right) ── */}
         <div className="flex flex-col sm:flex-row sm:gap-5 sm:items-start gap-3">
           {/* Hand */}
           <div className="flex-1 min-w-0">
@@ -364,38 +371,42 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
             </div>
           </div>
 
-          {/* Stats */}
-          <StatsPanel stats={info?.stats} special={info?.special} />
-        </div>
-
-        {/* ── Row 2: Group buttons ── */}
-        <div>
-          <div className="text-xs text-gray-500 mb-1.5">牌型排法（點同一按鈕切換此型的不同排法）</div>
-          {apiError
-            ? <div className="text-xs text-red-400">⚠ {apiError}</div>
-            : !info
-              ? <div className="text-xs text-gray-500">分析中…</div>
-              : info.groups.length===0
-                ? <div className="text-xs text-orange-400">特殊牌型：{info.special.name}</div>
-                : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {info.groups.slice(0,10).map((g,gi)=>{
-                      const active = gi===selGroup
-                      const cnt = g.variants.length
-                      return (
-                        <button key={gi} onClick={()=>pickGroup(gi)}
-                          className={`text-xs px-3 py-1.5 rounded-full border transition-colors
-                            ${active
-                              ?'bg-yellow-400 text-gray-900 border-yellow-400 font-bold'
-                              :'bg-gray-800 text-gray-300 border-gray-600 hover:border-yellow-500'}`}>
-                          {g.label}
-                          {active && cnt>1 && <span className="ml-1 opacity-70">{varIdx+1}/{cnt}</span>}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )
-          }
+          {/* Right panel: Stats + Group buttons */}
+          <div className="w-full sm:w-[420px] shrink-0 flex flex-col gap-3">
+            <StatsPanel stats={info?.stats} special={info?.special} />
+            {/* Group buttons in 2-column grid */}
+            <div>
+              <div className="text-xs text-gray-500 mb-1.5">牌型排法（點同一按鈕切換此型的不同排法）</div>
+              {apiError
+                ? <div className="text-xs text-red-400">⚠ {apiError}</div>
+                : !info
+                  ? <div className="text-xs text-gray-500">分析中…</div>
+                  : info.groups.length===0
+                    ? <div className="text-xs text-orange-400">特殊牌型：{info.special.name}</div>
+                    : (
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {info.groups.slice(0,10).map((g,gi)=>{
+                          const active  = gi===selGroup
+                          const matched = gi===matchedGroup && gi!==selGroup
+                          const cnt = g.variants.length
+                          return (
+                            <button key={gi} onClick={()=>pickGroup(gi)}
+                              className={`text-[16px] px-2 py-1.5 rounded-lg border transition-colors text-left
+                                ${active
+                                  ?'bg-yellow-400 text-gray-900 border-yellow-400 font-bold'
+                                  : matched
+                                    ?'bg-gray-800 text-gray-200 border-orange-500 font-semibold'
+                                    :'bg-gray-800 text-gray-300 border-gray-600 hover:border-yellow-500'}`}>
+                              {g.label}
+                              {active && cnt>1 && <span className="ml-1 opacity-70 text-sm">{varIdx+1}/{cnt}</span>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )
+              }
+            </div>
+          </div>
         </div>
 
         {/* ── Row 3: Arrangement area ── */}

@@ -34,6 +34,7 @@ interface Props {
   history:       number[][]
   multipliers?:  number[]
   circleMarks?:  Record<number, number>
+  roundBadges?:  string[][]          // per round: event labels to show as purple chips
   isEnded:       boolean
   roundLabel:    string
   voiceOn:       boolean
@@ -42,7 +43,7 @@ interface Props {
 }
 
 export default function TournamentPanel({
-  names, history, multipliers = [], circleMarks = {},
+  names, history, multipliers = [], circleMarks = {}, roundBadges = [],
   isEnded, roundLabel, voiceOn, onToggleVoice, actionButtons,
 }: Props) {
   const [historyView, setHistoryView] = useState<0 | 1 | 2>(0)
@@ -79,14 +80,22 @@ export default function TournamentPanel({
         const roundIdx     = base + i
         const mul          = multipliers[roundIdx] ?? 1
         const circledPlayer = circleMarks[roundIdx] ?? -1
+        const badges       = roundBadges[roundIdx] ?? []
         return (
-          <div key={i} className="flex items-center">
-            <span className="w-11 shrink-0 text-gray-500 text-sm leading-tight">
-              {roundIdx + 1}
-              {mul > 1 && <span className="text-orange-400 font-bold text-xs ml-0.5">×{mul}</span>}
-            </span>
+          <div key={i} className="flex items-start">
+            <div className="w-14 shrink-0 flex flex-col gap-0.5 pt-0.5">
+              <span className="text-gray-500 text-sm leading-tight">
+                {roundIdx + 1}
+                {mul > 1 && <span className="text-orange-400 font-bold text-xs ml-0.5">×{mul}</span>}
+              </span>
+              {badges.map(b => (
+                <span key={b} className="text-[9px] px-1 rounded bg-purple-900/70 text-purple-300 font-bold leading-tight whitespace-nowrap">
+                  {b}
+                </span>
+              ))}
+            </div>
             {scores.map((s, j) => (
-              <span key={j} className="flex-1 flex justify-center items-center text-sm">
+              <span key={j} className="flex-1 flex justify-center items-start pt-0.5 text-sm">
                 {j === circledPlayer
                   ? <span className={`${scoreColor(s)} outline outline-1 outline-orange-400 rounded-full inline-flex items-center justify-center min-w-[1.4rem] h-[1.4rem] text-xs leading-none px-0.5`}>{fmt(s)}</span>
                   : <span className={scoreColor(s)}>{fmt(s)}</span>
