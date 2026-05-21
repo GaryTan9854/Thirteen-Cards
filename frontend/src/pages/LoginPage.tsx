@@ -3,15 +3,16 @@ import { useAuth } from '../contexts/AuthContext'
 
 export default function LoginPage() {
   const { login } = useAuth()
-  const [players,  setPlayers]  = useState<string[]>([])
-  const [selected, setSelected] = useState('')
+  const [allowed,  setAllowed]  = useState<string[]>([])
+  const [name,     setName]     = useState('')
+  const [error,    setError]    = useState('')
   const [version,  setVersion]  = useState('')
 
   useEffect(() => {
     fetch('/api/online/players')
       .then(r => r.json())
-      .then(d => setPlayers(d.players ?? []))
-      .catch(() => setPlayers(['Gary', 'Jack', 'Ian', 'Glory', 'Shawn', 'Dan', 'Eugene', 'Guest']))
+      .then(d => setAllowed((d.players ?? []).map((p: string) => p.toLowerCase())))
+      .catch(() => setAllowed(['gary','jack','ian','glory','shawn','dan','eugene','guest']))
 
     fetch('/api/health')
       .then(r => r.json())
@@ -21,7 +22,28 @@ export default function LoginPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (selected) login(selected)
+    setError('')
+    const trimmed = name.trim()
+    if (!trimmed) return
+
+    // Case-insensitive match against allowed list
+    const match = allowed.find(p => p === trimmed.toLowerCase())
+    if (!match) {
+      setError('找不到此玩家，請確認名字')
+      return
+    }
+
+    // Login with properly-cased name from allowed list fetch
+    // (re-fetch canonical casing from server)
+    fetch('/api/online/players')
+      .then(r => r.json())
+      .then(d => {
+        const canonical = (d.players as string[]).find(
+          p => p.toLowerCase() === trimmed.toLowerCase()
+        ) ?? trimmed
+        login(canonical)
+      })
+      .catch(() => login(trimmed))
   }
 
   return (
@@ -41,35 +63,30 @@ export default function LoginPage() {
 
         {/* Card — TunaLogin style */}
         <div className="bg-green-900 rounded-2xl shadow-2xl p-6 border border-green-700/60">
-          <h2 className="text-base font-semibold text-gray-200 mb-5">選擇玩家</h2>
+          <h2 className="text-base font-semibold text-gray-200 mb-5">玩家登入</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm text-gray-400 mb-1.5">玩家名稱</label>
-              <div className="relative">
-                <select
-                  value={selected}
-                  onChange={e => setSelected(e.target.value)}
-                  autoFocus
-                  className="w-full bg-green-800 border border-green-600 rounded-xl px-3 py-2.5
-                             text-white focus:outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400
-                             appearance-none cursor-pointer transition"
-                >
-                  <option value="">— 請選擇 —</option>
-                  {players.map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-                {/* Dropdown arrow */}
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                  ▾
-                </span>
-              </div>
+              <input
+                type="text"
+                autoFocus
+                autoComplete="off"
+                placeholder="輸入你的名字"
+                value={name}
+                onChange={e => { setName(e.target.value); setError('') }}
+                className="w-full bg-green-800 border border-green-600 rounded-xl px-3 py-2.5
+                           text-white placeholder-green-700
+                           focus:outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400
+                           transition"
+              />
             </div>
+
+            {error && <p className="text-sm text-red-400">{error}</p>}
 
             <button
               type="submit"
-              disabled={!selected}
+              disabled={!name.trim()}
               className="w-full py-2.5 rounded-xl bg-yellow-400 text-gray-900 font-bold
                          hover:bg-yellow-300 active:scale-95 transition-all
                          disabled:opacity-40 disabled:cursor-not-allowed"
