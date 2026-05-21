@@ -14,20 +14,20 @@ function resIcon(val: number) {
 
 // Labels vary by row — mid and bot have different multipliers
 const TOP_MONSTER_SHORT: Record<string, string> = {
-  '三條': '原子頭×3↑',          // ×3 normal, ×6 for trip-3s
+  '三條': '原子頭 3↑',
 }
 const MID_MONSTER_SHORT: Record<string, string> = {
-  '葫蘆':      '葫蘆×2',
-  '鐵支':      '鐵支×8↑',       // ×8 normal, ×16 for quad-4s
-  '同花順':    '同花順×10',
-  '同花次大順':'次大順×12',
-  '同花大順':  '大順×14',
+  '葫蘆':      '葫蘆 2',
+  '鐵支':      '鐵支 8↑',
+  '同花順':    '同花順 10',
+  '同花次大順':'次大順 12',
+  '同花大順':  '大順 14',
 }
 const BOT_MONSTER_SHORT: Record<string, string> = {
-  '鐵支':      '鐵支',            // ×4 normal, ×8 for quad-4s
-  '同花順':    '同花順×5',
-  '同花次大順':'次大順×6',
-  '同花大順':  '大順×7',
+  '鐵支':      '鐵支',
+  '同花順':    '同花順 5',
+  '同花次大順':'次大順 6',
+  '同花大順':  '大順 7',
 }
 
 function MonsterBadge({ type, shortMap }: { type?: string | null; shortMap: Record<string, string> }) {

@@ -258,12 +258,13 @@ class Hand5(Hand):
             rest  = sorted([c for c in self if c.value != self.p[0]], key=lambda c: c.value, reverse=True)
             return trips + rest
         elif ht in ("順", "同花順", "同花次大順", "同花大順"):
-            # A2345: p[0]==1 → show A first, then 2,3,4,5
+            # A2345: show A first, then 2,3,4,5 low→high
             if self.p[0] == 1:
                 ace  = [c for c in self if c.value == 14]
                 rest = sorted([c for c in self if c.value != 14], key=lambda c: c.value)
                 return ace + rest
-            return sorted(self, key=lambda c: c.value, reverse=True)
+            # all other straights: low → high
+            return sorted(self, key=lambda c: c.value)
         elif ht == "葫蘆":
             trips = [c for c in self if c.value == self.p[0]]
             pairs = [c for c in self if c.value == self.p[1]]
