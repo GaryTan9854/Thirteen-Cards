@@ -11,7 +11,7 @@ from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 
-APP_VERSION = "4.8"
+APP_VERSION = "4.9"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -463,8 +463,9 @@ async def ws_endpoint(player_name: str, websocket: WebSocket):
         "online_players": online,
         "room":           room.snapshot(),
     })
-    # Notify others
-    await manager.broadcast({"type": "online_update", "online_players": online},
+    # Notify others — include who just joined
+    await manager.broadcast({"type": "online_update", "online_players": online,
+                             "joined": player_name},
                             exclude=player_name)
 
     try:
@@ -621,6 +622,7 @@ async def ws_endpoint(player_name: str, websocket: WebSocket):
         await manager.broadcast({
             "type":           "online_update",
             "online_players": online,
+            "left":           player_name,
         })
 
 

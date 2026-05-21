@@ -44,8 +44,8 @@ function fmt(n: number) { return (n > 0 ? '+' : '') + n }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function OnlineBar({ players, self: self_, connected }: {
-  players: string[]; self: string | null; connected: boolean
+function OnlineBar({ players, self: self_ }: {
+  players: string[]; self: string | null
 }) {
   return (
     <div className="flex items-center gap-2 flex-wrap py-1">
@@ -58,9 +58,6 @@ function OnlineBar({ players, self: self_, connected }: {
           {p}
         </span>
       ))}
-      <span className={`ml-auto text-xs ${connected ? 'text-green-400' : 'text-red-400'}`}>
-        {connected ? '● 已連線' : '○ 斷線'}
-      </span>
     </div>
   )
 }
@@ -110,12 +107,13 @@ export default function OnlinePage() {
 
   // ── WebSocket ──
   const wsRef    = useRef<WebSocket | null>(null)
-  const [connected, setConnected] = useState(false)
+  const [_connected, setConnected] = useState(false)
 
   // ── Lobby / room state ──
-  const [onlinePlayers, setOnlinePlayers] = useState<string[]>([])
+  const [onlinePlayers, setOnlinePlayers] = useState<string[]>(() => player ? [player] : [])
   const [room,          setRoom]          = useState<RoomSnapshot | null>(null)
   const [invited,       setInvited]       = useState<InviteInfo | null>(null)
+  const [notices,       setNotices]       = useState<string[]>([])
 
   // ── Setup form (host only) ──
   const [cfgNormal,     setCfgNormal]     = useState(16)
@@ -153,6 +151,11 @@ export default function OnlinePage() {
     wsRef.current?.send(JSON.stringify(msg))
   }
 
+  function pushNotice(text: string) {
+    setNotices(prev => [...prev.slice(-4), text])   // keep last 5
+    setTimeout(() => setNotices(prev => prev.slice(1)), 4000)  // auto-clear after 4s
+  }
+
   function handleMsg(msg: any) {
     switch (msg.type) {
       case 'welcome':
@@ -161,6 +164,8 @@ export default function OnlinePage() {
         break
       case 'online_update':
         setOnlinePlayers(msg.online_players ?? [])
+        if (msg.joined) pushNotice(`${msg.joined} 登入系統`)
+        if (msg.left)   pushNotice(`${msg.left} 離線`)
         break
       case 'room_update':
         setRoom(msg.room ?? null)
@@ -255,7 +260,20 @@ export default function OnlinePage() {
     <>
       {arrangePortal}
       <div className="space-y-4 max-w-3xl">
-        <OnlineBar players={onlinePlayers} self={player} connected={connected} />
+        <OnlineBar players={onlinePlayers} self={player} />
+
+        {/* Join/leave notices */}
+        {notices.length > 0 && (
+          <div className="space-y-1">
+            {notices.map((n, i) => (
+              <div key={i} className="text-xs text-green-400 bg-green-900/40 px-3 py-1 rounded-lg
+                                     animate-pulse">
+                📢 {n}
+              </div>
+            ))}
+          </div>
+        )}
+
         {renderPhase()}
       </div>
     </>
