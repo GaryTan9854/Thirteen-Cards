@@ -1,4 +1,4 @@
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,8 +8,20 @@ import os
 
 from game.game import play_one_game
 from game.hands import Hand13
+from online.ws_manager import ConnectionManager
+from online.room import room, Phase
 
-APP_VERSION = "4.1"
+APP_VERSION = "4.3"
+
+# ── Online singletons ─────────────────────────────────────────────────────────
+manager = ConnectionManager()
+
+_ALLOWED_FILE = os.path.join(os.path.dirname(__file__), "allowed_players.txt")
+
+def _load_allowed() -> list[str]:
+    if os.path.exists(_ALLOWED_FILE):
+        return [l.strip() for l in open(_ALLOWED_FILE) if l.strip()]
+    return ["Gary", "Jack", "Ian", "Glory", "Shawn", "Dan", "Eugene", "Guest"]
 
 app = FastAPI(title="ThirteenCards", version=APP_VERSION)
 
@@ -421,6 +433,192 @@ def ml_status():
         "model_exists": os.path.exists(model_path),
         "model_path": model_path,
     }
+
+
+# ── Online: allowed players ───────────────────────────
+@app.get("/api/online/players")
+def online_players():
+    return {"players": _load_allowed()}
+
+
+@app.get("/api/online/status")
+def online_status():
+    return {"online": manager.online_players(), "room": room.snapshot()}
+
+
+# ── Online: WebSocket endpoint ────────────────────────
+@app.websocket("/ws/{player_name}")
+async def ws_endpoint(player_name: str, websocket: WebSocket):
+    if player_name not in _load_allowed():
+        await websocket.close(code=4001, reason="Not allowed")
+        return
+
+    await manager.connect(player_name, websocket)
+    online = manager.online_players()
+
+    # Greet connecting player
+    await manager.send(player_name, {
+        "type":           "welcome",
+        "player":         player_name,
+        "online_players": online,
+        "room":           room.snapshot(),
+    })
+    # Notify others
+    await manager.broadcast({"type": "online_update", "online_players": online},
+                            exclude=player_name)
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+            t = data.get("type", "")
+
+            # ── new_game ─────────────────────────────────────────────────────
+            if t == "new_game":
+                if room.phase not in (Phase.LOBBY, Phase.ENDED):
+                    await manager.send(player_name,
+                        {"type": "error", "message": "已有一場比賽進行中"})
+                    continue
+                room.reset()
+                room.host    = player_name
+                room.players = [player_name]
+                room.phase   = Phase.SETUP
+                await manager.broadcast({"type": "room_update", "room": room.snapshot()})
+
+            # ── game_config (+ invite) ────────────────────────────────────────
+            elif t == "game_config":
+                if room.host != player_name:
+                    continue
+                room.rounds_normal = int(data.get("rounds_normal", 16))
+                room.rounds_appeal = int(data.get("rounds_appeal",  4))
+                room.time_limit    = int(data.get("time_limit",     30))
+                invite_list        = [p for p in data.get("invite_players", [])
+                                      if manager.is_online(p)]
+
+                if invite_list:
+                    room.phase   = Phase.INVITING
+                    room.invites = {p: "pending" for p in invite_list}
+                    for p in invite_list:
+                        await manager.send(p, {
+                            "type": "invited",
+                            "from": player_name,
+                            "config": {
+                                "rounds_normal": room.rounds_normal,
+                                "rounds_appeal": room.rounds_appeal,
+                                "time_limit":    room.time_limit,
+                            },
+                        })
+                else:
+                    room.phase = Phase.SEATING
+
+                await manager.broadcast({"type": "room_update", "room": room.snapshot()})
+
+            # ── invite_response ───────────────────────────────────────────────
+            elif t == "invite_response":
+                if player_name not in room.invites:
+                    continue
+                accepted = bool(data.get("accepted", False))
+                room.invites[player_name] = "accepted" if accepted else "declined"
+                if accepted and player_name not in room.players:
+                    room.players.append(player_name)
+
+                await manager.broadcast({
+                    "type":     "invite_update",
+                    "player":   player_name,
+                    "accepted": accepted,
+                    "room":     room.snapshot(),
+                })
+
+                if all(v != "pending" for v in room.invites.values()):
+                    room.phase = Phase.SEATING
+                    await manager.broadcast({"type": "room_update", "room": room.snapshot()})
+
+            # ── draw_seats ────────────────────────────────────────────────────
+            elif t == "draw_seats":
+                if room.phase != Phase.SEATING:
+                    continue
+                if not room.seats:          # draw only once
+                    room.assign_seats()
+                    await manager.broadcast({
+                        "type":       "seats_drawn",
+                        "seats":      room.seats,
+                        "seat_names": room.seat_names(),
+                    })
+                    await manager.broadcast({"type": "room_update", "room": room.snapshot()})
+
+            # ── start_game ────────────────────────────────────────────────────
+            elif t == "start_game":
+                if room.host != player_name or room.phase != Phase.SEATING:
+                    continue
+                if not room.seats:
+                    room.assign_seats()
+                await room.start_round(manager)
+
+            # ── submit_arrangement ────────────────────────────────────────────
+            elif t == "submit_arrangement":
+                if room.phase != Phase.PLAYING or player_name not in room.players:
+                    continue
+                top = data.get("top", [])
+                mid = data.get("mid", [])
+                bot = data.get("bot", [])
+                all_in = room.submit(player_name, top, mid, bot)
+
+                await manager.broadcast({
+                    "type":      "arrangement_ready",
+                    "player":    player_name,
+                    "submitted": list(room.arrangements.keys()),
+                    "total":     len(room.players),
+                })
+
+                if all_in:
+                    await room.resolve_round(manager)
+
+            # ── next_round ────────────────────────────────────────────────────
+            elif t == "next_round":
+                if room.host != player_name or room.phase != Phase.ROUND_END:
+                    continue
+                await room.start_round(manager)
+
+            # ── leave_game ────────────────────────────────────────────────────
+            elif t == "leave_game":
+                if player_name in room.players:
+                    room.players.remove(player_name)
+                    room.seats.pop(player_name, None)
+                    if room.host == player_name:
+                        room.host = room.players[0] if room.players else None
+                    if not room.players:
+                        room.reset()
+                    await manager.broadcast({
+                        "type":   "player_disconnected",
+                        "player": player_name,
+                        "room":   room.snapshot(),
+                    })
+
+    except (WebSocketDisconnect, Exception):
+        pass
+    finally:
+        manager.disconnect(player_name)
+        online = manager.online_players()
+
+        if player_name in room.players and room.phase in (Phase.PLAYING, Phase.ROUND_END):
+            await manager.broadcast({
+                "type":           "player_disconnected",
+                "player":         player_name,
+                "online_players": online,
+            })
+            # If in a round and everyone else already submitted, resolve now
+            if room.phase == Phase.PLAYING:
+                room.players = [p for p in room.players if p != player_name]
+                room.seats.pop(player_name, None)
+                if room.players and set(room.arrangements.keys()) >= set(room.players):
+                    await room.resolve_round(manager)
+        elif player_name == room.host and room.phase in (Phase.SETUP, Phase.INVITING, Phase.SEATING):
+            room.reset()
+            await manager.broadcast({"type": "room_update", "room": room.snapshot()})
+
+        await manager.broadcast({
+            "type":           "online_update",
+            "online_players": online,
+        })
 
 
 # ── Serve React frontend ──────────────────────────────

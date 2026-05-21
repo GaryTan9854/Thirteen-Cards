@@ -6,7 +6,7 @@
  * Model toggle: cycles through RB-攻守 / RB-1 / Monte Carlo default arrangements
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 
 // ─── Card helpers ─────────────────────────────────────────────────────────────
 
@@ -177,12 +177,15 @@ const MODEL_LABEL: Record<ModelStrategy,string> = {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 interface Props {
-  hand:      string[]
-  onConfirm: (top:string[], mid:string[], bot:string[]) => void
-  onCancel:  () => void
+  hand:            string[]
+  onConfirm:       (top:string[], mid:string[], bot:string[]) => void
+  onCancel:        () => void
+  countdown?:      number    // if provided, show timer; auto-submit at 0
+  submittedCount?: number    // how many players have submitted (online mode)
+  totalPlayers?:   number    // total human players in this round (online mode)
 }
 
-export default function ManualArrange({ hand, onConfirm, onCancel }: Props) {
+export default function ManualArrange({ hand, onConfirm, onCancel, countdown, submittedCount, totalPlayers }: Props) {
 
   // ── Sort / animate ──
   const [sorted,   setSorted]   = useState(false)
@@ -277,6 +280,19 @@ export default function ManualArrange({ hand, onConfirm, onCancel }: Props) {
     } finally { setModelLoading(false) }
   }
 
+  // ── Auto-submit when countdown hits 0 (online mode) ──
+  const arrRef = useRef(arr)
+  useEffect(() => { arrRef.current = arr }, [arr])
+
+  useEffect(() => {
+    if (countdown === 0) {
+      const a = arrRef.current
+      if (a.top.length === 3 && a.mid.length === 5 && a.bot.length === 5) {
+        onConfirm(a.top, a.mid, a.bot)
+      }
+    }
+  }, [countdown])
+
   const currentModel = MODEL_STRATEGIES[modelIdx]
   const curVariant = info && selGroup>=0 ? info.groups[selGroup]?.variants[varIdx] : null
   const canConfirm = arr.top.length===3 && arr.mid.length===5 && arr.bot.length===5
@@ -357,7 +373,24 @@ export default function ManualArrange({ hand, onConfirm, onCancel }: Props) {
           <RowDisplay label="尾墩 (5)" cards={arr.bot} slots={5} />
         </div>
 
-        {/* ── Row 4: Actions ── */}
+        {/* ── Row 4: Countdown (online mode) ── */}
+        {countdown !== undefined && (
+          <div className="flex items-center justify-center gap-4">
+            <div className={`text-3xl font-bold tabular-nums
+              ${countdown <= 5 ? 'text-red-400 animate-pulse'
+                : countdown <= 10 ? 'text-orange-400'
+                : 'text-yellow-300'}`}>
+              ⏱ {countdown}s
+            </div>
+            {totalPlayers !== undefined && submittedCount !== undefined && (
+              <div className="text-sm text-gray-400">
+                已送出：{submittedCount}/{totalPlayers}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Row 5: Actions ── */}
         <div className="flex items-center justify-between gap-3">
           {/* Model toggle */}
           <button

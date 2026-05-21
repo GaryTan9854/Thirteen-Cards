@@ -1,31 +1,50 @@
 import { useState, useEffect } from 'react'
-import GamePage from './pages/GamePage'
-import DuelPage from './pages/DuelPage'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
+import LoginPage  from './pages/LoginPage'
+import GamePage   from './pages/GamePage'
+import DuelPage   from './pages/DuelPage'
+import OnlinePage from './pages/OnlinePage'
 
-const TABS = [
-  { id: 'game', label: '🃏 遊戲模擬' },
-  { id: 'duel', label: '⚔️ 策略對決' },
-]
+// ─── Inner app (needs AuthProvider above) ─────────────────────────────────────
 
-export default function App() {
-  const [tab, setTab] = useState('game')
+function AppInner() {
+  const { player, logout } = useAuth()
+  const [tab, setTab]       = useState('online')
   const [version, setVersion] = useState('')
 
   useEffect(() => {
-    fetch('/api/health').then(r => r.json()).then(d => setVersion(d.version)).catch(() => {})
+    fetch('/api/health')
+      .then(r => r.json())
+      .then(d => setVersion(d.version))
+      .catch(() => {})
   }, [])
+
+  // Require login
+  if (!player) return <LoginPage />
+
+  const isGary = player === 'Gary'
+
+  const TABS = [
+    { id: 'online', label: '🌐 連線遊戲' },
+    { id: 'game',   label: '🃏 遊戲模擬' },
+    ...(isGary ? [{ id: 'duel', label: '⚔️ 策略對決' }] : []),
+  ]
 
   return (
     <div className="min-h-screen bg-green-950 text-white">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 bg-green-900 shadow">
+        {/* Logo */}
         <div>
           <h1 className="text-xl font-bold tracking-wide">
             🃏 Thirteen Cards
-            {version && <span className="ml-2 text-xs font-normal text-green-400">v{version}</span>}
+            {version && (
+              <span className="ml-2 text-xs font-normal text-green-400">v{version}</span>
+            )}
           </h1>
           <p className="text-xs text-green-300 mt-0.5">十三支 AI 排牌模擬器</p>
         </div>
+
         {/* Tabs */}
         <div className="flex bg-green-800 rounded-xl p-1 gap-1">
           {TABS.map(t => (
@@ -41,12 +60,41 @@ export default function App() {
             </button>
           ))}
         </div>
+
+        {/* Player chip + logout */}
+        <div className="flex items-center gap-3">
+          <span className={`font-bold px-3 py-1 rounded-full
+            ${isGary
+              ? 'bg-yellow-400 text-gray-900 text-base'
+              : 'bg-green-700 text-green-100 text-sm'}`}>
+            {player}
+          </span>
+          <button
+            onClick={logout}
+            className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded
+                       hover:bg-green-800 transition"
+          >
+            登出
+          </button>
+        </div>
       </div>
 
+      {/* Page content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
-        {tab === 'game' && <GamePage embedded />}
-        {tab === 'duel' && <DuelPage />}
+        {tab === 'online' && <OnlinePage />}
+        {tab === 'game'   && <GamePage embedded />}
+        {tab === 'duel'   && isGary && <DuelPage />}
       </div>
     </div>
+  )
+}
+
+// ─── Root ─────────────────────────────────────────────────────────────────────
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
   )
 }
