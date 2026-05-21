@@ -34,7 +34,7 @@ interface Props {
   history:       number[][]
   multipliers?:  number[]
   circleMarks?:  Record<number, number>
-  roundBadges?:  string[][]          // per round: event labels to show as purple chips
+  roundBadges?:  string[][][]         // per round → per seat: event labels shown beside score
   isEnded:       boolean
   roundLabel:    string
   voiceOn:       boolean
@@ -80,28 +80,31 @@ export default function TournamentPanel({
         const roundIdx     = base + i
         const mul          = multipliers[roundIdx] ?? 1
         const circledPlayer = circleMarks[roundIdx] ?? -1
-        const badges       = roundBadges[roundIdx] ?? []
+        const badgesPerSeat = roundBadges[roundIdx] ?? []
         return (
           <div key={i} className="flex items-start">
-            <div className="w-14 shrink-0 flex flex-col gap-0.5 pt-0.5">
+            <div className="w-14 shrink-0 pt-0.5">
               <span className="text-gray-400 text-base leading-tight">
                 {roundIdx + 1}
                 {mul > 1 && <span className="text-orange-400 font-bold text-sm ml-0.5">×{mul}</span>}
               </span>
-              {badges.map(b => (
-                <span key={b} className="text-[10px] px-1 rounded bg-purple-900/70 text-purple-300 font-bold leading-tight whitespace-nowrap">
-                  {b}
-                </span>
-              ))}
             </div>
-            {scores.map((s, j) => (
-              <span key={j} className="flex-1 flex justify-center items-start pt-0.5 text-base">
-                {j === circledPlayer
-                  ? <span className={`${scoreColor(s)} outline outline-1 outline-orange-400 rounded-full inline-flex items-center justify-center min-w-[1.6rem] h-[1.6rem] text-sm leading-none px-0.5`}>{fmt(s)}</span>
-                  : <span className={scoreColor(s)}>{fmt(s)}</span>
-                }
-              </span>
-            ))}
+            {scores.map((s, j) => {
+              const pBadges = badgesPerSeat[j] ?? []
+              return (
+                <span key={j} className="flex-1 flex flex-col items-center pt-0.5">
+                  {j === circledPlayer
+                    ? <span className={`${scoreColor(s)} text-base outline outline-1 outline-orange-400 rounded-full inline-flex items-center justify-center min-w-[1.6rem] h-[1.6rem] text-sm leading-none px-0.5`}>{fmt(s)}</span>
+                    : <span className={`${scoreColor(s)} text-base`}>{fmt(s)}</span>
+                  }
+                  {pBadges.map(b => (
+                    <span key={b} className="text-[10px] px-1 rounded bg-purple-900/70 text-purple-300 font-bold leading-tight whitespace-nowrap mt-0.5">
+                      {b}
+                    </span>
+                  ))}
+                </span>
+              )
+            })}
           </div>
         )
       })}

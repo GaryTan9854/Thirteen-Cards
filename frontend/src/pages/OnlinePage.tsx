@@ -184,28 +184,29 @@ export default function OnlinePage() {
   const [submitted,       setSubmitted]       = useState(false)
   const [submittedList,   setSubmittedList]   = useState<string[]>([])
   const [lastResult,      setLastResult]      = useState<any | null>(null)
-  const [historyBadges,   setHistoryBadges]   = useState<string[][]>([])
+  const [historyBadges,   setHistoryBadges]   = useState<string[][][]>([])
 
-  // ── Badge extraction ──
-  function extractRoundBadges(result: any): string[] {
-    const badges: string[] = []
-    if ((result.players ?? []).some((p: any) => p.special_hand && p.special_hand !== 'normal'))
-      badges.push('報到')
-    if ((result.battles ?? []).some((b: any) => b.gun !== 0))
-      badges.push('打槍')
-    const mSet = new Set<string>()
-    for (const b of result.battles ?? [])
-      for (const k of ['p1_top','p1_mid','p1_bot','p2_mid','p2_bot'])
-        if (b[k]) mSet.add(b[k])
-    const ML: Record<string,string> = {'三條':'原子頭','葫蘆':'葫蘆','鐵支':'鐵支','同花順':'同花順','同花次大順':'次大順','同花大順':'大順'}
-    for (const [key, label] of Object.entries(ML))
-      if (mSet.has(key)) badges.push(label)
-    return badges
+  // ── Badge extraction (per-seat) ──
+  const TOP_M = new Set(['三條'])
+  const MID_M = new Set(['葫蘆','鐵支','同花順','同花次大順','同花大順'])
+  const BOT_M = new Set(['鐵支','同花順','同花次大順','同花大順'])
+  const ML: Record<string,string> = {'三條':'原子頭','葫蘆':'葫蘆','鐵支':'鐵支','同花順':'同花順','同花次大順':'次大順','同花大順':'大順'}
+
+  function extractRoundBadges(result: any): string[][] {
+    const players: any[] = result.players ?? []
+    return players.map((p: any) => {
+      const b: string[] = []
+      if (p.special_hand && p.special_hand !== 'normal') b.push('報到')
+      if (TOP_M.has(p.top?.hand_type))  b.push(ML[p.top.hand_type])
+      if (MID_M.has(p.mid?.hand_type))  b.push(ML[p.mid.hand_type])
+      if (BOT_M.has(p.bot?.hand_type))  b.push(ML[p.bot.hand_type])
+      return b
+    })
   }
   function addRoundBadges(roundNum: number, result: any) {
     if (!result) return
     const badges = extractRoundBadges(result)
-    if (badges.length === 0) return
+    if (!badges.some(b => b.length > 0)) return
     setHistoryBadges(prev => { const next = [...prev]; next[roundNum - 1] = badges; return next })
   }
 
