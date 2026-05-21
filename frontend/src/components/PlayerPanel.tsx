@@ -75,7 +75,7 @@ export default function PlayerPanel({ player, finalScore, strategy = 'rule_base_
                 <span className="text-xs font-semibold text-gray-500">{ROW_LABELS[i]}</span>
                 <span className="text-xs text-gray-400">{row.description}</span>
               </div>
-              <div className="flex gap-1">
+              <div className="flex gap-1 overflow-x-auto pb-0.5">
                 {row.cards.map((c, j) => <CardChip key={j} card={c} />)}
               </div>
             </div>
