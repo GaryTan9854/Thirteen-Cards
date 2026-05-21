@@ -259,16 +259,6 @@ export default function OnlinePage() {
   // ── Phase renderers ────────────────────────────────────────────────────────
 
   function renderPhase() {
-    // Not yet connected
-    if (!connected) {
-      return (
-        <div className="flex flex-col items-center justify-center h-40 text-gray-500 gap-3">
-          <div className="text-2xl animate-pulse">🔌</div>
-          <div className="text-sm">連接伺服器中…</div>
-        </div>
-      )
-    }
-
     // Submitted — waiting for others / timer
     if (submitted && phase === 'playing') {
       return (
