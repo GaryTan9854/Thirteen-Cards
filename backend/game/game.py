@@ -74,7 +74,7 @@ def compete(h1, h2):
     elif h1.hmid.handtype == "鐵支" or h2.hmid.handtype == "鐵支":
         p_whowin = h1.hmid.p[0] if res[i] > 0 else h2.hmid.p[0]
         res[i] = res[i] * (16 if p_whowin == 4 else 8)
-    elif h1.hmid.handtype == "同花順":
+    elif h1.hmid.handtype == "同花順" or h2.hmid.handtype == "同花順":
         res[i] = res[i] * 10
     elif h1.hmid.handtype == "同花次大順" or h2.hmid.handtype == "同花次大順":
         res[i] = res[i] * 12
@@ -251,6 +251,8 @@ def play_one_game(player_names=None, strategies=None,
 
     gun_counts = {name: 0 for name in player_names}
 
+    MONSTER_TYPES = {'葫蘆', '鐵支', '同花順', '同花次大順', '同花大順', '三條'}
+
     for i, j in combos:
         res = compete(hand13_list[i], hand13_list[j])
         p1_name = player_names[i]
@@ -276,15 +278,30 @@ def play_one_game(player_names=None, strategies=None,
         else:
             desc = f"{p1_name} 平手 {p2_name}"
 
+        # Collect monster hand-types for both sides (for UI annotation)
+        h1, h2 = hand13_list[i], hand13_list[j]
+
+        def _mtype(h, row):
+            if h.specialhand != 'normal': return None
+            ht = getattr(h, row).handtype
+            return ht if ht in MONSTER_TYPES else None
+
         battles.append({
             "p1": p1_name,
             "p2": p2_name,
-            "top": res[0],
-            "mid": res[1],
-            "bot": res[2],
-            "total": res[3],
+            # battle_res[0..3] is from the WINNER/DESC person's perspective
+            # (positive total = winner's score), consistent with desc label
+            "top": battle_res[0],
+            "mid": battle_res[1],
+            "bot": battle_res[2],
+            "total": battle_res[3],
             "gun": res[4],
             "desc": desc,
+            "p1_top": _mtype(h1, 'htop'),
+            "p1_mid": _mtype(h1, 'hmid'),
+            "p1_bot": _mtype(h1, 'hbot'),
+            "p2_mid": _mtype(h2, 'hmid'),
+            "p2_bot": _mtype(h2, 'hbot'),
         })
 
     # Calculate final scores with gun multipliers
