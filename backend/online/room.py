@@ -169,6 +169,9 @@ class Room:
             for s in range(self.time_limit, 0, -1):
                 await mgr.broadcast({"type": "countdown", "seconds": s})
                 await asyncio.sleep(1)
+            # Send 0 so clients can auto-submit, then give a brief window
+            await mgr.broadcast({"type": "countdown", "seconds": 0})
+            await asyncio.sleep(1.0)
             await self.resolve_round(mgr)
         except asyncio.CancelledError:
             pass

@@ -81,6 +81,22 @@ export function buildSpecialTTS(players: any[]): { baodao: string[]; monsters: s
 
 // ── 女聲 TTS（Web Speech API，優先 zh-TW）────────────────────────────────────
 
+/** Pick best female zh voice across browsers/OS */
+function pickFemaleZh(zh: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
+  return (
+    // macOS: Meijia (zh-TW), Sinji (zh-HK), Yawen (zh-TW)
+    zh.find(v => /meijia|美嘉|sin[\s-]?ji|sinji|ya[\s-]?wen|雅雯/i.test(v.name)) ||
+    // macOS: Tingting (zh-CN)
+    zh.find(v => /tingting|ting[\s-]?ting/i.test(v.name)) ||
+    // Windows / Firefox: Hanhan (zh-TW female), Huihui (zh-CN female)
+    zh.find(v => /hanhan|han[\s-]?han|huihui|hui[\s-]?hui/i.test(v.name)) ||
+    // Google voices (Android / ChromeOS): 普通話 / 國語
+    zh.find(v => /google/i.test(v.name) && v.lang.startsWith('zh')) ||
+    // Fallback: any zh-TW, then any zh
+    zh.find(v => v.lang === 'zh-TW') || zh[0]
+  )
+}
+
 export function speak(text: string, rate = 1.05) {
   const synth = window.speechSynthesis
   if (!synth) return
@@ -92,10 +108,7 @@ export function speak(text: string, rate = 1.05) {
   const doSpeak = () => {
     const voices = synth.getVoices()
     const zh     = voices.filter(v => v.lang.startsWith('zh'))
-    const female =
-      zh.find(v => /meijia|美嘉|sin[\s-]?ji|sinji|ya[\s-]?wen|雅雯/i.test(v.name)) ||
-      zh.find(v => /tingting|ting[\s-]?ting/i.test(v.name)) ||
-      zh.find(v => v.lang === 'zh-TW') || zh[0]
+    const female = pickFemaleZh(zh)
     if (female) utter.voice = female
     synth.speak(utter)
   }
@@ -111,10 +124,7 @@ export function speakSequence(lines: string[], onDone?: () => void, rate = 1.05)
   if (!synth) { onDone?.(); return }
   const voices = synth.getVoices()
   const zh     = voices.filter(v => v.lang.startsWith('zh'))
-  const female =
-    zh.find(v => /meijia|美嘉|sin[\s-]?ji|sinji|ya[\s-]?wen|雅雯/i.test(v.name)) ||
-    zh.find(v => /tingting|ting[\s-]?ting/i.test(v.name))                         ||
-    zh.find(v => v.lang === 'zh-TW') || zh[0]
+  const female = pickFemaleZh(zh)
   let idx = 0
   const playNext = () => {
     if (idx >= lines.length) { onDone?.(); return }
