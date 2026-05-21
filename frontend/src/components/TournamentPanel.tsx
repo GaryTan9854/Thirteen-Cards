@@ -99,7 +99,7 @@ export default function TournamentPanel({
                   }
                   <span className="flex flex-wrap gap-0.5">
                   {pBadges.map(b => (
-                    <span key={b} className="text-[11px] px-1 rounded bg-purple-900/70 text-purple-300 font-bold leading-tight whitespace-nowrap">
+                    <span key={b} className="text-[13px] px-1 rounded bg-purple-900/70 text-purple-300 font-bold leading-tight whitespace-nowrap">
                       {b}
                     </span>
                   ))}

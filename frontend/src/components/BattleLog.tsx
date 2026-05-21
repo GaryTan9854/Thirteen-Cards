@@ -33,7 +33,7 @@ const BOT_MONSTER_SHORT: Record<string, string> = {
 function MonsterBadge({ type, shortMap }: { type?: string | null; shortMap: Record<string, string> }) {
   if (!type || !shortMap[type]) return null
   return (
-    <span className="ml-1 text-[10px] px-1 py-0.5 rounded bg-purple-100 text-purple-700 font-bold
+    <span className="ml-1 text-[12px] px-1 py-0.5 rounded bg-purple-100 text-purple-700 font-bold
                      whitespace-nowrap leading-none">
       {shortMap[type]}
     </span>
