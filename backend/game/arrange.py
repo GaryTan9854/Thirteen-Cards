@@ -224,6 +224,19 @@ def generate_5card_options(available: list) -> list:
                 bot2s = nt_skip[-2:]
                 if set(bot2s) != set(nt_skip[:2]):
                     options.append(by_rank[tr][:3] + bot2s)
+        # Skip ALL pair ranks → frees pairs for mid/top rows.
+        # e.g. 222+10+8 as bot allows QQ/66/55 pairs to be used freely
+        # in mid (two-pair) and top (pair), enabling A/K kickers in top row.
+        pair_ranks_set = set(r for r, c in cnt.items() if c >= 2)
+        nt_singles = sorted([cs for cs in available
+                             if int(cs[:2]) != tr and int(cs[:2]) not in pair_ranks_set],
+                            key=lambda cs: -int(cs[:2]))
+        if len(nt_singles) >= 2:
+            opt_top = by_rank[tr][:3] + nt_singles[:2]
+            opt_bot = by_rank[tr][:3] + nt_singles[-2:]
+            options.append(opt_top)
+            if tuple(sorted(opt_bot)) != tuple(sorted(opt_top)):
+                options.append(opt_bot)
 
     # ── 一對 P ───────────────────────────────────────────────────────────
     # Try top-3 AND bottom-3 kickers (same logic as 三條): high single cards
