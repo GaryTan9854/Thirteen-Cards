@@ -12,23 +12,30 @@ function resIcon(val: number) {
   return <span className="text-gray-400">—</span>
 }
 
-const MONSTER_SHORT: Record<string, string> = {
-  // top (頭墩) only — 原子頭
-  '三條':      '原子頭×3↑',
-  // mid/bot
+// Labels vary by row — mid and bot have different multipliers
+const TOP_MONSTER_SHORT: Record<string, string> = {
+  '三條': '原子頭×3↑',          // ×3 normal, ×6 for trip-3s
+}
+const MID_MONSTER_SHORT: Record<string, string> = {
   '葫蘆':      '葫蘆×2',
-  '鐵支':      '鐵支×8↑',
+  '鐵支':      '鐵支×8↑',       // ×8 normal, ×16 for quad-4s
   '同花順':    '同花順×10',
   '同花次大順':'次大順×12',
   '同花大順':  '大順×14',
 }
+const BOT_MONSTER_SHORT: Record<string, string> = {
+  '鐵支':      '鐵支×4↑',       // ×4 normal, ×8 for quad-4s
+  '同花順':    '同花順×5',
+  '同花次大順':'次大順×6',
+  '同花大順':  '大順×7',
+}
 
-function MonsterBadge({ type }: { type?: string | null }) {
-  if (!type || !MONSTER_SHORT[type]) return null
+function MonsterBadge({ type, shortMap }: { type?: string | null; shortMap: Record<string, string> }) {
+  if (!type || !shortMap[type]) return null
   return (
     <span className="ml-1 text-[10px] px-1 py-0.5 rounded bg-purple-100 text-purple-700 font-bold
                      whitespace-nowrap leading-none">
-      {MONSTER_SHORT[type]}
+      {shortMap[type]}
     </span>
   )
 }
@@ -48,17 +55,17 @@ export default function BattleLog({ battles }: Props) {
               {/* Top — show 原子頭 badge if either player has 三條 at top */}
               <span className="flex items-center gap-0.5 text-gray-500">
                 頭 {resIcon(b.top)}
-                <MonsterBadge type={b.p1_top} />
+                <MonsterBadge type={b.p1_top} shortMap={TOP_MONSTER_SHORT} />
               </span>
               {/* Mid */}
               <span className="flex items-center gap-0.5 text-gray-500">
                 中 {resIcon(b.mid)}
-                <MonsterBadge type={b.p1_mid ?? b.p2_mid} />
+                <MonsterBadge type={b.p1_mid ?? b.p2_mid} shortMap={MID_MONSTER_SHORT} />
               </span>
               {/* Bot */}
               <span className="flex items-center gap-0.5 text-gray-500">
                 尾 {resIcon(b.bot)}
-                <MonsterBadge type={b.p1_bot ?? b.p2_bot} />
+                <MonsterBadge type={b.p1_bot ?? b.p2_bot} shortMap={BOT_MONSTER_SHORT} />
               </span>
               {/* Total — always non-negative (winner's score) */}
               <span className="font-bold text-gray-700">
