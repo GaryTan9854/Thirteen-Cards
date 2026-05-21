@@ -253,8 +253,10 @@ def play_one_game(player_names=None, strategies=None,
 
     # 三條 bonus only applies to 頭墩 (top row = 原子頭).
     # 中墩/尾墩 三條 is a normal hand with no special scoring.
-    TOP_MONSTERS    = {'三條'}
-    MID_BOT_MONSTERS = {'葫蘆', '鐵支', '同花順', '同花次大順', '同花大順'}
+    # 葫蘆 bonus only applies to 中墩 (×2); 尾墩 葫蘆 has no bonus.
+    TOP_MONSTERS = {'三條'}
+    MID_MONSTERS = {'葫蘆', '鐵支', '同花順', '同花次大順', '同花大順'}
+    BOT_MONSTERS = {'鐵支', '同花順', '同花次大順', '同花大順'}
 
     for i, j in combos:
         res = compete(hand13_list[i], hand13_list[j])
@@ -300,12 +302,12 @@ def play_one_game(player_names=None, strategies=None,
             "total": battle_res[3],
             "gun": res[4],
             "desc": desc,
-            # top: 原子頭(三條) only; mid/bot: 葫蘆/鐵支/同花順 only
+            # top: 原子頭(三條) only; mid: 葫蘆/鐵支/同花順; bot: 鐵支/同花順 (葫蘆無加成)
             "p1_top": _mtype(h1, 'htop', TOP_MONSTERS),
-            "p1_mid": _mtype(h1, 'hmid', MID_BOT_MONSTERS),
-            "p1_bot": _mtype(h1, 'hbot', MID_BOT_MONSTERS),
-            "p2_mid": _mtype(h2, 'hmid', MID_BOT_MONSTERS),
-            "p2_bot": _mtype(h2, 'hbot', MID_BOT_MONSTERS),
+            "p1_mid": _mtype(h1, 'hmid', MID_MONSTERS),
+            "p1_bot": _mtype(h1, 'hbot', BOT_MONSTERS),
+            "p2_mid": _mtype(h2, 'hmid', MID_MONSTERS),
+            "p2_bot": _mtype(h2, 'hbot', BOT_MONSTERS),
         })
 
     # Calculate final scores with gun multipliers
