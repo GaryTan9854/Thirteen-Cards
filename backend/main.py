@@ -11,7 +11,7 @@ from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 
-APP_VERSION = "5.14"
+APP_VERSION = "5.15"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -122,17 +122,17 @@ def arrange_hand(req: ArrangeRequest):
     return {
         "special": "normal",
         "top": {
-            "cards": [c.show() for c in arr.htop],
+            "cards": [c.show() for c in arr.htop.display_order()],
             "hand_type": arr.htop.handtype,
             "description": arr.htop.hand_dscp(),
         },
         "mid": {
-            "cards": [c.show() for c in arr.hmid],
+            "cards": [c.show() for c in arr.hmid.display_order()],
             "hand_type": arr.hmid.handtype,
             "description": arr.hmid.hand_dscp(),
         },
         "bot": {
-            "cards": [c.show() for c in arr.hbot],
+            "cards": [c.show() for c in arr.hbot.display_order()],
             "hand_type": arr.hbot.handtype,
             "description": arr.hbot.hand_dscp(),
         },
@@ -289,9 +289,9 @@ def manual_arrange_info(req: ManualInfoRequest):
 
     def _arr_to_dict(h3, hm, hb):
         return {
-            "top":      [c.cardstr() for c in h3],
-            "mid":      [c.cardstr() for c in hm],
-            "bot":      [c.cardstr() for c in hb],
+            "top":      [c.cardstr() for c in h3.display_order()],
+            "mid":      [c.cardstr() for c in hm.display_order()],
+            "bot":      [c.cardstr() for c in hb.display_order()],
             "top_type": _row_label(h3.handtype_val),
             "mid_type": _row_label(hm.handtype_val),
             "bot_type": _row_label(hb.handtype_val),
