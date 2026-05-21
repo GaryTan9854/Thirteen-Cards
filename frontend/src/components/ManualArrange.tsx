@@ -111,10 +111,10 @@ function StatsPanel({ stats, special }: { stats?:StatsData; special?:SpecialData
   const rows = [
     { label:'Pairs',          v:stats.pairs.count,      d:stats.pairs.ranks.map(rn).join(' ') },
     { label:'Threes',         v:stats.trips.count,      d:stats.trips.ranks.map(rn).join(' ') },
-    { label:'Quads',          v:stats.quads.count,      d:stats.quads.ranks.map(rn).join(' ') },
     { label:'Straights',      v:stats.straights.count,  d:stats.straights.ranges.map(r=>`${rn(r[0])}-${rn(r[1])}`).join(' ') },
-    { label:'Flushes (C5)',   v:stats.flushes.count,    d:stats.flushes.detail.join(' ') },
+    { label:'Flushes',        v:stats.flushes.count,    d:stats.flushes.detail.join(' ') },
     { label:'Full House',     v:stats.fullhouses.count, d:stats.fullhouses.combos.slice(0,4).map(c=>`${rn(c[0])}+${rn(c[1])}`).join(' ') },
+    { label:'Quads',          v:stats.quads.count,      d:stats.quads.ranks.map(rn).join(' ') },
     { label:'Straight Flush', v:stats.sf.count,         d:stats.sf.detail.join(' ') },
   ]
 
