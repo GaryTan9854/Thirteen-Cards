@@ -11,7 +11,7 @@ from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 
-APP_VERSION = "4.17"
+APP_VERSION = "4.18"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -596,6 +596,54 @@ async def ws_endpoint(player_name: str, websocket: WebSocket):
                     continue
                 await room.start_round(manager)
 
+            # ── appeal_decision ───────────────────────────────────────────────
+            elif t == "appeal_decision":
+                if room.phase != Phase.APPEAL_PENDING:
+                    continue
+                seat_names = room.seat_names()
+                loser_name = seat_names[room.appeal_loser_seat] if room.appeal_loser_seat >= 0 else None
+                loser_is_ai = loser_name not in room.players if loser_name else True
+
+                # Only the loser (if human) or the host (for AI / as override) may decide
+                if not loser_is_ai and player_name != loser_name and player_name != room.host:
+                    continue
+
+                accept = bool(data.get("accept", True))
+                if accept:
+                    room.appeal_generation += 1
+                    room.appeal_played     = 0
+                    room.is_tiebreaking    = False
+                    room.phase             = Phase.ROUND_END   # host clicks "next round"
+                    appeal_rounds = 1 if room.appeal_generation >= 2 else room.rounds_appeal
+                    await manager.broadcast({
+                        "type":           "appeal_started",
+                        "loser_name":     loser_name,
+                        "generation":     room.appeal_generation,
+                        "appeal_rounds":  appeal_rounds,
+                    })
+                    await manager.broadcast({"type": "room_update", "room": room.snapshot()})
+                else:
+                    # Declined → end game immediately
+                    room.phase = Phase.ENDED
+                    totals = [sum(r[i] for r in room.history) for i in range(4)]
+                    final_low = totals.index(min(totals))
+                    room.circle_marks[room.current_round - 1] = final_low
+                    await manager.broadcast({
+                        "type":        "game_ended",
+                        "result":      None,
+                        "round":       room.current_round,
+                        "history":     room.history,
+                        "seat_names":  seat_names,
+                        "is_last":     True,
+                        "circle_seat": final_low,
+                        "multiplier":  1,
+                        "is_boring":   False,
+                        "next_multiplier": 1,
+                        "new_tiebreak": False,
+                        "from_appeal_decline": True,
+                    })
+                    await manager.broadcast({"type": "room_update", "room": room.snapshot()})
+
             # ── leave_game ────────────────────────────────────────────────────
             elif t == "leave_game":
                 if player_name in room.players:
@@ -618,7 +666,7 @@ async def ws_endpoint(player_name: str, websocket: WebSocket):
         online = manager.online_players()
 
         if player_name in room.players and room.phase in (
-                Phase.PLAYING, Phase.ROUND_END, Phase.ENDED):
+                Phase.PLAYING, Phase.ROUND_END, Phase.APPEAL_PENDING, Phase.ENDED):
             await manager.broadcast({
                 "type":           "player_disconnected",
                 "player":         player_name,

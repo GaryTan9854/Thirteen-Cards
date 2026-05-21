@@ -2,7 +2,8 @@
  * OnlinePage — real-time multiplayer 十三支.
  *
  * Phases (driven by server room.phase):
- *   lobby → setup → inviting → seating → playing → round_end → ended
+ *   lobby → setup → inviting → seating → playing → round_end
+ *   → appeal_pending → round_end (appeal) → ended
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -20,27 +21,42 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface RoomSnapshot {
-  phase:          string
-  host:           string | null
-  players:        string[]
-  seats:          Record<string, number>
-  rounds_normal:  number
-  rounds_appeal:  number
-  time_limit:     number
-  invites:        Record<string, string>
-  current_round:  number
-  total_rounds:   number
-  in_appeal:      boolean
-  seat_names:     string[]
-  history:        number[][]
-  submitted:      string[]
-  ai_strategy:    string
-  ai_names:       string[]
+  phase:              string
+  host:               string | null
+  players:            string[]
+  seats:              Record<string, number>
+  rounds_normal:      number
+  rounds_appeal:      number
+  time_limit:         number
+  invites:            Record<string, string>
+  current_round:      number
+  total_rounds:       number
+  in_appeal:          boolean
+  seat_names:         string[]
+  history:            number[][]
+  round_multipliers:  number[]
+  multiplier:         number
+  circle_marks:       Record<string, number>  // "roundIdx" → seatIdx
+  appeal_loser_seat:  number
+  appeal_generation:  number
+  appeal_played:      number
+  is_tiebreaking:     boolean
+  submitted:          string[]
+  ai_strategy:        string
+  ai_names:           string[]
 }
 
 interface InviteInfo {
   from:   string
   config: { rounds_normal: number; rounds_appeal: number; time_limit: number }
+}
+
+interface AppealInfo {
+  loser_seat:        number
+  loser_name:        string
+  loser_is_ai:       boolean
+  appeal_generation: number
+  appeal_rounds:     number
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -59,8 +75,8 @@ function randomBeauties(): string[] {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function OnlineBar({ players, self: self_ }: {
-  players: string[]; self: string | null
+function OnlineBar({ players, self: self_, onLeave }: {
+  players: string[]; self: string | null; onLeave: () => void
 }) {
   return (
     <div className="flex items-center gap-2 flex-wrap py-1">
@@ -73,6 +89,13 @@ function OnlineBar({ players, self: self_ }: {
           {p}
         </span>
       ))}
+      <div className="flex-1" />
+      <button
+        onClick={onLeave}
+        className="text-xs text-gray-500 hover:text-red-400 px-2 py-0.5 rounded
+                   hover:bg-gray-800/60 transition whitespace-nowrap">
+        ← 離開大廳
+      </button>
     </div>
   )
 }
@@ -80,7 +103,7 @@ function OnlineBar({ players, self: self_ }: {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function OnlinePage() {
-  const { player } = useAuth()
+  const { player, logout } = useAuth()
 
   // ── WebSocket ──
   const wsRef    = useRef<WebSocket | null>(null)
@@ -94,7 +117,7 @@ export default function OnlinePage() {
 
   // ── Setup form (host only) ──
   const [cfgNormal,     setCfgNormal]     = useState(4)
-  const [cfgAppeal,     setCfgAppeal]     = useState(0)
+  const [cfgAppeal,     setCfgAppeal]     = useState(4)
   const [cfgTimeLimit,  setCfgTimeLimit]  = useState(30)
   const [cfgInvitees,   setCfgInvitees]   = useState<string[]>([])
   const [cfgAiStrategy, setCfgAiStrategy] = useState('rule_base_as')
@@ -107,6 +130,12 @@ export default function OnlinePage() {
   const [submitted,       setSubmitted]       = useState(false)
   const [submittedList,   setSubmittedList]   = useState<string[]>([])
   const [lastResult,      setLastResult]      = useState<any | null>(null)
+
+  // ── Score / appeal display state ──
+  const [circleMarks,      setCircleMarks]      = useState<Record<number, number>>({})
+  const [roundMultipliers, setRoundMultipliers] = useState<number[]>([])
+  const [appealInfo,       setAppealInfo]       = useState<AppealInfo | null>(null)
+  const [nextMultiplier,   setNextMultiplier]   = useState(1)
 
   // ── Effects: 打槍 / 全壘打 / 語音 ──
   const [grandSlammer, setGrandSlammer]     = useState<string | null>(null)
@@ -149,7 +178,7 @@ export default function OnlinePage() {
   useEffect(() => {
     if (!player) return
     const playerName = player    // capture non-null for nested function
-    let dead = false          // set true on cleanup so reconnect doesn't fire after unmount
+    let dead = false
     let retryTimer: ReturnType<typeof setTimeout> | null = null
 
     function connect() {
@@ -162,7 +191,6 @@ export default function OnlinePage() {
       ws.onclose = () => {
         setConnected(false)
         wsRef.current = null
-        // Auto-reconnect after 2 s (handles Cloudflare idle-timeout drops)
         if (!dead) retryTimer = setTimeout(connect, 2000)
       }
       ws.onerror = () => setConnected(false)
@@ -184,8 +212,8 @@ export default function OnlinePage() {
   }
 
   function pushNotice(text: string) {
-    setNotices(prev => [...prev.slice(-4), text])   // keep last 5
-    setTimeout(() => setNotices(prev => prev.slice(1)), 4000)  // auto-clear after 4s
+    setNotices(prev => [...prev.slice(-4), text])
+    setTimeout(() => setNotices(prev => prev.slice(1)), 4000)
   }
 
   function handleMsg(msg: any) {
@@ -194,26 +222,35 @@ export default function OnlinePage() {
         setOnlinePlayers(msg.online_players ?? [])
         setRoom(msg.room ?? null)
         if (msg.room?.ai_names?.length === 3) setCfgAiNames(msg.room.ai_names)
+        // Restore display state from room snapshot
+        if (msg.room) restoreFromSnapshot(msg.room)
         break
+
       case 'online_update':
         setOnlinePlayers(msg.online_players ?? [])
         if (msg.joined) pushNotice(`${msg.joined} 登入系統`)
         if (msg.left)   pushNotice(`${msg.left} 離線`)
         break
+
       case 'room_update':
         setRoom(msg.room ?? null)
+        if (msg.room) restoreFromSnapshot(msg.room)
         break
+
       case 'invited':
         setInvited({ from: msg.from, config: msg.config })
         break
+
       case 'invite_update':
         if (msg.room) setRoom(msg.room)
         break
+
       case 'seats_drawn':
         setRoom(prev => prev ? {
           ...prev, seats: msg.seats, seat_names: msg.seat_names
         } : prev)
         break
+
       case 'your_hand':
         setMyHand(msg.hand)
         setMySeat(msg.seat)
@@ -221,32 +258,77 @@ export default function OnlinePage() {
         setSubmitted(false)
         setSubmittedList([])
         setLastResult(null)
+        setAppealInfo(null)
+        // Voice: announce multiplier if > 1
+        if ((msg.multiplier ?? 1) > 1 && voiceRef.current) {
+          setTimeout(() => speak(`第 ${msg.round} 局，計分乘${msg.multiplier}！`, 1.0), 500)
+        }
         break
+
       case 'round_started':
         setLastResult(null)
+        setAppealInfo(null)
+        if ((msg.multiplier ?? 1) > 1 && voiceRef.current) {
+          setTimeout(() => speak(`第 ${msg.round} 局，計分乘${msg.multiplier}！`, 1.0), 500)
+        }
         break
+
       case 'countdown':
         setCountdown(msg.seconds)
         break
+
       case 'arrangement_ready':
         setSubmittedList(msg.submitted ?? [])
         break
-      case 'round_result':
+
+      case 'round_result': {
         setMyHand(null)
         setCountdown(null)
         setLastResult(msg)
         setRoom(prev => prev ? {
-          ...prev, phase: 'round_end', current_round: msg.round, history: msg.history
+          ...prev, phase: msg.appeal_pending ? 'appeal_pending' : 'round_end',
+          current_round: msg.round, history: msg.history
         } : prev)
-        fireRoundEffects(msg.result ?? {})
+        // Update multipliers
+        applyRoundMeta(msg)
+        fireRoundEffects(msg.result ?? {}, msg)
+        // If an appeal was triggered, voice the prompt after effects settle
+        if (msg.appeal_pending) {
+          setAppealInfo(msg.appeal_pending)
+          scheduleAppealVoice(msg.appeal_pending, false)
+        }
         break
-      case 'game_ended':
+      }
+
+      case 'game_ended': {
         setMyHand(null)
         setCountdown(null)
         setLastResult(msg)
         setRoom(prev => prev ? { ...prev, phase: 'ended' } : prev)
-        fireRoundEffects(msg.result ?? {})
+        applyRoundMeta(msg)
+        setAppealInfo(null)
+        if (!msg.from_appeal_decline) {
+          fireRoundEffects(msg.result ?? {}, msg)
+        }
+        // End-game voice
+        scheduleEndGameVoice(msg)
         break
+      }
+
+      case 'appeal_started': {
+        setAppealInfo(null)
+        const { loser_name, generation, appeal_rounds } = msg
+        const label = generation >= 2 ? '終局申訴，加賽一局！' : `加賽 ${appeal_rounds} 局開始！`
+        if (voiceRef.current) {
+          setTimeout(() => speakSequence([
+            `${loser_name} 上訴，${label}`,
+            '等待下一局開始',
+          ], undefined, 0.9), 800)
+        }
+        pushNotice(`⚖️ ${loser_name} 申訴！加賽 ${appeal_rounds} 局`)
+        break
+      }
+
       case 'player_disconnected':
         if (msg.online_players) setOnlinePlayers(msg.online_players)
         if (msg.room) setRoom(msg.room)
@@ -254,9 +336,82 @@ export default function OnlinePage() {
     }
   }
 
+  // Restore circleMarks + roundMultipliers from a snapshot (e.g. after reconnect)
+  function restoreFromSnapshot(snap: RoomSnapshot) {
+    if (snap.round_multipliers?.length) setRoundMultipliers(snap.round_multipliers)
+    if (snap.circle_marks) {
+      const cm: Record<number, number> = {}
+      for (const [k, v] of Object.entries(snap.circle_marks)) cm[Number(k)] = v
+      setCircleMarks(cm)
+    }
+    setNextMultiplier(snap.multiplier ?? 1)
+  }
+
+  // Apply per-round metadata from a round_result / game_ended event
+  function applyRoundMeta(msg: any) {
+    const roundIdx = (msg.round ?? 1) - 1
+    if ((msg.multiplier ?? 1) >= 1) {
+      setRoundMultipliers(prev => {
+        const next = [...prev]
+        next[roundIdx] = msg.multiplier ?? 1
+        return next
+      })
+    }
+    if ((msg.circle_seat ?? -1) >= 0) {
+      setCircleMarks(prev => ({ ...prev, [roundIdx]: msg.circle_seat }))
+    }
+    setNextMultiplier(msg.next_multiplier ?? 1)
+    // Voice: boring round → multiplier
+    if (msg.is_boring && (msg.next_multiplier ?? 1) > 1 && voiceRef.current) {
+      setTimeout(() => {
+        if (voiceRef.current) speak(`下一局計分乘${msg.next_multiplier}！`, 1.0)
+      }, 9000)   // after main TTS chain
+    }
+    // Voice: tiebreak
+    if (msg.new_tiebreak && voiceRef.current) {
+      setTimeout(() => { if (voiceRef.current) speak('平局！繼續加賽！', 0.9) }, 2000)
+    }
+  }
+
+  // Schedule appeal-pending voice (4s delay, matches GamePage)
+  function scheduleAppealVoice(info: AppealInfo, _isFromStarted: boolean) {
+    const name = info.loser_name
+    const isAi = info.loser_is_ai
+    const gen  = info.appeal_generation
+    if (isAi) {
+      // AI always appeals → auto-decide + announce
+      setTimeout(() => {
+        const label = gen >= 1 ? '終局申訴' : '申訴'
+        if (voiceRef.current) speak(`${name} 決定${label}！`, 0.88)
+        send({ type: 'appeal_decision', accept: true })
+      }, 3500)
+    } else {
+      const msg = gen === 0
+        ? `比賽結束，請問 ${name}，你要申訴嗎？`
+        : `申訴局結束，請問 ${name}，你也要申訴嗎？`
+      setTimeout(() => { if (voiceRef.current) speak(msg, 0.88) }, 4000)
+    }
+  }
+
+  // Schedule end-game voice after round effects settle
+  function scheduleEndGameVoice(msg: any) {
+    const seatNames: string[] = msg.seat_names ?? []
+    const history: number[][] = msg.history ?? []
+    if (!seatNames.length || !history.length) return
+    const totals = seatNames.map((_: string, i: number) =>
+      history.reduce((s: number, r: number[]) => s + (r[i] ?? 0), 0)
+    )
+    const winnerIdx = totals.indexOf(Math.max(...totals))
+    const loserIdx  = totals.indexOf(Math.min(...totals))
+    setTimeout(() => {
+      if (voiceRef.current)
+        speak(`本場結束！冠軍 ${seatNames[winnerIdx]}！${seatNames[loserIdx]} 請客！`, 0.92)
+    }, msg.from_appeal_decline ? 800 : 7000)
+  }
+
   // ── Fire round effects (slam / guns / voice) ───────────────────────────────
 
-  function fireRoundEffects(result: any) {
+  function fireRoundEffects(result: any, _msg?: any) {
     window.speechSynthesis?.cancel()
     const slam      = detectGrandSlam(result.battles ?? [])
     const gunNotifs = buildGunNotifs(result.battles ?? [], slam)
@@ -311,22 +466,16 @@ export default function OnlinePage() {
 
   const phase  = room?.phase ?? 'lobby'
   const isHost = room?.host === player
+  const isGary = player === 'Gary'
 
   // ── Render ─────────────────────────────────────────────────────────────────
-
-  // ── Disconnected state: show inline (no early-return — portal must always render) ──
-
-  // ── ManualArrange overlay via portal ──────────────────────────────────────
-  // Renders to document.body so it appears on top even when this component
-  // is inside a display:none wrapper (e.g. user switched to 遊戲模擬 tab).
-  const isGary = player === 'Gary'
 
   const arrangePortal = myHand && !submitted && phase === 'playing'
     ? createPortal(
         <ManualArrange
           hand={myHand}
           onConfirm={handleConfirm}
-          onCancel={() => {}}         // cannot cancel in online mode
+          onCancel={() => {}}
           countdown={countdown ?? undefined}
           submittedCount={submittedList.length}
           totalPlayers={room?.players.length ?? 1}
@@ -379,8 +528,49 @@ export default function OnlinePage() {
         </div>
       )}
 
+      {/* ── 申訴 Popup ── */}
+      {appealInfo && phase === 'appeal_pending' && !appealInfo.loser_is_ai && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center"
+             style={{ background: 'rgba(0,0,0,0.78)' }}>
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-8 max-w-xs w-full mx-4
+                          text-center shadow-2xl">
+            <div className="text-5xl mb-4">⚖️</div>
+            <div className="text-sm text-gray-400 mb-1">
+              {appealInfo.appeal_generation === 0 ? `正式賽 ${room?.rounds_normal ?? 16} 局結束` : '申訴局結束'}
+            </div>
+            <div className="text-xl font-bold text-white mb-1">
+              <span className="text-orange-300">{appealInfo.loser_name}</span>，你要申訴嗎？
+            </div>
+            <div className="text-xs text-gray-500 mb-5">
+              申訴可加賽 {appealInfo.appeal_rounds} 局
+            </div>
+            {/* Only the loser sees the buttons; others see a waiting message */}
+            {player === appealInfo.loser_name ? (
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => { setAppealInfo(null); send({ type: 'appeal_decision', accept: true }) }}
+                  className="flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white
+                             font-bold text-lg active:scale-95 transition">
+                  ✅ 申訴
+                </button>
+                <button
+                  onClick={() => { setAppealInfo(null); send({ type: 'appeal_decision', accept: false }) }}
+                  className="flex-1 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-white
+                             font-bold text-lg active:scale-95 transition">
+                  ❌ 不了
+                </button>
+              </div>
+            ) : (
+              <div className="text-sm text-gray-400 animate-pulse">
+                等待 {appealInfo.loser_name} 決定…
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4">
-        <OnlineBar players={onlinePlayers} self={player} />
+        <OnlineBar players={onlinePlayers} self={player} onLeave={logout} />
 
         {/* Reconnecting banner */}
         {!connected && (
@@ -437,7 +627,6 @@ export default function OnlinePage() {
   // ── Phase renderers ────────────────────────────────────────────────────────
 
   function renderPhase() {
-    // Submitted — waiting for others / timer
     if (submitted && phase === 'playing') {
       return (
         <div className="bg-green-900/30 rounded-xl p-8 text-center space-y-3">
@@ -457,14 +646,15 @@ export default function OnlinePage() {
     }
 
     switch (phase) {
-      case 'lobby':     return renderLobby()
-      case 'setup':     return isHost ? renderSetup() : renderWait(`等待 ${room?.host} 設定比賽…`)
-      case 'inviting':  return renderInviting()
-      case 'seating':   return renderSeating()
-      case 'playing':   return renderSpectator()
-      case 'round_end': return renderRoundEnd()  // always show; non-players see "等待 host..."
-      case 'ended':     return renderGameEnd()
-      default:          return renderLobby()
+      case 'lobby':          return renderLobby()
+      case 'setup':          return isHost ? renderSetup() : renderWait(`等待 ${room?.host} 設定比賽…`)
+      case 'inviting':       return renderInviting()
+      case 'seating':        return renderSeating()
+      case 'playing':        return renderSpectator()
+      case 'round_end':      return renderRoundEnd()
+      case 'appeal_pending': return renderAppealPending()
+      case 'ended':          return renderGameEnd()
+      default:               return renderLobby()
     }
   }
 
@@ -473,21 +663,24 @@ export default function OnlinePage() {
   function renderLobby() {
     const seatNames = room?.seat_names ?? cfgAiNames.concat([player ?? '']).slice(0, 4)
     const history   = room?.history ?? []
+    const rm        = room?.round_multipliers ?? roundMultipliers
+    const cm        = (() => {
+      const m: Record<number, number> = {}
+      for (const [k, v] of Object.entries(room?.circle_marks ?? {})) m[Number(k)] = v
+      return m
+    })()
     return (
       <div className="flex flex-col gap-6">
         <TournamentPanel
           names={seatNames}
           history={history}
+          multipliers={rm}
+          circleMarks={cm}
           isEnded={false}
           roundLabel={history.length === 0 ? '準備開始' : `上場共 ${history.length} 局`}
           voiceOn={voiceOn}
           onToggleVoice={toggleVoice}
           actionButtons={<>
-            {isGary && (
-              <button onClick={async () => { await fetch('/api/online/reset', { method: 'POST' }) }}
-                className="text-xs text-gray-500 hover:text-red-400 px-2 py-1 rounded transition"
-                title="強制重置">⚙ 重置</button>
-            )}
             <button
               onClick={() => send({ type: 'new_game' })}
               className="text-xs px-3 py-1 rounded-full bg-orange-400 text-gray-900 font-bold
@@ -542,7 +735,6 @@ export default function OnlinePage() {
       <div className="bg-green-900/30 rounded-xl p-6 space-y-5">
         <div className="text-xl font-bold text-yellow-300">⚙️ 設定新比賽</div>
 
-        {/* Config inputs */}
         <div className="grid grid-cols-3 gap-4">
           {[
             { label: '比賽局數', val: cfgNormal,    set: setCfgNormal,    min: 1,  max: 40  },
@@ -561,7 +753,7 @@ export default function OnlinePage() {
           ))}
         </div>
 
-        {/* AI names (3 beauties) */}
+        {/* AI names */}
         <div className="space-y-2">
           <div className="text-sm text-gray-400">AI 玩家名稱</div>
           <div className="grid grid-cols-3 gap-2">
@@ -583,7 +775,7 @@ export default function OnlinePage() {
           </div>
         </div>
 
-        {/* AI model selector */}
+        {/* AI model */}
         <label className="flex items-center gap-3">
           <span className="text-sm text-gray-400 whitespace-nowrap">AI 模型：</span>
           <select
@@ -599,7 +791,7 @@ export default function OnlinePage() {
           <span className="text-xs text-gray-600">（AI 玩家使用）</span>
         </label>
 
-        {/* Invite buttons — show all online others */}
+        {/* Invite */}
         <div className="space-y-2">
           <div className="text-sm text-gray-400">
             {others.length > 0
@@ -696,9 +888,9 @@ export default function OnlinePage() {
                 <div key={i} className={`rounded-xl p-3 text-center
                   ${name === player
                     ? 'bg-yellow-400 text-gray-900 ring-2 ring-yellow-300'
-                    : name.startsWith('AI-')
-                      ? 'bg-gray-700 text-gray-400'
-                      : 'bg-green-800 text-white'}`}>
+                    : (room?.players ?? []).includes(name)
+                      ? 'bg-green-800 text-white'
+                      : 'bg-gray-700 text-gray-400'}`}>
                   <div className="text-[10px] opacity-60 mb-0.5">座位 {i + 1}</div>
                   <div className="font-bold">{name}</div>
                 </div>
@@ -723,11 +915,15 @@ export default function OnlinePage() {
   // ── Spectator (non-player during a round) ─────────────────────────────────
 
   function renderSpectator() {
+    const inAppeal = (room?.in_appeal ?? false)
     return (
       <div className="bg-green-900/30 rounded-xl p-8 text-center space-y-4">
         <div className="text-sm text-gray-500">
           第 {room?.current_round}/{room?.total_rounds} 局
-          {room?.in_appeal ? ' 【申訴局】' : ''}
+          {inAppeal ? ' 【申訴局】' : ''}
+          {(nextMultiplier > 1) && (
+            <span className="ml-2 text-orange-400 font-bold">× {nextMultiplier}</span>
+          )}
         </div>
         {countdown !== null && (
           <div className={`text-5xl font-bold tabular-nums
@@ -742,11 +938,10 @@ export default function OnlinePage() {
     )
   }
 
-  // ── Shared round/game result renderer ────────────────────────────────────
+  // ── Shared round / game result renderer ───────────────────────────────────
 
   function renderResult(isEnded: boolean) {
-    const res        = lastResult
-    // No result yet (e.g. reconnected mid-phase) → show lobby
+    const res = lastResult
     if (!res) return renderLobby()
 
     const gameResult = res.result
@@ -756,26 +951,36 @@ export default function OnlinePage() {
     const strategies = seatNames.map((n: string) =>
       (room?.players ?? []).includes(n) ? 'manual' : aiStrategy
     )
+
+    // Multipliers and circle marks: use accumulated state (most up-to-date after reconnect)
+    const rm = roundMultipliers.length > 0 ? roundMultipliers : (room?.round_multipliers ?? [])
+    const cm = circleMarks
+
+    const inAppeal = room?.in_appeal ?? false
+    const appealPlayedStr = inAppeal
+      ? ` 申訴 ${room?.appeal_played ?? 0}/${(room?.appeal_generation ?? 0) >= 2 ? 1 : (room?.rounds_appeal ?? 4)}`
+      : ''
     const roundLabel = isEnded
       ? `本場結束（共 ${history.length} 局）`
-      : `第 ${res.round} / ${room?.total_rounds ?? '?'} 局結果${res.round > (room?.rounds_normal ?? 999) ? '【申訴】' : ''}`
+      : `第 ${res.round} / ${room?.total_rounds ?? '?'} 局結果${inAppeal ? '【申訴】' + appealPlayedStr : ''}`
 
     return (
       <div className="flex flex-col gap-6">
-
-        {/* TournamentPanel — identical to 遊戲模擬 */}
         <TournamentPanel
           names={seatNames}
           history={history}
+          multipliers={rm}
+          circleMarks={cm}
           isEnded={isEnded}
           roundLabel={roundLabel}
           voiceOn={voiceOn}
           onToggleVoice={toggleVoice}
           actionButtons={<>
-            {isGary && (
-              <button onClick={async () => { await fetch('/api/online/reset', { method: 'POST' }) }}
-                className="text-xs text-gray-500 hover:text-red-400 px-2 py-1 rounded transition"
-                title="強制重置">⚙ 重置</button>
+            {(nextMultiplier > 1) && (
+              <span className="text-xs px-3 py-1 rounded-full bg-orange-500 text-white font-bold
+                               whitespace-nowrap select-none animate-pulse">
+                下局 {nextMultiplier}✕
+              </span>
             )}
             {isEnded ? (
               <button onClick={() => send({ type: 'new_game' })}
@@ -797,7 +1002,6 @@ export default function OnlinePage() {
           </>}
         />
 
-        {/* 本局比分 + PlayerPanels + BattleLog — identical to 遊戲模擬 */}
         {gameResult && (
           <GameResultDisplay result={gameResult} strategies={strategies} />
         )}
@@ -805,8 +1009,15 @@ export default function OnlinePage() {
     )
   }
 
-  function renderRoundEnd() { return renderResult(false) }
-  function renderGameEnd()  { return renderResult(true)  }
+  function renderRoundEnd()    { return renderResult(false) }
+  function renderGameEnd()     { return renderResult(true)  }
+
+  // ── Appeal pending: show last result + popup ───────────────────────────────
+
+  function renderAppealPending() {
+    // Show last round result underneath; popup is rendered above in the fixed overlay
+    return renderResult(false)
+  }
 
   // ── Generic wait screen ───────────────────────────────────────────────────
 
