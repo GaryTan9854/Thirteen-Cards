@@ -96,6 +96,31 @@ function randomBeauties(): string[] {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+/** Number input that allows free typing; only clamps to [min,max] on blur. */
+function NumInput({ value, onChange, min, max, className }: {
+  value: number; onChange: (v: number) => void
+  min: number; max: number; className?: string
+}) {
+  const [disp, setDisp] = useState(String(value))
+  // Sync display when parent changes value externally (e.g. on reconnect)
+  useEffect(() => { setDisp(String(value)) }, [value])
+  return (
+    <input
+      type="number"
+      min={min} max={max}
+      value={disp}
+      onChange={e => setDisp(e.target.value)}
+      onBlur={() => {
+        const n = parseInt(disp, 10)
+        const clamped = isNaN(n) ? min : Math.max(min, Math.min(max, n))
+        setDisp(String(clamped))
+        onChange(clamped)
+      }}
+      className={className}
+    />
+  )
+}
+
 function OnlineBar({ players, self: self_, onLeave }: {
   players: string[]; self: string | null; onLeave: () => void
 }) {
@@ -146,7 +171,7 @@ export default function OnlinePage() {
 
   // ── Setup form (host only) ──
   const [cfgNormal,     setCfgNormal]     = useState(4)
-  const [cfgAppeal,     setCfgAppeal]     = useState(4)
+  const [cfgAppeal,     setCfgAppeal]     = useState(1)
   const [cfgTimeLimit,  setCfgTimeLimit]  = useState(30)
   const [cfgInvitees,   setCfgInvitees]   = useState<string[]>([])
   const [cfgAiStrategy, setCfgAiStrategy] = useState('rule_base_as')
@@ -1104,9 +1129,8 @@ export default function OnlinePage() {
           ].map(({ label, val, set, min, max }) => (
             <label key={label} className="space-y-1">
               <span className="text-xs text-gray-400">{label}</span>
-              <input
-                type="number" min={min} max={max} value={val}
-                onChange={e => set(Math.max(min, Math.min(max, +e.target.value)))}
+              <NumInput
+                value={val} onChange={set} min={min} max={max}
                 className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2
                            text-white text-center font-bold focus:outline-none focus:border-yellow-400"
               />
