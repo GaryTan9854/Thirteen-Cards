@@ -48,6 +48,7 @@ class Room:
         self.pre_dealt     = None                # type: Optional[List]
         self.arrangements  = {}                  # type: Dict[str, dict]
         self.history       = []                  # type: List[List[int]]
+        self.ai_strategy   = "rule_base_as"      # type: str
         self._timer:        Optional[asyncio.Task] = None
 
     # ── Helpers ───────────────────────────────────────────────────────────────
@@ -89,6 +90,7 @@ class Room:
             "seat_names":     self.seat_names(),
             "history":        self.history,
             "submitted":      list(self.arrangements.keys()),
+            "ai_strategy":    self.ai_strategy,
         }
 
     # ── Game actions ──────────────────────────────────────────────────────────
@@ -156,7 +158,7 @@ class Room:
         loop = _aio.get_event_loop()
         result = await loop.run_in_executor(None, lambda: play_one_game(
             player_names=seat_names,
-            strategies=["rule_base_as"] * 4,
+            strategies=[self.ai_strategy] * 4,
             pre_dealt=self.pre_dealt,
             overrides=overrides,
         ))

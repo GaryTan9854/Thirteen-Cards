@@ -27,6 +27,7 @@ interface RoomSnapshot {
   seat_names:     string[]
   history:        number[][]
   submitted:      string[]
+  ai_strategy:    string
 }
 
 interface InviteInfo {
@@ -117,10 +118,11 @@ export default function OnlinePage() {
   const [invited,       setInvited]       = useState<InviteInfo | null>(null)
 
   // ── Setup form (host only) ──
-  const [cfgNormal,    setCfgNormal]    = useState(16)
-  const [cfgAppeal,    setCfgAppeal]    = useState(4)
-  const [cfgTimeLimit, setCfgTimeLimit] = useState(30)
-  const [cfgInvitees,  setCfgInvitees]  = useState<string[]>([])
+  const [cfgNormal,     setCfgNormal]     = useState(16)
+  const [cfgAppeal,     setCfgAppeal]     = useState(4)
+  const [cfgTimeLimit,  setCfgTimeLimit]  = useState(30)
+  const [cfgInvitees,   setCfgInvitees]   = useState<string[]>([])
+  const [cfgAiStrategy, setCfgAiStrategy] = useState('rule_base_as')
 
   // ── Round state ──
   const [myHand,          setMyHand]          = useState<string[] | null>(null)
@@ -232,6 +234,8 @@ export default function OnlinePage() {
   // ── ManualArrange overlay via portal ──────────────────────────────────────
   // Renders to document.body so it appears on top even when this component
   // is inside a display:none wrapper (e.g. user switched to 遊戲模擬 tab).
+  const isGary = player === 'Gary'
+
   const arrangePortal = myHand && !submitted && phase === 'playing'
     ? createPortal(
         <ManualArrange
@@ -241,6 +245,7 @@ export default function OnlinePage() {
           countdown={countdown ?? undefined}
           submittedCount={submittedList.length}
           totalPlayers={room?.players.length ?? 1}
+          defaultModelStrategy={isGary ? 'rule_base_as' : 'rule_base_1'}
         />,
         document.body
       )
@@ -293,15 +298,9 @@ export default function OnlinePage() {
   // ── Lobby ─────────────────────────────────────────────────────────────────
 
   function renderLobby() {
-    const others = onlinePlayers.filter(p => p !== player)
     return (
       <div className="bg-green-900/30 rounded-xl p-6 space-y-5">
         <div className="text-xl font-bold text-yellow-300">🏠 大廳</div>
-        <div className="text-sm text-gray-300">
-          {others.length > 0
-            ? `在線：${others.join('、')}`
-            : '目前只有你在線，可以對 AI 練習'}
-        </div>
 
         <button
           onClick={() => send({ type: 'new_game' })}
@@ -348,6 +347,11 @@ export default function OnlinePage() {
         prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p].slice(0, 3)
       )
 
+    const aiOptions = [
+      { value: 'rule_base_as', label: 'RB-攻守（推薦）' },
+      { value: 'rule_base_1',  label: 'RB-Σ%' },
+    ]
+
     return (
       <div className="bg-green-900/30 rounded-xl p-6 space-y-5">
         <div className="text-xl font-bold text-yellow-300">⚙️ 設定新比賽</div>
@@ -371,10 +375,30 @@ export default function OnlinePage() {
           ))}
         </div>
 
-        {/* Invite buttons */}
-        {others.length > 0 && (
-          <div className="space-y-2">
-            <div className="text-sm text-gray-400">邀請玩家（最多 3 位）：</div>
+        {/* AI model selector */}
+        <label className="flex items-center gap-3">
+          <span className="text-sm text-gray-400 whitespace-nowrap">AI 模型：</span>
+          <select
+            value={cfgAiStrategy}
+            onChange={e => setCfgAiStrategy(e.target.value)}
+            className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
+                       focus:outline-none focus:border-yellow-400 cursor-pointer"
+          >
+            {aiOptions.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          <span className="text-xs text-gray-600">（AI 玩家使用）</span>
+        </label>
+
+        {/* Invite buttons — show all online others */}
+        <div className="space-y-2">
+          <div className="text-sm text-gray-400">
+            {others.length > 0
+              ? `邀請玩家（最多 3 位）：`
+              : '目前只有你在線，AI 將填滿其餘位置'}
+          </div>
+          {others.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {others.slice(0, 3).map(p => (
                 <button key={p}
@@ -382,21 +406,22 @@ export default function OnlinePage() {
                   className={`px-4 py-2 rounded-full border text-sm font-medium transition
                     ${cfgInvitees.includes(p)
                       ? 'bg-yellow-400 text-gray-900 border-yellow-400'
-                      : 'bg-gray-800 text-gray-300 border-gray-600 hover:border-yellow-400'}`}>
+                      : 'bg-green-800 text-green-200 border-green-600 hover:border-yellow-400'}`}>
                   {p}
                 </button>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         <button
           onClick={() => send({
-            type: 'game_config',
+            type:           'game_config',
             rounds_normal:  cfgNormal,
             rounds_appeal:  cfgAppeal,
             time_limit:     cfgTimeLimit,
             invite_players: cfgInvitees,
+            ai_strategy:    cfgAiStrategy,
           })}
           className="px-6 py-3 rounded-xl bg-yellow-400 text-gray-900 font-bold
                      hover:bg-yellow-300 active:scale-95 transition-all"

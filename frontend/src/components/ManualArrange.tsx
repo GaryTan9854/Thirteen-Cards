@@ -177,15 +177,16 @@ const MODEL_LABEL: Record<ModelStrategy,string> = {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 interface Props {
-  hand:            string[]
-  onConfirm:       (top:string[], mid:string[], bot:string[]) => void
-  onCancel:        () => void
-  countdown?:      number    // if provided, show timer; auto-submit at 0
-  submittedCount?: number    // how many players have submitted (online mode)
-  totalPlayers?:   number    // total human players in this round (online mode)
+  hand:                  string[]
+  onConfirm:             (top:string[], mid:string[], bot:string[]) => void
+  onCancel:              () => void
+  countdown?:            number    // if provided, show timer; auto-submit at 0
+  submittedCount?:       number    // how many players have submitted (online mode)
+  totalPlayers?:         number    // total human players in this round (online mode)
+  defaultModelStrategy?: string    // which AI model to pre-load (default: rule_base_as)
 }
 
-export default function ManualArrange({ hand, onConfirm, onCancel, countdown, submittedCount, totalPlayers }: Props) {
+export default function ManualArrange({ hand, onConfirm, onCancel, countdown, submittedCount, totalPlayers, defaultModelStrategy }: Props) {
 
   // ── Sort / animate ──
   const [sorted,   setSorted]   = useState(false)
@@ -221,10 +222,31 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
     .then(r=>{ if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
     .then((data:ArrangeInfo)=>{
       setInfo(data)
+      // Set initial arrangement from groups (always load for the groups panel)
       if(data.groups.length>0){
         setSelGroup(0); setVarIdx(0)
         const v=data.groups[0].variants[0]
         setArr({top:v.top,mid:v.mid,bot:v.bot})
+      }
+      // If a non-default model is requested, auto-fetch and apply it
+      const dm = defaultModelStrategy as ModelStrategy | undefined
+      if (dm && dm !== 'rule_base_as' && MODEL_STRATEGIES.includes(dm)) {
+        fetch('/api/game/arrange',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({hand, strategy: dm}),
+        })
+        .then(r=>r.json())
+        .then(d=>{
+          if(d.top && d.mid && d.bot){
+            const showToCs = Object.fromEntries(hand.map(cs=>[cardShow(cs), cs]))
+            const toCs = (cards:string[]) => cards.map((c:string)=>showToCs[c]??c)
+            const v = { top:toCs(d.top.cards), mid:toCs(d.mid.cards), bot:toCs(d.bot.cards) }
+            setModelArr(prev=>({...prev,[dm]:v}))
+            setArr({top:v.top,mid:v.mid,bot:v.bot}); setSelGroup(-1)
+          }
+        })
+        .catch(()=>{})
       }
     })
     .catch(e=>setApiError(String(e)))
@@ -246,7 +268,11 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
   }
 
   // ── Model comparison ──
-  const [modelIdx,    setModelIdx]    = useState(0)
+  const [modelIdx,    setModelIdx]    = useState(() => {
+    if (!defaultModelStrategy) return 0
+    const idx = MODEL_STRATEGIES.indexOf(defaultModelStrategy as ModelStrategy)
+    return idx >= 0 ? idx : 0
+  })
   const [modelArr,    setModelArr]    = useState<Record<ModelStrategy,{top:string[];mid:string[];bot:string[]}>>({} as any)
   const [modelLoading,setModelLoading]= useState(false)
 

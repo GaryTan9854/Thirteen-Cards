@@ -11,7 +11,7 @@ from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 
-APP_VERSION = "4.7"
+APP_VERSION = "4.8"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -491,6 +491,9 @@ async def ws_endpoint(player_name: str, websocket: WebSocket):
                 room.rounds_normal = int(data.get("rounds_normal", 16))
                 room.rounds_appeal = int(data.get("rounds_appeal",  4))
                 room.time_limit    = int(data.get("time_limit",     30))
+                _valid_ai = {"rule_base_as", "rule_base_1"}
+                room.ai_strategy   = data.get("ai_strategy", "rule_base_as") \
+                                     if data.get("ai_strategy") in _valid_ai else "rule_base_as"
                 invite_list        = [p for p in data.get("invite_players", [])
                                       if manager.is_online(p)]
 
