@@ -104,7 +104,7 @@ export function speak(text: string, rate = 1.05) {
   const utter = new SpeechSynthesisUtterance(text)
   utter.lang  = 'zh-TW'
   utter.rate  = rate
-  utter.pitch = 1.2
+  utter.pitch = 1.0
   const doSpeak = () => {
     const voices = synth.getVoices()
     const zh     = voices.filter(v => v.lang.startsWith('zh'))
@@ -129,7 +129,7 @@ export function speakSequence(lines: string[], onDone?: () => void, rate = 1.05)
   const playNext = () => {
     if (idx >= lines.length) { onDone?.(); return }
     const utter = new SpeechSynthesisUtterance(lines[idx++])
-    utter.lang = 'zh-TW'; utter.rate = rate; utter.pitch = 1.2
+    utter.lang = 'zh-TW'; utter.rate = rate; utter.pitch = 1.0
     if (female) utter.voice = female
     utter.onend = playNext
     synth.speak(utter)
