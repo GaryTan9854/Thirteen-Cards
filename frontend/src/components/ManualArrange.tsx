@@ -181,11 +181,12 @@ interface ArrangeInfo {
 }
 
 // Model comparison
-const MODEL_STRATEGIES = ['rulealpha','ml'] as const
+const MODEL_STRATEGIES = ['rulealpha','rulealpha2','ml'] as const
 type ModelStrategy = typeof MODEL_STRATEGIES[number]
 const MODEL_LABEL: Record<ModelStrategy,string> = {
-  rulealpha: 'RuleAlpha',
-  ml:        'ML Alpha',
+  rulealpha:  'RuleAlpha',
+  rulealpha2: 'RuleAlpha2',
+  ml:         'ML Alpha',
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────

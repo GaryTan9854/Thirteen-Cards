@@ -11,7 +11,7 @@ from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 
-APP_VERSION = "6.19"
+APP_VERSION = "6.20"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -111,6 +111,16 @@ def arrange_hand(req: ArrangeRequest):
         from game.arrange import best_arrangement_ml
         attitude = {"ml_aggressive": 0.8, "ml_conservative": -0.8}.get(strategy, 0.0)
         result = best_arrangement_ml(req.hand, attitude=attitude)
+        if result:
+            h13.htop, h13.hmid, h13.hbot = result
+            h13.ss = [h13.htop.score, h13.hmid.score, h13.hbot.score]
+            arr = h13
+        else:
+            h13.arrange13()
+            arr = h13
+    elif strategy == "rulealpha2":
+        from game.arrange import best_arrangement_rulealpha2
+        result = best_arrangement_rulealpha2(req.hand, attitude=0.0)
         if result:
             h13.htop, h13.hmid, h13.hbot = result
             h13.ss = [h13.htop.score, h13.hmid.score, h13.hbot.score]
