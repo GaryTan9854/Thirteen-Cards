@@ -11,7 +11,7 @@ from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 
-APP_VERSION = "6.8"
+APP_VERSION = "6.9"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -45,6 +45,7 @@ class ManualOverride(BaseModel):
     top:    List[str]
     mid:    List[str]
     bot:    List[str]
+    baodao: bool = True
 
 class PlayRequest(BaseModel):
     player_names: Optional[List[str]]       = None
