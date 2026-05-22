@@ -358,39 +358,44 @@ def score_defensive(h3: Hand3, hm: Hand5, hb: Hand5) -> float:
 
 
 
-def _try_quads(handstrs: list):
+def _find_sf_candidates(handstrs: list) -> list:
     """
-    Domain rule: when the hand contains a four-of-a-kind (鐵支),
-    lock the quads in bot and exhaustively search the best mid+top
-    from the remaining 8 cards (C(8,5)=56 combos).
-
-    Rationale: score_arrangement() has no knowledge of the 4× bot bonus
-    for 鐵支, so it may incorrectly prefer e.g. 三條-in-top + two straights
-    over quads-in-bot.  This domain rule overrides that mistake.
-
-    Kicker = lowest remaining card (frees high cards for mid/top).
-    Returns (Hand3, Hand5, Hand5) or None if no quads found.
+    Return all straight-flush 5-card combos present in the hand,
+    sorted strongest-first (by hand score desc).
     """
-    by_rank: dict = defaultdict(list)
+    by_suit: dict = defaultdict(list)
     for cs in handstrs:
-        by_rank[int(cs[:2])].append(cs)
+        by_suit[cs[2]].append(cs)
 
-    quad_ranks = sorted([r for r, cs in by_rank.items() if len(cs) >= 4], reverse=True)
-    if not quad_ranks:
-        return None
+    sfs = []
+    for suit, scards in by_suit.items():
+        if len(scards) < 5:
+            continue
+        suit_ranks = {int(cs[:2]): cs for cs in scards}
+        all_r = set(suit_ranks)
+        for hi in range(14, 5, -1):
+            seq = set(range(hi - 4, hi + 1))
+            if seq.issubset(all_r):
+                sfs.append([suit_ranks[r] for r in sorted(seq, reverse=True)])
+        if {14, 2, 3, 4, 5}.issubset(all_r):
+            sfs.append([suit_ranks[r] for r in [14, 5, 4, 3, 2]])
 
-    quad_rank  = quad_ranks[0]
-    quad_cards = by_rank[quad_rank][:4]
-    remaining9 = [cs for cs in handstrs if cs not in quad_cards]
+    # Score each and sort strongest first
+    scored = []
+    for cards in sfs:
+        h = Hand5(cards); h.score_hand()
+        scored.append((h.score, cards, h))
+    scored.sort(key=lambda x: -x[0])
+    return [(cards, h) for _, cards, h in scored]
 
-    # Lowest remaining card as kicker — frees high cards for mid/top
-    kicker     = sorted(remaining9, key=lambda cs: int(cs[:2]))[0]
-    bot_cards  = quad_cards + [kicker]
-    remaining8 = [cs for cs in remaining9 if cs != kicker]
 
+def _best_mid_top(bot_cards: list, remaining8: list) -> tuple | None:
+    """
+    Exhaustive search (C(8,5)=56) for best mid+top given a fixed bot.
+    Returns (Hand3, Hand5, Hand5) or None if no valid arrangement found.
+    """
     hb = Hand5(bot_cards); hb.score_hand()
-
-    best: tuple | None = None
+    best = None
     best_score = -float('inf')
     for mid_combo in _comb(remaining8, 5):
         mid_list = list(mid_combo)
@@ -403,6 +408,89 @@ def _try_quads(handstrs: list):
                 best_score = s
                 best = (h3, hm, hb)
     return best
+
+
+def _try_monster_bot(handstrs: list):
+    """
+    Domain rule for monster hands (同花順系列 + 鐵支).
+
+    score_arrangement() is blind to the bonus multipliers (鐵支 bot=4×,
+    mid=8×; 同花順 bot=5×, mid=10×; etc.), so it may incorrectly split
+    quads into 三條-in-top + two straights, or misplace SF vs quads.
+
+    Priority (stronger hand → goes to bot):
+      同花大順 > 同花次大順 > 同花順 > 鐵支
+
+    When hand has BOTH SF and quads:
+      Strongest SF → bot (e.g. score 965), quads → mid (8× bonus).
+      (Quads score 736 < SF score, so quads-in-bot + SF-in-mid is 倒水.)
+
+    When hand has only quads (no SF):
+      Quads → bot (kicker = lowest remaining card).
+
+    When hand has only SF (no quads):
+      Returns None — the main scoring loop handles SF correctly because
+      SF cards can't form a competing 三條-in-top, so pct5_bot naturally
+      keeps the SF in bot.
+
+    Returns (Hand3, Hand5, Hand5) or None if rule does not apply.
+    """
+    by_rank: dict = defaultdict(list)
+    for cs in handstrs:
+        by_rank[int(cs[:2])].append(cs)
+
+    quad_ranks  = sorted([r for r, cs in by_rank.items() if len(cs) >= 4], reverse=True)
+    sf_cands    = _find_sf_candidates(handstrs)
+
+    has_quads = bool(quad_ranks)
+    has_sf    = bool(sf_cands)
+
+    if not has_quads and not has_sf:
+        return None
+
+    # ── Case 1: SF + Quads coexist ──────────────────────────────────────
+    if has_sf and has_quads:
+        # Strongest SF goes to bot; quads go to mid (kicker = lowest remaining)
+        bot_cards, _hb = sf_cands[0]
+        bot_set = set(bot_cards)
+
+        quad_rank  = quad_ranks[0]
+        quad_cards = by_rank[quad_rank][:4]
+        remaining_after_sf = [cs for cs in handstrs if cs not in bot_set]
+
+        # Use quads as mid + one kicker; remaining 3 go to top
+        non_quad_rem = [cs for cs in remaining_after_sf if cs not in quad_cards]
+        if not non_quad_rem:
+            return None
+        kicker_mid = sorted(non_quad_rem, key=lambda cs: int(cs[:2]))[0]
+        mid_cards  = quad_cards + [kicker_mid]
+        top_cards  = [cs for cs in remaining_after_sf
+                      if cs not in quad_cards and cs != kicker_mid]
+        if len(top_cards) != 3:
+            return None
+
+        h3 = Hand3(top_cards); h3.score_hand()
+        hm = Hand5(mid_cards); hm.score_hand()
+        hb = Hand5(bot_cards); hb.score_hand()
+        if h3.score <= hm.score <= hb.score:
+            return (h3, hm, hb)
+        # Ordering violated — fall through to general loop
+        remaining8 = [cs for cs in handstrs if cs not in bot_set]
+        return _best_mid_top(bot_cards, remaining8)
+
+    # ── Case 2: Only Quads (no SF) ───────────────────────────────────────
+    if has_quads and not has_sf:
+        quad_rank  = quad_ranks[0]
+        quad_cards = by_rank[quad_rank][:4]
+        remaining9 = [cs for cs in handstrs if cs not in quad_cards]
+        kicker     = sorted(remaining9, key=lambda cs: int(cs[:2]))[0]
+        bot_cards  = quad_cards + [kicker]
+        remaining8 = [cs for cs in remaining9 if cs != kicker]
+        return _best_mid_top(bot_cards, remaining8)
+
+    # ── Case 3: Only SF (no Quads) ───────────────────────────────────────
+    # The main scoring loop handles this correctly — no domain rule needed.
+    return None
 
 
 def _try_four_pairs(handstrs: list):
@@ -480,7 +568,7 @@ def best_arrangement_rulealpha(handstrs: list, attitude: float = 0.0):
       防守尾更強 → bot_edge = +0.3（attitude 需 > 0.3 才觸發攻擊）
       攻擊尾不弱 → bot_edge = -0.3（attitude > -0.3 即觸發攻擊）
     """
-    qr = _try_quads(handstrs)
+    qr = _try_monster_bot(handstrs)
     if qr:
         return qr
 
@@ -609,7 +697,7 @@ def best_arrangement_ml(handstrs: list, attitude: float = 0.0):
     if model is None:
         return best_arrangement(handstrs)
 
-    qr = _try_quads(handstrs)
+    qr = _try_monster_bot(handstrs)
     if qr:
         return qr
 
