@@ -600,6 +600,204 @@ def best_arrangement(handstrs: list):
     return best_arrangement_rulealpha(handstrs, attitude=0.0)
 
 
+# ─── RuleAlpha2 helper: double full-house monster ─────────────────────────────
+
+def _enum_double_fullhouse(handstrs: list, inv: dict):
+    """
+    When ≥2 trips exist, enumerate all (bot=葫蘆, mid=葫蘆) combinations and
+    return the best-scoring valid arrangement, or None if none are valid.
+    """
+    by_rank   = inv['by_rank']
+    trip_ranks = inv['trips']        # ranks with ≥3 cards, desc
+    pair_srcs  = inv['pairs']        # ranks with ≥2 cards (trips included), desc
+
+    best = None
+    best_s = -float('inf')
+
+    for bot_tr in trip_ranks:
+        # possible pair partners for bot 葫蘆 (any rank ≠ bot_tr with ≥2 cards)
+        for bot_pr in pair_srcs:
+            if bot_pr == bot_tr:
+                continue
+            bot_cs = by_rank[bot_tr][:3] + by_rank[bot_pr][:2]
+            bot_set = set(bot_cs)
+            rem8 = [c for c in handstrs if c not in bot_set]
+
+            hb = Hand5(bot_cs); hb.score_hand()
+
+            # mid: try each remaining trip + pair from the 8 remaining cards
+            rem_inv = analyze_inventory(rem8)
+            rem_by_rank = rem_inv['by_rank']
+            for mid_tr in rem_inv['trips']:
+                for mid_pr in rem_inv['pairs']:
+                    if mid_pr == mid_tr:
+                        continue
+                    mid_cs = rem_by_rank[mid_tr][:3] + rem_by_rank[mid_pr][:2]
+                    mid_set = set(mid_cs)
+                    top_cs  = [c for c in rem8 if c not in mid_set]
+                    if len(top_cs) != 3:
+                        continue
+                    hm = Hand5(mid_cs); hm.score_hand()
+                    h3 = Hand3(top_cs); h3.score_hand()
+                    if h3.score <= hm.score <= hb.score:
+                        s = score_arrangement(h3, hm, hb)
+                        if s > best_s:
+                            best_s = s
+                            best   = (h3, hm, hb)
+    return best
+
+
+# ─── RuleAlpha2 ───────────────────────────────────────────────────────────────
+
+def best_arrangement_rulealpha2(handstrs: list, attitude: float = 0.0):
+    """
+    RuleAlpha2 — 新三程序候選池設計（實驗版）。
+
+    程序 A: 頭優先 top-20 — TR/P 在頭，窮舉 C(10,5) 找最佳中/尾
+    程序 B: Pure Pairs 排法 — 僅當手牌純對子（無TR/S/F/QD）時執行
+            2P→2排法, 3P→2排法, 4P→2排法, 5P→1排法
+    程序 C: 牌型列舉 — 怪物 early-abort（中墩葫蘆/鐵支/柳丁, 尾墩鐵支/柳丁）
+            再依 SF→QD→F→S→H→TR 列舉各尾墩組合
+    程序 E: AlphaRule 選出最佳（攻/守邏輯同 RuleAlpha）
+
+    設計目標：省略 enumerate_arrangements 中的四/五輪車特殊邏輯與怪物拆分規則，
+    讓程序 A/B/C 自然涵蓋，便於後續維護。
+    """
+    pool: list = []
+    seen: set  = set()
+
+    def _add(h3, hm, hb):
+        if hb.score >= hm.score >= h3.score:
+            key = (tuple(h3.handlist), tuple(hm.handlist), tuple(hb.handlist))
+            if key not in seen:
+                seen.add(key)
+                pool.append((h3, hm, hb))
+
+    def _mk3(css):
+        h = Hand3(css); h.score_hand(); return h
+
+    def _mk5(css):
+        h = Hand5(css); h.score_hand(); return h
+
+    inv    = analyze_inventory(handstrs)
+    by_rank = inv['by_rank']
+
+    # ── C0: Monster early-abort ───────────────────────────────────────────────
+    # 尾墩鐵支 / 尾墩柳丁 — delegate to existing domain-rule handler
+    monster = _try_monster_bot(handstrs)
+    if monster:
+        return monster
+
+    # 中墩葫蘆 monster: ≥2 trip ranks → both mid and bot can be 葫蘆
+    if len(inv['trips']) >= 2:
+        dh = _enum_double_fullhouse(handstrs, inv)
+        if dh:
+            return dh
+
+    # ── A: 頭優先 top-20 (TR/P 頭) ───────────────────────────────────────────
+    A_cands: list = []
+    for top_cs in _generate_3card_tops(handstrs):
+        # Only TR-head and P-head (skip scatter heads — covered by C)
+        from collections import Counter as _Ctr
+        top_cnt = _Ctr(int(cs[:2]) for cs in top_cs)
+        if not any(n >= 2 for n in top_cnt.values()):
+            continue
+        top_set  = set(top_cs)
+        rem10    = [c for c in handstrs if c not in top_set]
+        h3       = _mk3(top_cs)
+        for mid_combo in _comb(rem10, 5):
+            mid_list = list(mid_combo)
+            bot_list = [c for c in rem10 if c not in mid_combo]
+            hm = _mk5(mid_list); hb = _mk5(bot_list)
+            if hb.score >= hm.score >= h3.score:
+                A_cands.append((h3, hm, hb))
+
+    A_cands.sort(key=lambda t: score_defensive(*t), reverse=True)
+    for x in A_cands[:20]:
+        _add(*x)
+
+    # ── B: Pure Pairs 排法 ────────────────────────────────────────────────────
+    # Only fires when no TR / straight / flush / quads exist
+    pure_pairs = (not inv['trips'] and not inv['quads']
+                  and not inv['straights'] and not inv['flush_suits'])
+    if pure_pairs:
+        pr_desc    = inv['pairs']           # pair ranks desc (all ranks with ≥2 cards)
+        single_cs  = sorted(
+            [cs for r, css in by_rank.items() if len(css) == 1 for cs in css],
+            key=lambda cs: -int(cs[:2]))    # singles high→low
+        n_pairs = len(pr_desc)
+
+        if n_pairs >= 5:
+            p1, p2, p3, p4, p5 = pr_desc[:5]
+            sc = single_cs                  # exactly 3 singles for 5P
+            _add(_mk3(by_rank[p1][:2] + sc[:1]),                          # 最大P + 1散
+                 _mk5(by_rank[p3][:2] + by_rank[p4][:2] + sc[1:2]),       # 3rd&4th + 1散
+                 _mk5(by_rank[p2][:2] + by_rank[p5][:2] + sc[2:3]))       # 2nd&5th + 1散
+
+        elif n_pairs == 4:
+            p1, p2, p3, p4 = pr_desc
+            sc = single_cs                  # exactly 5 singles
+            # 排法1: 次大P頭, 最大P中, 剩2P尾
+            _add(_mk3(by_rank[p2][:2] + sc[:1]),
+                 _mk5(by_rank[p1][:2] + sc[1:4]),
+                 _mk5(by_rank[p3][:2] + by_rank[p4][:2] + sc[4:5]))
+            # 排法2: 最大3散頭, 2nd&3rd P中, 1st&4th P尾
+            _add(_mk3(sc[:3]),
+                 _mk5(by_rank[p2][:2] + by_rank[p3][:2] + sc[3:4]),
+                 _mk5(by_rank[p1][:2] + by_rank[p4][:2] + sc[4:5]))
+
+        elif n_pairs == 3:
+            p1, p2, p3 = pr_desc
+            sc = single_cs                  # exactly 7 singles
+            # 排法1: 最小P頭, 次小P中, 最大P尾
+            _add(_mk3(by_rank[p3][:2] + sc[:1]),
+                 _mk5(by_rank[p2][:2] + sc[1:4]),
+                 _mk5(by_rank[p1][:2] + sc[4:7]))
+            # 排法2: 最大3散頭, 最大P中, 剩2P尾
+            _add(_mk3(sc[:3]),
+                 _mk5(by_rank[p1][:2] + sc[3:6]),
+                 _mk5(by_rank[p2][:2] + by_rank[p3][:2] + sc[6:7]))
+
+        elif n_pairs == 2:
+            p1, p2 = pr_desc                # p1=big, p2=small
+            sc = single_cs                  # exactly 9 singles
+            # 排法1: R頭, R中, 兩對(p1+p2)尾 — 用最高散牌當尾 kicker
+            _add(_mk3(sc[6:9]),
+                 _mk5(sc[1:6]),
+                 _mk5(by_rank[p1][:2] + by_rank[p2][:2] + sc[:1]))
+            # 排法2: 最大3散頭, P小中, P大尾
+            _add(_mk3(sc[:3]),
+                 _mk5(by_rank[p2][:2] + sc[3:6]),
+                 _mk5(by_rank[p1][:2] + sc[6:9]))
+
+    # ── C: 牌型列舉 (bot-first) ───────────────────────────────────────────────
+    for bot_cs in generate_5card_options(handstrs):
+        bot_set = set(bot_cs)
+        rem8    = [c for c in handstrs if c not in bot_set]
+        hb      = _mk5(bot_cs)
+        for mid_combo in _comb(rem8, 5):
+            top_cs = [c for c in rem8 if c not in mid_combo]
+            if len(top_cs) != 3:
+                continue
+            hm = _mk5(list(mid_combo))
+            h3 = _mk3(top_cs)
+            _add(h3, hm, hb)
+
+    # ── E: AlphaRule 選最佳 ───────────────────────────────────────────────────
+    if not pool:
+        return best_arrangement_rulealpha(handstrs, attitude)
+
+    best_def = max(pool, key=lambda t: score_defensive(*t))
+    attack_cands = [c for c in pool if eval_attack(*c)]
+
+    if not attack_cands:
+        return best_def
+
+    best_att = max(attack_cands, key=lambda t: score_arrangement(*t))
+    bot_edge = 0.3 if best_def[2].handtype_val > best_att[2].handtype_val else -0.3
+    return best_att if attitude > bot_edge else best_def
+
+
 def compute_attitude(round_idx: int, total_rounds: int,
                      my_score: float, all_scores: list) -> float:
     """

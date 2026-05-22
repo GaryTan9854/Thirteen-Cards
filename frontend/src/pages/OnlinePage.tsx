@@ -1047,8 +1047,9 @@ export default function OnlinePage() {
 
   function renderSoloSetup() {
     const aiOptions = [
-      { value: 'rulealpha', label: 'RuleAlpha（推薦）' },
-      { value: 'ml',        label: 'ML Alpha' },
+      { value: 'rulealpha',  label: 'RuleAlpha（推薦）' },
+      { value: 'rulealpha2', label: 'RuleAlpha2（實驗）' },
+      { value: 'ml',         label: 'ML Alpha' },
     ]
     return (
       <div className="bg-green-900/30 rounded-xl p-6 space-y-5">
@@ -1239,8 +1240,9 @@ export default function OnlinePage() {
       )
 
     const aiOptions = [
-      { value: 'rulealpha', label: 'RuleAlpha（推薦）' },
-      { value: 'ml',        label: 'ML Alpha' },
+      { value: 'rulealpha',  label: 'RuleAlpha（推薦）' },
+      { value: 'rulealpha2', label: 'RuleAlpha2（實驗）' },
+      { value: 'ml',         label: 'ML Alpha' },
     ]
 
     return (

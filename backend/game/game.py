@@ -123,6 +123,23 @@ def _arrange(hand_cards, strategy: str) -> 'Hand13':
             h.score = sum(h.ss)
             h.totalscore = h.score
         return h
+    # rulealpha2 — 新三程序候選池（實驗版）
+    if strategy == 'rulealpha2':
+        from .arrange import best_arrangement_rulealpha2
+        h = Hand13(cardstrs)
+        sp = h.chk_special()
+        h.specialhand = sp
+        if sp != 'normal':
+            return h
+        result = best_arrangement_rulealpha2(cardstrs, attitude=0.0)
+        if result:
+            h.htop, h.hmid, h.hbot = result
+            h.ss = [h.htop.score, h.hmid.score, h.hbot.score]
+            h.score = sum(h.ss)
+            h.totalscore = h.score
+            h.CanAttack  = getattr(result, 'CanAttack', False)
+        return h
+
     # rulealpha | rule_base (default)：RuleAlpha 雙路徑 + 精選候選 + attitude
     from .arrange import best_arrangement_rulealpha
     attitude = 0.0

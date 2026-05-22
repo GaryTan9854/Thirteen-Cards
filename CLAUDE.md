@@ -8,6 +8,7 @@
 - URL: https://thirteencards.visadelab.xyz
 - Deploy: `cd ~/Documents/ThirteenCards && ./deploy.sh --quick` (無新 deps 時)
 - **重要**: Vite build 在 MBP 上跑 (MBA 的 Node 會 crash)，`deploy.sh --quick` 透過 SSH 在 MBP build
+- **Python venv**: MBP venv 路徑 `~/thirteencards-dist/backend/venv`，**必須用 `/usr/local/bin/python3.10` 建立**。系統預設 python3 是 3.9，`tuple | None` 等 3.10+ 語法會報錯。重建指令：`cd ~/thirteencards-dist/backend && rm -rf venv && /usr/local/bin/python3.10 -m venv venv && venv/bin/pip install -r requirements.txt`
 
 ## 架構
 ```
