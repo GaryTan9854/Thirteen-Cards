@@ -389,7 +389,7 @@ def _find_sf_candidates(handstrs: list) -> list:
     return [(cards, h) for _, cards, h in scored]
 
 
-def _best_mid_top(bot_cards: list, remaining8: list) -> tuple | None:
+def _best_mid_top(bot_cards: list, remaining8: list):
     """
     Exhaustive search (C(8,5)=56) for best mid+top given a fixed bot.
     Returns (Hand3, Hand5, Hand5) or None if no valid arrangement found.

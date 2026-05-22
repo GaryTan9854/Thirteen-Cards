@@ -11,7 +11,7 @@ from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 
-APP_VERSION = "6.14"
+APP_VERSION = "6.15"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
