@@ -45,7 +45,7 @@ interface RoomSnapshot {
   appeal_played:      number
   is_tiebreaking:     boolean
   submitted:          string[]
-  ai_strategy:        string
+  ai_strategies:      string[]
   ai_names:           string[]
 }
 
@@ -67,7 +67,7 @@ interface SoloState {
   seatNames:       string[]
   roundsNormal:    number
   roundsAppeal:    number
-  aiStrategy:      string
+  strategies:      string[]   // per-seat [0=self, 1=AI1, 2=AI2, 3=AI3]
   multiplier:      number
   currentRound:    number
   appealGeneration: number
@@ -175,7 +175,7 @@ export default function OnlinePage() {
   const [cfgAppeal,     setCfgAppeal]     = useState(1)
   const [cfgTimeLimit,  setCfgTimeLimit]  = useState(30)
   const [cfgInvitees,   setCfgInvitees]   = useState<string[]>([])
-  const [cfgAiStrategy, setCfgAiStrategy] = useState('rulealpha')
+  const [cfgStrategies, setCfgStrategies] = useState<string[]>(['rulealpha', 'rulealpha', 'rulealpha', 'rulealpha'])
   const [cfgAiNames,    setCfgAiNames]    = useState<string[]>(() => randomBeauties())
 
   // ── Round state ──
@@ -557,7 +557,7 @@ export default function OnlinePage() {
   // ── Solo game ──────────────────────────────────────────────────────────────
 
   function startSoloGame(cfg: {
-    roundsNormal: number; roundsAppeal: number; aiStrategy: string; aiNames: string[]
+    roundsNormal: number; roundsAppeal: number; strategies: string[]; aiNames: string[]
   }) {
     // Reset server room so it stays clean
     fetch('/api/online/reset', { method: 'POST' }).catch(() => {})
@@ -567,7 +567,7 @@ export default function OnlinePage() {
       seatNames,
       roundsNormal:    cfg.roundsNormal,
       roundsAppeal:    cfg.roundsAppeal,
-      aiStrategy:      cfg.aiStrategy,
+      strategies:      cfg.strategies,
       multiplier:      1,
       currentRound:    0,
       appealGeneration: 0,
@@ -618,7 +618,7 @@ export default function OnlinePage() {
     const seatNames = state.seatNames
 
     // Resolve via HTTP
-    const strategies = seatNames.map((_, i) => i === 0 ? 'manual' : state.aiStrategy)
+    const strategies = seatNames.map((_, i) => i === 0 ? 'manual' : (state.strategies[i] ?? 'rulealpha'))
     const res = await fetch('/api/game/play', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -835,7 +835,7 @@ export default function OnlinePage() {
   const effAppealPlayed  = soloActive ? (soloStateRef.current?.appealPlayed  ?? 0)           : (room?.appeal_played  ?? 0)
   const effAppealGen     = soloActive ? (soloStateRef.current?.appealGeneration ?? 0)        : (room?.appeal_generation ?? 0)
   const effAppealRounds  = soloActive ? (soloStateRef.current?.roundsAppeal  ?? cfgAppeal)   : (room?.rounds_appeal  ?? cfgAppeal)
-  const effAiStrategy    = soloActive ? (soloStateRef.current?.aiStrategy    ?? cfgAiStrategy) : (room?.ai_strategy ?? cfgAiStrategy)
+  const effAiStrategy    = soloActive ? (soloStateRef.current?.strategies?.[0] ?? cfgStrategies[0]) : cfgStrategies[0]
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -848,7 +848,7 @@ export default function OnlinePage() {
           countdown={countdown ?? undefined}
           submittedCount={submittedList.length}
           totalPlayers={soloActive ? 1 : (room?.players.length ?? 1)}
-          defaultModelStrategy='rulealpha'
+          defaultModelStrategy={(['rulealpha','rulealpha2','ml'] as const).includes(effAiStrategy as any) ? effAiStrategy : 'rulealpha'}
         />,
         document.body
       )
@@ -1046,11 +1046,21 @@ export default function OnlinePage() {
   // ── Solo setup screen (no WS, no OnlineBar) ───────────────────────────────
 
   function renderSoloSetup() {
-    const aiOptions = [
-      { value: 'rulealpha',  label: 'RuleAlpha（推薦）' },
-      { value: 'rulealpha2', label: 'RuleAlpha2（實驗）' },
+    const modelOptions = [
+      { value: 'rulealpha',  label: 'RuleAlpha' },
+      { value: 'rulealpha2', label: 'RuleAlpha2' },
       { value: 'ml',         label: 'ML Alpha' },
     ]
+    const ModelSelect = ({ idx }: { idx: number }) => (
+      <select
+        value={cfgStrategies[idx]}
+        onChange={e => setCfgStrategies(prev => prev.map((s, j) => j === idx ? e.target.value : s))}
+        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5
+                   text-white text-xs focus:outline-none focus:border-green-400 cursor-pointer"
+      >
+        {modelOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    )
     return (
       <div className="bg-green-900/30 rounded-xl p-6 space-y-5">
         <div className="flex items-center gap-3">
@@ -1079,38 +1089,36 @@ export default function OnlinePage() {
           ))}
         </div>
 
-        {/* AI 玩家名稱 */}
+        {/* 各座設定 */}
         <div className="space-y-2">
-          <div className="text-sm text-gray-400">AI 陪打名稱</div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="text-sm text-gray-400">各座模型設定</div>
+          <div className="grid grid-cols-4 gap-2">
+            {/* 你 */}
+            <div className="space-y-1.5">
+              <div className="text-xs text-gray-500">你</div>
+              <div className="text-xs font-semibold text-green-300 px-2 py-1.5 bg-green-900/60
+                              border border-green-700 rounded-lg truncate">
+                {player}
+              </div>
+              <ModelSelect idx={0} />
+            </div>
+            {/* AI 1 / 2 / 3 */}
             {cfgAiNames.map((name, i) => (
-              <label key={i} className="space-y-1">
-                <span className="text-xs text-gray-500">AI {i + 1}</span>
+              <div key={i} className="space-y-1.5">
+                <div className="text-xs text-gray-500">AI {i + 1}</div>
                 <select
                   value={name}
                   onChange={e => setCfgAiNames(prev => prev.map((n, j) => j === i ? e.target.value : n))}
                   className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5
-                             text-white text-sm focus:outline-none focus:border-green-400 cursor-pointer"
+                             text-white text-xs focus:outline-none focus:border-green-400 cursor-pointer"
                 >
                   {BEAUTIES.map(b => <option key={b} value={b}>{b}</option>)}
                 </select>
-              </label>
+                <ModelSelect idx={i + 1} />
+              </div>
             ))}
           </div>
         </div>
-
-        {/* AI 模型 */}
-        <label className="flex items-center gap-3">
-          <span className="text-sm text-gray-400 whitespace-nowrap">AI 模型：</span>
-          <select
-            value={cfgAiStrategy}
-            onChange={e => setCfgAiStrategy(e.target.value)}
-            className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
-                       focus:outline-none focus:border-green-400 cursor-pointer"
-          >
-            {aiOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </label>
 
         <button
           onClick={() => {
@@ -1118,7 +1126,7 @@ export default function OnlinePage() {
             startSoloGame({
               roundsNormal: cfgNormal,
               roundsAppeal: cfgAppeal,
-              aiStrategy:   cfgAiStrategy,
+              strategies:   cfgStrategies,
               aiNames:      cfgAiNames,
             })
           }}
@@ -1239,11 +1247,25 @@ export default function OnlinePage() {
         prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p].slice(0, 3)
       )
 
-    const aiOptions = [
-      { value: 'rulealpha',  label: 'RuleAlpha（推薦）' },
-      { value: 'rulealpha2', label: 'RuleAlpha2（實驗）' },
+    const modelOptions = [
+      { value: 'rulealpha',  label: 'RuleAlpha' },
+      { value: 'rulealpha2', label: 'RuleAlpha2' },
       { value: 'ml',         label: 'ML Alpha' },
     ]
+    const ModelSelect = ({ idx }: { idx: number }) => (
+      <select
+        value={cfgStrategies[idx]}
+        onChange={e => setCfgStrategies(prev => prev.map((s, j) => j === idx ? e.target.value : s))}
+        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5
+                   text-white text-xs focus:outline-none focus:border-yellow-400 cursor-pointer"
+      >
+        {modelOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    )
+
+    // Determine per-slot display: slot 1/2/3 = invited player or AI
+    const slotLabels = [0, 1, 2].map(i => cfgInvitees[i] ?? cfgAiNames[i] ?? `AI ${i + 1}`)
+    const slotIsHuman = [0, 1, 2].map(i => !!cfgInvitees[i])
 
     return (
       <div className="bg-green-900/30 rounded-xl p-6 space-y-5">
@@ -1266,43 +1288,43 @@ export default function OnlinePage() {
           ))}
         </div>
 
-        {/* AI names */}
+        {/* 各座設定 */}
         <div className="space-y-2">
-          <div className="text-sm text-gray-400">AI 玩家名稱</div>
-          <div className="grid grid-cols-3 gap-2">
-            {cfgAiNames.map((name, i) => (
-              <label key={i} className="space-y-1">
-                <span className="text-xs text-gray-500">AI {i + 1}</span>
-                <select
-                  value={name}
-                  onChange={e => setCfgAiNames(prev => prev.map((n, j) => j === i ? e.target.value : n))}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5
-                             text-white text-sm focus:outline-none focus:border-yellow-400 cursor-pointer"
-                >
-                  {BEAUTIES.map(b => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                </select>
-              </label>
+          <div className="text-sm text-gray-400">各座模型設定</div>
+          <div className="grid grid-cols-4 gap-2">
+            {/* 你 */}
+            <div className="space-y-1.5">
+              <div className="text-xs text-gray-500">你</div>
+              <div className="text-xs font-semibold text-yellow-300 px-2 py-1.5 bg-yellow-900/40
+                              border border-yellow-700 rounded-lg truncate">
+                {player}
+              </div>
+              <ModelSelect idx={0} />
+            </div>
+            {/* 位置 2 / 3 / 4 */}
+            {slotLabels.map((label, i) => (
+              <div key={i} className="space-y-1.5">
+                <div className="text-xs text-gray-500">位置 {i + 2}</div>
+                {slotIsHuman[i] ? (
+                  <div className="text-xs font-semibold text-blue-300 px-2 py-1.5 bg-blue-900/30
+                                  border border-blue-700 rounded-lg truncate">
+                    {label}
+                  </div>
+                ) : (
+                  <select
+                    value={cfgAiNames[i]}
+                    onChange={e => setCfgAiNames(prev => prev.map((n, j) => j === i ? e.target.value : n))}
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5
+                               text-white text-xs focus:outline-none focus:border-yellow-400 cursor-pointer"
+                  >
+                    {BEAUTIES.map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                )}
+                <ModelSelect idx={i + 1} />
+              </div>
             ))}
           </div>
         </div>
-
-        {/* AI model */}
-        <label className="flex items-center gap-3">
-          <span className="text-sm text-gray-400 whitespace-nowrap">AI 模型：</span>
-          <select
-            value={cfgAiStrategy}
-            onChange={e => setCfgAiStrategy(e.target.value)}
-            className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
-                       focus:outline-none focus:border-yellow-400 cursor-pointer"
-          >
-            {aiOptions.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-          <span className="text-xs text-gray-600">（AI 玩家使用）</span>
-        </label>
 
         {/* Invite */}
         <div className="space-y-2">
@@ -1334,7 +1356,7 @@ export default function OnlinePage() {
               startSoloGame({
                 roundsNormal: cfgNormal,
                 roundsAppeal: cfgAppeal,
-                aiStrategy:   cfgAiStrategy,
+                strategies:   cfgStrategies,
                 aiNames:      cfgAiNames,
               })
             } else {
@@ -1344,7 +1366,7 @@ export default function OnlinePage() {
                 rounds_appeal:  cfgAppeal,
                 time_limit:     cfgTimeLimit,
                 invite_players: cfgInvitees,
-                ai_strategy:    cfgAiStrategy,
+                seat_strategies: cfgStrategies,
                 ai_names:       cfgAiNames,
               })
             }
@@ -1472,9 +1494,16 @@ export default function OnlinePage() {
     const gameResult = res.result
     const seatNames  = (res.seat_names ?? room?.seat_names ?? []) as string[]
     const history    = (res.history ?? room?.history ?? []) as number[][]
-    const strategies = seatNames.map((n: string) =>
-      (soloActive ? [player!] : (room?.players ?? [])).includes(n) ? 'manual' : effAiStrategy
-    )
+    const soloStrats = soloStateRef.current?.strategies ?? cfgStrategies
+    const humanPlayers = new Set(soloActive ? [player!] : (room?.players ?? []))
+    const aiStrats = soloActive ? soloStrats : ['rulealpha', ...cfgStrategies.slice(1)]
+    let aiSlot = 0
+    const strategies = seatNames.map((n: string) => {
+      if (humanPlayers.has(n)) return 'manual'
+      const s = aiStrats[aiSlot + 1] ?? 'rulealpha'
+      aiSlot++
+      return s
+    })
 
     // Multipliers and circle marks: use accumulated state (most up-to-date after reconnect)
     const rm = roundMultipliers.length > 0 ? roundMultipliers : (room?.round_multipliers ?? [])

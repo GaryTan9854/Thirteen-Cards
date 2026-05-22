@@ -62,7 +62,7 @@ class Room:
         self.appeal_played      = 0              # type: int  rounds played in this appeal
         self.is_tiebreaking     = False          # type: bool
 
-        self.ai_strategy   = "rule_base_as"      # type: str
+        self.ai_strategies = ["rulealpha"] * 3    # type: List[str]  per AI slot (order = seat order)
         self.ai_names      = random.sample(BEAUTIES, 3)  # type: List[str]
         self._timer:        Optional[asyncio.Task] = None
 
@@ -120,7 +120,7 @@ class Room:
             "appeal_played":      self.appeal_played,
             "is_tiebreaking":     self.is_tiebreaking,
             "submitted":          list(self.arrangements.keys()),
-            "ai_strategy":        self.ai_strategy,
+            "ai_strategies":      self.ai_strategies,
             "ai_names":           self.ai_names,
         }
 
@@ -195,9 +195,19 @@ class Room:
 
         # Run scoring off the event loop (it's CPU-bound)
         loop = _aio.get_event_loop()
+        human_players = set(self.players)
+        ai_idx = 0
+        strats = []
+        for name in seat_names:
+            if name in human_players:
+                strats.append('rulealpha')  # overridden by arrangement override anyway
+            else:
+                strats.append(self.ai_strategies[ai_idx] if ai_idx < len(self.ai_strategies) else 'rulealpha')
+                ai_idx += 1
+
         result = await loop.run_in_executor(None, lambda: play_one_game(
             player_names=seat_names,
-            strategies=[self.ai_strategy] * 4,
+            strategies=strats,
             pre_dealt=self.pre_dealt,
             overrides=overrides,
         ))

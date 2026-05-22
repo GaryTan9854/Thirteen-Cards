@@ -11,7 +11,7 @@ from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 
-APP_VERSION = "6.20"
+APP_VERSION = "7.0"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -518,10 +518,17 @@ async def ws_endpoint(player_name: str, websocket: WebSocket):
                 room.rounds_normal = int(data.get("rounds_normal", 16))
                 room.rounds_appeal = int(data.get("rounds_appeal",  4))
                 room.time_limit    = int(data.get("time_limit",     30))
-                _valid_ai = {"rulealpha", "rulealpha_aggressive", "rulealpha_conservative",
+                _valid_ai = {"rulealpha", "rulealpha2", "rulealpha_aggressive", "rulealpha_conservative",
                              "monte_carlo", "ml", "ml_aggressive", "ml_conservative", "random"}
-                room.ai_strategy   = data.get("ai_strategy", "rulealpha") \
-                                     if data.get("ai_strategy") in _valid_ai else "rulealpha"
+                raw_strats = data.get("seat_strategies")
+                if isinstance(raw_strats, list) and len(raw_strats) == 4:
+                    # seat_strategies[0] = player's own preference (ignored server-side)
+                    # seat_strategies[1:4] = AI slot strategies
+                    room.ai_strategies = [s if s in _valid_ai else "rulealpha" for s in raw_strats[1:4]]
+                else:
+                    legacy = data.get("ai_strategy", "rulealpha")
+                    s = legacy if legacy in _valid_ai else "rulealpha"
+                    room.ai_strategies = [s] * 3
                 from online.room import BEAUTIES
                 raw_names = data.get("ai_names", [])
                 if (isinstance(raw_names, list) and len(raw_names) == 3

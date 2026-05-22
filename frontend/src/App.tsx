@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import LoginPage  from './pages/LoginPage'
-import GamePage   from './pages/GamePage'
 import DuelPage   from './pages/DuelPage'
 import OnlinePage from './pages/OnlinePage'
 
@@ -27,7 +26,6 @@ function AppInner() {
   const TABS = [
     { id: 'online', label: '🌐', fullLabel: '連線遊戲' },
     ...(isGary ? [
-      { id: 'game', label: '🃏', fullLabel: '遊戲模擬' },
       { id: 'duel', label: '⚔️', fullLabel: '策略對決' },
     ] : []),
   ]
@@ -122,8 +120,6 @@ function AppInner() {
           <OnlinePage />
         </div>
 
-        {/* Game + Duel are conditionally mounted (no persistence needed) */}
-        {isGary && tab === 'game' && <GamePage embedded />}
         {isGary && tab === 'duel' && <DuelPage />}
       </main>
     </div>

@@ -1,6 +1,6 @@
 # ThirteenCards — CLAUDE.md
 
-十三支 (Chinese Poker / Big Two Variant) 遊戲平台。當前版本 v6.6。
+十三支 (Chinese Poker / Big Two Variant) 遊戲平台。當前版本 v6.20。
 
 ## 部署
 - **MBA** = 開發 / git source of truth (`~/Documents/ThirteenCards/`)
@@ -82,10 +82,15 @@ frontend/src/
 ## 關鍵實作細節
 
 ### arrange.py — 枚舉排列
-- 枚舉所有 C(13,3)×C(10,5) = 72,072 種排列
-- 過濾掉倒水（頭>中 或 中>尾）
-- 用 eval_defense/eval_attack 打分，選最高分
-- 目前: rule-based scoring = `s1*4 + s2*2 + s3` (defense) 或 `s1*5.5 + s2 + s3` (attack)
+- `best_arrangement()` — 枚舉所有 C(13,3)×C(10,5) = 72,072 種排列，過濾倒水，取最高分
+- `best_arrangement_rulealpha(handstrs, attitude)` — RuleAlpha：攻守評分 + attitude 切換
+- `best_arrangement_rulealpha2(handstrs, attitude)` — **RuleAlpha2（實驗）**，A/B/C/E 程序候選池：
+  - **A**: 頭墩優先，`_generate_3card_tops` 枚舉所有頭型 + C(10,5)=252 中/尾搜索，取 top-20（防禦分最高）
+  - **B**: 純對子手（無 TR/S/F/H/QD/L）的固定排法（2P~5P 各 1~2 種）
+  - **C**: 尾墩牌型枚舉（SF→QD→F→S→H→TR），怪物型早期 abort
+  - **E**: 與 RuleAlpha 同邏輯：eval_attack + attitude 決定攻/守；fallback 回 RuleAlpha
+- 攻擊閾值：頭≥0.5648，中≥0.6091，尾≥0.6988（三者同時達標才算攻擊候選）
+- rule-based scoring: defense=`s1*4+s2*2+s3`，attack=`s1*5.5+s2+s3`
 
 ### main.py — WebSocket 與 API
 - `/ws/{room_id}/{player_name}` — 遊戲 WebSocket
@@ -115,6 +120,8 @@ frontend/src/
 - [x] 排列選擇面板（右下角，最多顯示前5種分類）
 - [x] 局數設定、申訴制度
 - [x] TunaLogin 認證
+- [x] RuleAlpha2 AI 策略（實驗，可在 Solo/Online 設定頁選用）
+- [x] ManualArrange 支援 rulealpha2 下拉，並依遊戲設定預選策略
 
 ## 機器學習系統（進行中）
 
@@ -162,4 +169,4 @@ tail -f /tmp/train_scoring.log   # 監看進度
 
 ## 版本規則
 - bump +0.1 每次 deploy；minor=20 時升 major
-- 目前 v6.6
+- 目前 v6.20
