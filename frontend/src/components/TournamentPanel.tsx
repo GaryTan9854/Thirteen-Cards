@@ -93,7 +93,7 @@ export default function TournamentPanel({
               const pBadges = badgesPerSeat[j] ?? []
               return (
                 <span key={j} className="flex-1 flex flex-row items-center gap-1 pt-0.5 pl-2">
-                  {j === circledPlayer && !isEnded
+                  {j === circledPlayer && !(isEnded && roundIdx === roundCount - 1)
                     ? <span className={`${scoreColor(s)} text-lg tabular-nums min-w-[2.8rem] outline outline-1 outline-orange-400 rounded-full inline-flex items-center justify-center h-[1.8rem] leading-none px-1`}>{fmt(s)}</span>
                     : <span className={`${scoreColor(s)} text-lg tabular-nums min-w-[2.8rem] inline-block`}>{fmt(s)}</span>
                   }
