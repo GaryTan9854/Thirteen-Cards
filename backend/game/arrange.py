@@ -358,6 +358,53 @@ def score_defensive(h3: Hand3, hm: Hand5, hb: Hand5) -> float:
 
 
 
+def _try_quads(handstrs: list):
+    """
+    Domain rule: when the hand contains a four-of-a-kind (鐵支),
+    lock the quads in bot and exhaustively search the best mid+top
+    from the remaining 8 cards (C(8,5)=56 combos).
+
+    Rationale: score_arrangement() has no knowledge of the 4× bot bonus
+    for 鐵支, so it may incorrectly prefer e.g. 三條-in-top + two straights
+    over quads-in-bot.  This domain rule overrides that mistake.
+
+    Kicker = lowest remaining card (frees high cards for mid/top).
+    Returns (Hand3, Hand5, Hand5) or None if no quads found.
+    """
+    by_rank: dict = defaultdict(list)
+    for cs in handstrs:
+        by_rank[int(cs[:2])].append(cs)
+
+    quad_ranks = sorted([r for r, cs in by_rank.items() if len(cs) >= 4], reverse=True)
+    if not quad_ranks:
+        return None
+
+    quad_rank  = quad_ranks[0]
+    quad_cards = by_rank[quad_rank][:4]
+    remaining9 = [cs for cs in handstrs if cs not in quad_cards]
+
+    # Lowest remaining card as kicker — frees high cards for mid/top
+    kicker     = sorted(remaining9, key=lambda cs: int(cs[:2]))[0]
+    bot_cards  = quad_cards + [kicker]
+    remaining8 = [cs for cs in remaining9 if cs != kicker]
+
+    hb = Hand5(bot_cards); hb.score_hand()
+
+    best: tuple | None = None
+    best_score = -float('inf')
+    for mid_combo in _comb(remaining8, 5):
+        mid_list = list(mid_combo)
+        top_list = [cs for cs in remaining8 if cs not in mid_list]
+        h3 = Hand3(top_list); h3.score_hand()
+        hm = Hand5(mid_list); hm.score_hand()
+        if h3.score <= hm.score <= hb.score:
+            s = score_arrangement(h3, hm, hb)
+            if s > best_score:
+                best_score = s
+                best = (h3, hm, hb)
+    return best
+
+
 def _try_four_pairs(handstrs: list):
     """
     四輪車 domain rule:  P, P, 2P → [次大P 頭墩] [最大P 中墩] [兩小P 尾墩]
@@ -433,6 +480,10 @@ def best_arrangement_rulealpha(handstrs: list, attitude: float = 0.0):
       防守尾更強 → bot_edge = +0.3（attitude 需 > 0.3 才觸發攻擊）
       攻擊尾不弱 → bot_edge = -0.3（attitude > -0.3 即觸發攻擊）
     """
+    qr = _try_quads(handstrs)
+    if qr:
+        return qr
+
     fp = _try_four_pairs(handstrs)
     if fp:
         return fp
@@ -557,6 +608,10 @@ def best_arrangement_ml(handstrs: list, attitude: float = 0.0):
 
     if model is None:
         return best_arrangement(handstrs)
+
+    qr = _try_quads(handstrs)
+    if qr:
+        return qr
 
     fp = _try_four_pairs(handstrs)
     if fp:
