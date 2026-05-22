@@ -694,17 +694,13 @@ def best_arrangement_rulealpha2(handstrs: list, attitude: float = 0.0):
         if dh:
             return dh
 
-    # ── A: 頭優先 top-20 (TR/P 頭) ───────────────────────────────────────────
+    # ── A: 頭優先 top-20 (所有頭型：TR / P / 散牌) ────────────────────────────
+    # 全部 _generate_3card_tops 產生的頭型都跑，爛的自然排後面；不過濾。
     A_cands: list = []
     for top_cs in _generate_3card_tops(handstrs):
-        # Only TR-head and P-head (skip scatter heads — covered by C)
-        from collections import Counter as _Ctr
-        top_cnt = _Ctr(int(cs[:2]) for cs in top_cs)
-        if not any(n >= 2 for n in top_cnt.values()):
-            continue
-        top_set  = set(top_cs)
-        rem10    = [c for c in handstrs if c not in top_set]
-        h3       = _mk3(top_cs)
+        top_set = set(top_cs)
+        rem10   = [c for c in handstrs if c not in top_set]
+        h3      = _mk3(top_cs)
         for mid_combo in _comb(rem10, 5):
             mid_list = list(mid_combo)
             bot_list = [c for c in rem10 if c not in mid_combo]
