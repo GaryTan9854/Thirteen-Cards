@@ -181,11 +181,11 @@ interface ArrangeInfo {
 }
 
 // Model comparison
-const MODEL_STRATEGIES = ['rule_base_as','rule_base_1'] as const
+const MODEL_STRATEGIES = ['rulealpha','ml'] as const
 type ModelStrategy = typeof MODEL_STRATEGIES[number]
 const MODEL_LABEL: Record<ModelStrategy,string> = {
-  rule_base_as: 'RB-攻守',
-  rule_base_1:  'RB-Σ%',
+  rulealpha: 'RuleAlpha',
+  ml:        'ML Alpha',
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -247,13 +247,13 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
     Promise.all([
       fetch('/api/manual/arrange_info',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hand})})
         .then(r=>{ if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() }),
-      fetch('/api/game/arrange',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hand,strategy:'rule_base_as'})})
+      fetch('/api/game/arrange',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hand,strategy:'rulealpha'})})
         .then(r=>r.json()).catch(()=>null),
     ])
     .then(([data, rbData]:[ArrangeInfo, any])=>{
       setInfo(data)
-      // Apply rule_base_as as default arrangement (not groups[0])
-      const rbv = rbData ? applyModelData(rbData, hand, 'rule_base_as') : null
+      // Apply RuleAlpha as default arrangement (not groups[0])
+      const rbv = rbData ? applyModelData(rbData, hand, 'rulealpha') : null
       if(rbv){
         setArr({top:rbv.top,mid:rbv.mid,bot:rbv.bot})
         setSelGroup(-1)

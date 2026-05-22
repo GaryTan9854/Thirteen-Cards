@@ -175,7 +175,7 @@ export default function OnlinePage() {
   const [cfgAppeal,     setCfgAppeal]     = useState(1)
   const [cfgTimeLimit,  setCfgTimeLimit]  = useState(30)
   const [cfgInvitees,   setCfgInvitees]   = useState<string[]>([])
-  const [cfgAiStrategy, setCfgAiStrategy] = useState('rule_base_as')
+  const [cfgAiStrategy, setCfgAiStrategy] = useState('rulealpha')
   const [cfgAiNames,    setCfgAiNames]    = useState<string[]>(() => randomBeauties())
 
   // ── Round state ──
@@ -848,7 +848,7 @@ export default function OnlinePage() {
           countdown={countdown ?? undefined}
           submittedCount={submittedList.length}
           totalPlayers={soloActive ? 1 : (room?.players.length ?? 1)}
-          defaultModelStrategy={isGary ? 'rule_base_as' : 'rule_base_1'}
+          defaultModelStrategy='rulealpha'
         />,
         document.body
       )
@@ -1047,8 +1047,8 @@ export default function OnlinePage() {
 
   function renderSoloSetup() {
     const aiOptions = [
-      { value: 'rule_base_as', label: 'RB-攻守（推薦）' },
-      { value: 'rule_base_1',  label: 'RB-Σ%' },
+      { value: 'rulealpha', label: 'RuleAlpha（推薦）' },
+      { value: 'ml',        label: 'ML Alpha' },
     ]
     return (
       <div className="bg-green-900/30 rounded-xl p-6 space-y-5">
@@ -1239,8 +1239,8 @@ export default function OnlinePage() {
       )
 
     const aiOptions = [
-      { value: 'rule_base_as', label: 'RB-攻守（推薦）' },
-      { value: 'rule_base_1',  label: 'RB-Σ%' },
+      { value: 'rulealpha', label: 'RuleAlpha（推薦）' },
+      { value: 'ml',        label: 'ML Alpha' },
     ]
 
     return (

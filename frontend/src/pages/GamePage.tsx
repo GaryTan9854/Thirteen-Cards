@@ -10,14 +10,13 @@ import {
 } from '../utils/gameEffects'
 
 const DEFAULT_NAMES = ['Glory', 'Jack', 'Ian', 'Gary']
-const STRATEGIES = ['rule_base_1', 'rule_base_as', 'monte_carlo', 'ai_model', 'random', 'manual']
+const STRATEGIES = ['rulealpha', 'monte_carlo', 'ml', 'random', 'manual']
 const STRATEGY_LABEL: Record<string, string> = {
-  rule_base_1:  'Rule-Base 1 (Σ%)',
-  rule_base_as: 'Rule-Base 攻守',
-  monte_carlo:  'Monte Carlo',
-  ai_model:     'AI 神經網路',
-  random:       '隨機',
-  manual:       '自己排牌',
+  rulealpha:   'RuleAlpha',
+  monte_carlo: 'Monte Carlo',
+  ml:          'ML Alpha',
+  random:      '隨機',
+  manual:      '自己排牌',
 }
 
 const ROUNDS_NORMAL = 16
@@ -41,7 +40,7 @@ export default function GamePage({ embedded = false }: Props) {
   const [result, setResult]     = useState<GameResult | null>(null)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState<string | null>(null)
-  const [strategies, setStrategies] = useState<string[]>(['rule_base_as','rule_base_as','rule_base_as','rule_base_as'])
+  const [strategies, setStrategies] = useState<string[]>(['rulealpha','rulealpha','rulealpha','rulealpha'])
   const [grandSlammer, setGrandSlammer] = useState<string | null>(null)
 
   // 打槍通知佇列（用 ref 避免 effect cleanup 把 timeout 清掉）
@@ -445,7 +444,7 @@ export default function GamePage({ embedded = false }: Props) {
                 <button key={i}
                   onClick={() => {
                     setManualPlayer(i)
-                    setStrategies(prev => prev.map((s, j) => j === i ? 'manual' : s === 'manual' ? 'rule_base_as' : s))
+                    setStrategies(prev => prev.map((s, j) => j === i ? 'manual' : s === 'manual' ? 'rulealpha' : s))
                     setManualConflict(false)
                   }}
                   className="px-4 py-2 rounded-lg bg-yellow-400 text-gray-900 font-bold text-sm hover:bg-yellow-300"
