@@ -93,7 +93,7 @@ export default function TournamentPanel({
               const pBadges = badgesPerSeat[j] ?? []
               return (
                 <span key={j} className="flex-1 flex flex-row items-center gap-1 pt-0.5 pl-2">
-                  {j === circledPlayer
+                  {j === circledPlayer && !isEnded
                     ? <span className={`${scoreColor(s)} text-lg tabular-nums min-w-[2.8rem] outline outline-1 outline-orange-400 rounded-full inline-flex items-center justify-center h-[1.8rem] leading-none px-1`}>{fmt(s)}</span>
                     : <span className={`${scoreColor(s)} text-lg tabular-nums min-w-[2.8rem] inline-block`}>{fmt(s)}</span>
                   }
@@ -134,7 +134,12 @@ export default function TournamentPanel({
         <div className="flex mt-2 pt-2 border-t border-gray-600 font-bold">
           <span className="w-14 shrink-0 text-gray-400 text-lg">合計</span>
           {totalScores.map((s, j) => (
-            <span key={j} className={`flex-1 text-left text-lg pl-2 tabular-nums ${scoreColor(s)}`}>{fmt(s)}</span>
+            <span key={j} className={`flex-1 text-left text-lg pl-2 tabular-nums ${scoreColor(s)}`}>
+              {isEnded && j === lowestPlayer
+                ? <span className="outline outline-[2.5px] outline-red-400 rounded-full inline-flex items-center justify-center h-[1.8rem] leading-none px-1.5 min-w-[2.8rem]">{fmt(s)}</span>
+                : fmt(s)
+              }
+            </span>
           ))}
         </div>
       )}
