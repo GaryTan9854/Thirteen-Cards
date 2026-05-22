@@ -7,17 +7,19 @@ Compare two arrangement strategies fairly by:
   3. Report average score difference, win rate, and Elo estimate
 
 Strategies available:
-  "rule_base"      — 規則排列（攻守判斷 + 名次%，~70 種候選）
-  "monte_carlo"   — Top-K brute force + Monte Carlo evaluation
-  "ai_model"      — Trained neural network (requires data/model.pt)
-  "random"        — Random valid arrangement (baseline)
+  "rule_base"        — 規則排列（攻守判斷 + 名次%，~70 種候選）
+  "monte_carlo"      — Top-K brute force + Monte Carlo evaluation
+  "ml"               — ML Scoring Network 中性（attitude=0）
+  "ml_aggressive"    — ML Scoring Network 激進（attitude=+0.8）
+  "ml_conservative"  — ML Scoring Network 保守（attitude=-0.8）
+  "random"           — Random valid arrangement (baseline)
 
 Usage as module:
   from eval_duel import duel
-  result = duel("rule_base", "random", n_hands=200)
+  result = duel("ml", "rule_base", n_hands=200)
 
 Usage as CLI:
-  python3 eval_duel.py --a rule_base --b random --n 200
+  python3 eval_duel.py --a ml --b rule_base --n 200
 """
 
 import argparse
@@ -40,13 +42,26 @@ from game.evaluate import best_arrangement_mc
 # Strategy implementations
 # ──────────────────────────────────────────────────────
 
-def arrange_rule_base(cards) -> Hand13:
+def arrange_rulealpha(cards, attitude: float = 0.0) -> Hand13:
+    from game.arrange import best_arrangement_rulealpha
+    cardstrs = [c.cardstr() if hasattr(c, 'cardstr') else c for c in cards]
     h = Hand13(cards)
     sp = h.chk_special()
     h.specialhand = sp
-    if sp == "normal":
+    if sp != "normal":
+        return h
+    result = best_arrangement_rulealpha(cardstrs, attitude=attitude)
+    if result:
+        h.htop, h.hmid, h.hbot = result
+        h.ss = [h.htop.score, h.hmid.score, h.hbot.score]
+    else:
         h.arrange13()
     return h
+
+
+def arrange_rule_base(cards) -> Hand13:
+    """Backward-compat alias → RuleAlpha neutral."""
+    return arrange_rulealpha(cards, attitude=0.0)
 
 
 def arrange_random(cards) -> Hand13:
@@ -83,22 +98,37 @@ def arrange_monte_carlo(cards, top_k=20, n_sims=100) -> Hand13:
     return arr
 
 
-def arrange_ai_model(cards, arranger) -> Hand13:
+def arrange_ml(cards, attitude: float = 0.0) -> Hand13:
+    from game.arrange import best_arrangement_ml
+    cardstrs = [c.cardstr() if hasattr(c, 'cardstr') else c for c in cards]
     h = Hand13(cards)
     sp = h.chk_special()
     h.specialhand = sp
     if sp != "normal":
         return h
-    return arranger.arrange_hand13(h)
+    result = best_arrangement_ml(cardstrs, attitude=attitude)
+    if result:
+        h.htop, h.hmid, h.hbot = result
+        h.ss = [h.htop.score, h.hmid.score, h.hbot.score]
+    else:
+        h.arrange13()
+    return h
 
 
-STRATEGIES = ["rule_base", "brute_force", "monte_carlo", "ai_model", "random"]
+STRATEGIES = ["rulealpha", "rulealpha_aggressive", "rulealpha_conservative",
+              "monte_carlo", "ml", "ml_aggressive", "ml_conservative", "random"]
 
 
-def get_arranger_fn(strategy: str, ai_model_path: str = None):
+def get_arranger_fn(strategy: str, **_):
     """Return a callable: cards → Hand13."""
-    if strategy in ("rule_base", "brute_force"):
-        return arrange_rule_base
+    if strategy in ("rulealpha", "rule_base"):
+        return lambda cards: arrange_rulealpha(cards, attitude=0.0)
+
+    elif strategy == "rulealpha_aggressive":
+        return lambda cards: arrange_rulealpha(cards, attitude=0.8)
+
+    elif strategy == "rulealpha_conservative":
+        return lambda cards: arrange_rulealpha(cards, attitude=-0.8)
 
     elif strategy == "random":
         return arrange_random
@@ -106,10 +136,14 @@ def get_arranger_fn(strategy: str, ai_model_path: str = None):
     elif strategy == "monte_carlo":
         return lambda cards: arrange_monte_carlo(cards)
 
-    elif strategy == "ai_model":
-        from ml.inference import AIArranger
-        arranger = AIArranger(ai_model_path or AIArranger.__init__.__defaults__[0])
-        return lambda cards: arrange_ai_model(cards, arranger)
+    elif strategy in ("ml", "ml_neutral"):
+        return lambda cards: arrange_ml(cards, attitude=0.0)
+
+    elif strategy == "ml_aggressive":
+        return lambda cards: arrange_ml(cards, attitude=0.8)
+
+    elif strategy == "ml_conservative":
+        return lambda cards: arrange_ml(cards, attitude=-0.8)
 
     else:
         raise ValueError(f"Unknown strategy: {strategy}. Choose from {STRATEGIES}")
@@ -162,8 +196,7 @@ def _play_hand(arr_a, arr_b, arr_c, arr_d, hand_a, hand_b, hand_c, hand_d) -> tu
 
 def duel(strategy_a: str, strategy_b: str, n_hands: int = 500,
          mc_top_k: int = 20, mc_sims: int = 100,
-         ai_model_path: str = None, verbose: bool = True,
-         progress_callback=None) -> dict:
+         verbose: bool = True, progress_callback=None) -> dict:
     """
     Duplicate duel between strategy_a and strategy_b.
 
@@ -178,15 +211,9 @@ def duel(strategy_a: str, strategy_b: str, n_hands: int = 500,
       avg_diff: mean(score_a - score_b) per hand
       elo_diff: estimated Elo difference
     """
-    arr_a = get_arranger_fn(strategy_a, ai_model_path)
-    arr_b = get_arranger_fn(strategy_b, ai_model_path)
-    # Neutral players: use AI if available (fast + consistent), else random
-    try:
-        from ml.inference import AIArranger
-        _ai = AIArranger.get()
-        arr_other = (lambda cards: arrange_ai_model(cards, _ai)) if _ai else arrange_random
-    except Exception:
-        arr_other = arrange_random
+    arr_a = get_arranger_fn(strategy_a)
+    arr_b = get_arranger_fn(strategy_b)
+    arr_other = arrange_rule_base   # neutral players always use rule_base
 
     total_a = 0.0
     total_b = 0.0
@@ -313,9 +340,7 @@ if __name__ == "__main__":
     parser.add_argument("--a", default="rule_base", choices=STRATEGIES)
     parser.add_argument("--b", default="random",      choices=STRATEGIES)
     parser.add_argument("--n", type=int, default=200, help="Number of hand pairs")
-    parser.add_argument("--model", default=None,
-                        help="Path to model.pt (required if strategy=ai_model)")
     args = parser.parse_args()
 
     print(f"Dueling: {args.a}  vs  {args.b}  ({args.n * 2} total hand plays)")
-    duel(args.a, args.b, n_hands=args.n, ai_model_path=args.model)
+    duel(args.a, args.b, n_hands=args.n)

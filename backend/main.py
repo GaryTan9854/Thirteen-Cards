@@ -11,7 +11,7 @@ from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 
-APP_VERSION = "6.6"
+APP_VERSION = "6.7"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -75,7 +75,7 @@ def game_play(req: PlayRequest = None):
 # ── AI arrange: arrange a single hand with specified strategy ──
 class ArrangeRequest(BaseModel):
     hand: List[str]                          # 13 cardstrs e.g. ["02C","05H",...]
-    strategy: Optional[str] = "rule_base"  # rule_base | monte_carlo | ai_model
+    strategy: Optional[str] = "rule_base"  # rule_base | monte_carlo | ml | ml_aggressive | ml_conservative
 
 
 @app.post("/api/game/arrange")
@@ -98,25 +98,32 @@ def arrange_hand(req: ArrangeRequest):
         }
 
     strategy = req.strategy or "rule_base"
-    # backward-compat alias
-    if strategy == "brute_force":
+    # backward-compat aliases
+    if strategy in ("brute_force", "ai_model"):
         strategy = "rule_base"
 
     if strategy == "monte_carlo":
         from game.evaluate import best_arrangement_mc
         result = best_arrangement_mc(req.hand, top_k=20, n_sims=150)
         arr = result["arrangement"]
-    elif strategy == "ai_model":
-        from ml.inference import AIArranger
-        ai = AIArranger.get()
-        if ai is None:
-            strategy = "rule_base"
-            h13.arrange13()
+    elif strategy in ("ml", "ml_neutral", "ml_aggressive", "ml_conservative"):
+        from game.arrange import best_arrangement_ml
+        attitude = {"ml_aggressive": 0.8, "ml_conservative": -0.8}.get(strategy, 0.0)
+        result = best_arrangement_ml(req.hand, attitude=attitude)
+        if result:
+            h13.htop, h13.hmid, h13.hbot = result
+            h13.ss = [h13.htop.score, h13.hmid.score, h13.hbot.score]
             arr = h13
         else:
-            arr = ai.arrange_hand13(h13)
-    else:  # rule_base
-        h13.arrange13()
+            h13.arrange13()
+            arr = h13
+    else:  # rulealpha (default)
+        from game.arrange import best_arrangement_rulealpha
+        attitude = {"rulealpha_aggressive": 0.8, "rulealpha_conservative": -0.8}.get(strategy, 0.0)
+        result = best_arrangement_rulealpha(req.hand, attitude=attitude)
+        if result:
+            h13.htop, h13.hmid, h13.hbot = result
+            h13.ss = [h13.htop.score, h13.hmid.score, h13.hbot.score]
         arr = h13
 
     return {
@@ -371,20 +378,25 @@ def get_duel_result(task_id: str):
 
 @app.get("/api/eval/strategies")
 def list_strategies():
-    """List available strategies and whether AI model is ready."""
+    """List available strategies and whether ML model is ready."""
     try:
-        from ml.inference import AIArranger
-        ai_ready = AIArranger.model_exists()
+        from ml.scoring_model import ScoringModel
+        ml_ready = ScoringModel.model_exists()
     except Exception:
-        ai_ready = False
+        ml_ready = False
     return {
-        "strategies": ["rule_base", "monte_carlo", "ai_model", "random"],  # monte_carlo restored
-        "ai_model_ready": ai_ready,
+        "strategies": ["rulealpha", "rulealpha_aggressive", "rulealpha_conservative",
+                       "monte_carlo", "ml", "ml_aggressive", "ml_conservative", "random"],
+        "ml_model_ready": ml_ready,
         "descriptions": {
-            "rule_base":    "規則排列（攻守判斷 + 名次%評分），~70 種候選，3 ms／手",
-            "monte_carlo":  "對前 20 名候選排列各跑 150 次模擬，取期望得分最高者",
-            "ai_model":     "神經網路（需先訓練 data/model.pt）",
-            "random":       "隨機選一個合法排列（基準線）",
+            "rulealpha":              "RuleAlpha：雙路徑候選池 + 精選前40 + 攻守切換，預設 AI",
+            "rulealpha_aggressive":   "RuleAlpha 激進模式（attitude=+0.8）",
+            "rulealpha_conservative": "RuleAlpha 保守模式（attitude=-0.8）",
+            "monte_carlo":            "對前 20 名候選各跑 150 次模擬，取期望得分最高者",
+            "ml":                     "ML Scoring Network 中性（attitude=0），預測期望得分",
+            "ml_aggressive":          "ML Scoring Network 激進（attitude=+0.8）",
+            "ml_conservative":        "ML Scoring Network 保守（attitude=-0.8）",
+            "random":                 "隨機選一個合法排列（基準線）",
         },
     }
 
@@ -409,14 +421,18 @@ def get_loss_cases():
 # ── Dataset status ────────────────────────────────────
 @app.get("/api/ml/status")
 def ml_status():
-    """Check training data and model status."""
-    data_path = os.path.join(os.path.dirname(__file__), "data", "dataset.jsonl")
-    model_path = os.path.join(os.path.dirname(__file__), "data", "model_weights.npz")
+    """Check training data and ML model status."""
+    data_path  = os.path.join(os.path.dirname(__file__), "ml", "data", "train_10k.npz")
+    model_path = os.path.join(os.path.dirname(__file__), "ml", "data", "scoring_net.pt")
+    import numpy as np
 
     n_samples = 0
     if os.path.exists(data_path):
-        with open(data_path) as f:
-            n_samples = sum(1 for line in f if line.strip())
+        try:
+            d = np.load(data_path)
+            n_samples = int(d["X"].shape[0])
+        except Exception:
+            pass
 
     return {
         "dataset_exists": os.path.exists(data_path),
@@ -491,9 +507,10 @@ async def ws_endpoint(player_name: str, websocket: WebSocket):
                 room.rounds_normal = int(data.get("rounds_normal", 16))
                 room.rounds_appeal = int(data.get("rounds_appeal",  4))
                 room.time_limit    = int(data.get("time_limit",     30))
-                _valid_ai = {"rule_base_as", "rule_base_1"}
-                room.ai_strategy   = data.get("ai_strategy", "rule_base_as") \
-                                     if data.get("ai_strategy") in _valid_ai else "rule_base_as"
+                _valid_ai = {"rulealpha", "rulealpha_aggressive", "rulealpha_conservative",
+                             "monte_carlo", "ml", "ml_aggressive", "ml_conservative", "random"}
+                room.ai_strategy   = data.get("ai_strategy", "rulealpha") \
+                                     if data.get("ai_strategy") in _valid_ai else "rulealpha"
                 from online.room import BEAUTIES
                 raw_names = data.get("ai_names", [])
                 if (isinstance(raw_names, list) and len(raw_names) == 3

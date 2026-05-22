@@ -356,21 +356,6 @@ def score_defensive(h3: Hand3, hm: Hand5, hb: Hand5) -> float:
     return -(1 - p1) * (1 - p2) * (1 - p3)
 
 
-def best_arrangement_simple(handstrs: list):
-    """
-    Rule-Base 1：純用千萬位勝率 p1+p2+p3 合計選最佳排列。
-
-    最透明的基準版本：無打槍加成、無攻守切換。
-    用途：若正確排法未被選中，可判斷是「候選未生成」還是「評分選錯」。
-    - 若 Rule-Base 1 也選錯 → 候選生成問題
-    - 若 Rule-Base 1 選對但攻守版選錯 → 評分公式問題
-    """
-    candidates = enumerate_arrangements(handstrs)
-    if not candidates:
-        return None
-    return max(candidates, key=lambda t: (
-        winrate3(t[0]) + winrate5_mid(t[1]) + winrate5_bot(t[2])
-    ))
 
 
 def _try_four_pairs(handstrs: list):
@@ -427,25 +412,27 @@ def _try_four_pairs(handstrs: list):
     return None  # shouldn't happen for valid 4-pair hands
 
 
-def best_arrangement(handstrs: list):
+def best_arrangement_rulealpha(handstrs: list, attitude: float = 0.0):
     """
-    Rule-Base 攻守：雙模式評分選最佳排列。
+    RuleAlpha — 升級版 rule-based 排列，取代舊 rule_base 攻守。
 
-    特殊牌型優先：
-      • 四輪車（恰好4對+5單張，無同花）→ 固定排法 [次大P] [最大P] [兩小P]
+    改進點：
+      1. enumerate_arrangements 雙路徑（頭優先 + 尾優先 merge），補足舊版漏洞
+      2. _prefilter_candidates(K=20)：攻擊前20 + 防守前20 = 最多40個精選候選
+      3. attitude ∈ [-1, 1] 調整攻守傾向
 
-    攻牌模式觸發條件（兩者皆需）：
-      1. 任一候選可 eval_attack
-      2. score_arrangement 選出的最佳攻擊排列，其尾墩必須達到同花以上
+    攻擊觸發條件（同舊版，三者同時成立）：
+      頭 ≥ AJx   中 ≥ JJ33x   尾 ≥ 23457同花
 
-    若最佳攻擊排列的尾墩僅為順或以下，視為防守牌（例如：整手牌
-    三墩組合最強尾墩也只有順，即便湊出同花的次優排法讓 eval_attack 觸發，
-    也不應切換到攻擊模式）。
+    attitude 對攻守切換的影響：
+      原邏輯（attitude=0）：若防守尾墩牌型比攻擊尾更強，選防守，反之選攻擊。
+      attitude → +1：降低攻擊門檻，有攻擊候選即傾向進攻。
+      attitude → -1：提高攻擊門檻，傾向保守防守。
 
-    防守模式：score = -(1-p1)(1-p2)(1-p3)
-    同時獎勵「穿透策略」（一墩接近0%輸）和「均衡策略」（三墩各≈60%）。
+    實作：將原邏輯的 bot_edge 對應到 attitude 空間。
+      防守尾更強 → bot_edge = +0.3（attitude 需 > 0.3 才觸發攻擊）
+      攻擊尾不弱 → bot_edge = -0.3（attitude > -0.3 即觸發攻擊）
     """
-    # ── 四輪車 special rule ──────────────────────────────────────────────
     fp = _try_four_pairs(handstrs)
     if fp:
         return fp
@@ -454,19 +441,202 @@ def best_arrangement(handstrs: list):
     if not candidates:
         return None
 
-    best_def = max(candidates, key=lambda t: score_defensive(*t))
+    finalists = _prefilter_candidates(candidates, K=20)
 
-    # 攻擊候選：三墩同時通過 eval_attack 門檻（頭≥AJ2 中≥JJ33+2 尾≥23457同花）
-    # best_att 只從這些候選中選，確保選出的攻擊排列本身也符合門檻。
-    attack_cands = [c for c in candidates if eval_attack(*c)]
-    if attack_cands:
-        best_att = max(attack_cands, key=lambda t: score_arrangement(*t))
-        # 防守最佳排列若尾墩牌型更強（例如葫蘆 > 同花），優先選防守排列。
-        if best_def[2].handtype_val > best_att[2].handtype_val:
-            return best_def
-        return best_att
+    best_def = max(finalists, key=lambda t: score_defensive(*t))
+    attack_cands = [c for c in finalists if eval_attack(*c)]
 
-    return best_def
+    if not attack_cands:
+        return best_def
+
+    best_att = max(attack_cands, key=lambda t: score_arrangement(*t))
+
+    # bot_edge：防守尾更強時偏守（+0.3），攻擊尾不弱時偏攻（-0.3）
+    bot_edge = 0.3 if best_def[2].handtype_val > best_att[2].handtype_val else -0.3
+    return best_att if attitude > bot_edge else best_def
+
+
+def best_arrangement(handstrs: list):
+    """Backward-compat alias → best_arrangement_rulealpha(attitude=0)."""
+    return best_arrangement_rulealpha(handstrs, attitude=0.0)
+
+
+def compute_attitude(round_idx: int, total_rounds: int,
+                     my_score: float, all_scores: list) -> float:
+    """
+    根據比賽階段與當前名次計算 attitude ∈ [-1, 1]。
+
+    前半段（第0局 ~ N/2-1局）：
+      attitude 從 +1 線性遞減至 0，前期主動進攻積累分差。
+
+    後半段（N/2局起）：
+      依名次決定態度：
+        第1名 → -1.0（保守，守住領先優勢）
+        第2名 → -0.33
+        第3名 → +0.33（落後，加大攻勢）
+        第4名 → +1.0（墊底，全力進攻）
+
+    Parameters
+    ----------
+    round_idx    : 0-based 局數（0 = 第1局）
+    total_rounds : 總局數 N
+    my_score     : 我的當前累計分
+    all_scores   : 4位玩家分數列表（順序不限）
+    """
+    half = max(1, total_rounds // 2)
+
+    if round_idx < half:
+        attitude = 1.0 - round_idx / half
+    else:
+        sorted_desc = sorted(all_scores, reverse=True)
+        try:
+            my_rank = sorted_desc.index(my_score) + 1  # 1=第1名
+        except ValueError:
+            my_rank = 2
+        attitude = (my_rank - 2.5) / 1.5  # 1→-1.0, 2→-0.33, 3→+0.33, 4→+1.0
+
+    return max(-1.0, min(1.0, attitude))
+
+
+# ─── ML-based arrangement ────────────────────────────────────────────────────
+
+def _prefilter_candidates(candidates: list, K: int = 20) -> list:
+    """
+    從完整候選池中，取攻擊分前K + 防守分前K，merge去重後回傳（最多2K個）。
+
+    攻擊分 = p1+p2+p3（加打槍加成），防守分 = -(1-p1)(1-p2)(1-p3)。
+    p 的選用與 score_arrangement / score_defensive 一致：
+      top/mid 用 winrate（機率%），bot 用 pct5_bot（名次%，正確區分K葫蘆vs2葫蘆）。
+
+    根據牌理，最佳排列幾乎必在這2K個之內。其餘散牌/花/順的無意義變種
+    對 ML 的最終選擇無貢獻，提前剔除可大幅降低推理成本。
+    """
+    if len(candidates) <= K * 2:
+        return candidates
+
+    top_off = sorted(candidates, key=lambda t: score_arrangement(*t), reverse=True)[:K]
+    top_def = sorted(candidates, key=lambda t: score_defensive(*t),   reverse=True)[:K]
+
+    seen: set  = set()
+    finalists: list = []
+    for c in top_off + top_def:
+        key = (tuple(sorted(c[0].handlist)),
+               tuple(sorted(c[1].handlist)),
+               tuple(sorted(c[2].handlist)))
+        if key not in seen:
+            seen.add(key)
+            finalists.append(c)
+    return finalists
+
+
+def best_arrangement_ml(handstrs: list, attitude: float = 0.0):
+    """
+    ML Scoring Network 選最佳排列。
+
+    流程：
+      1. enumerate_arrangements → 全候選池（雙路徑，可達300+）
+      2. _prefilter_candidates  → 攻擊前20 + 防守前20 = 最多40個 finalists
+      3. ScoringModel.predict   → 對40個 finalists 做 ML 推理
+      4. utility = μ + attitude×tanh(σ/5)×σ → 選最高
+
+    Lazy-load ScoringModel；模型不存在時 fallback 到 rule-based。
+
+    Parameters
+    ----------
+    handstrs : 13張牌的字串列表
+    attitude : float ∈ [-1, 1]
+        -1 = 極度保守（最小化 σ 風險）
+         0 = 中性（純比 μ，預設）
+        +1 = 極度激進（最大化 μ + σ）
+    """
+    try:
+        from ml.scoring_model import ScoringModel
+        model = ScoringModel.get()
+    except Exception:
+        model = None
+
+    if model is None:
+        return best_arrangement(handstrs)
+
+    fp = _try_four_pairs(handstrs)
+    if fp:
+        return fp
+
+    candidates = enumerate_arrangements(handstrs)
+    if not candidates:
+        return best_arrangement(handstrs)
+
+    finalists = _prefilter_candidates(candidates, K=20)
+    result = model.best_arrangement(handstrs, attitude=attitude, candidates=finalists)
+    if result is None:
+        return best_arrangement(handstrs)
+    return result
+
+
+# ─── 3-card top generator (for top-first enumeration) ────────────────────────
+
+def _generate_3card_tops(handstrs: list) -> list:
+    """
+    Generate meaningful 3-card top-row candidates for the top-first path.
+
+    Covers:
+      1. 三條 (trips) — 原子頭 3× bonus; critical to enumerate
+      2. 一對  (pairs) — several kicker variants to free strong cards for bot/mid
+      3. 散牌  (scatter) — highest-card variants
+    """
+    by_rank: dict = defaultdict(list)
+    for cs in handstrs:
+        by_rank[int(cs[:2])].append(cs)
+    cnt           = {r: len(cs) for r, cs in by_rank.items()}
+    multi_ranks   = set(r for r, c in cnt.items() if c >= 2)
+    tops: list    = []
+
+    # ── 三條 ─────────────────────────────────────────────────────────────────
+    for r in sorted([r for r, c in cnt.items() if c >= 3], reverse=True):
+        tops.append(by_rank[r][:3])
+
+    # ── 一對 ─────────────────────────────────────────────────────────────────
+    for pr in sorted([r for r, c in cnt.items() if c >= 2], reverse=True):
+        pair_cards = by_rank[pr][:2]
+        others = sorted([cs for cs in handstrs if int(cs[:2]) != pr],
+                        key=lambda cs: -int(cs[:2]))
+        if others:
+            tops.append(pair_cards + [others[0]])   # highest kicker
+            if others[-1] != others[0]:
+                tops.append(pair_cards + [others[-1]])  # lowest kicker
+            mid_i = len(others) // 2
+            if 0 < mid_i < len(others) - 1:
+                tops.append(pair_cards + [others[mid_i]])
+        # Variant: skip other paired/trip ranks as kicker (free them for mid/bot)
+        singles = sorted([cs for cs in handstrs
+                          if int(cs[:2]) != pr and int(cs[:2]) not in multi_ranks],
+                         key=lambda cs: -int(cs[:2]))
+        if singles:
+            tops.append(pair_cards + [singles[0]])
+            if len(singles) > 1 and singles[-1] != singles[0]:
+                tops.append(pair_cards + [singles[-1]])
+
+    # ── 散牌 ─────────────────────────────────────────────────────────────────
+    sorted_all = sorted(handstrs, key=lambda cs: -int(cs[:2]))
+    tops.append(sorted_all[:3])                     # top-3 highest
+    if len(sorted_all) >= 4:
+        alt = sorted([sorted_all[0], sorted_all[3], sorted_all[2]],
+                     key=lambda cs: -int(cs[:2]))
+        tops.append(alt)                             # swap 2nd ↔ 4th
+        tops.append([sorted_all[0]] + sorted_all[-2:])  # highest + 2 lowest
+    tops.append(sorted_all[-3:])                    # 3 lowest (conservative)
+
+    # Deduplicate
+    seen: set  = set()
+    unique: list = []
+    for t in tops:
+        if len(t) != 3:
+            continue
+        key = tuple(sorted(t))
+        if key not in seen:
+            seen.add(key)
+            unique.append(t)
+    return unique
 
 
 # ─── Main enumeration ─────────────────────────────────────────────────────────
@@ -475,29 +645,54 @@ def enumerate_arrangements(handstrs: list) -> list:
     """
     Enumerate meaningful arrangements for a 13-card hand.
 
+    Dual-approach: BOTH bottom-first (bot→mid→top) AND top-first (top→bot→mid)
+    paths run independently; results are merged with deduplication.
+    Bottom-first misses trip-in-top (三條 原子頭); top-first captures it directly.
+
     Returns list of (Hand3_top, Hand5_mid, Hand5_bot), each already scored,
     satisfying top.score ≤ mid.score ≤ bot.score.
-
-    Typical count: 50–150 candidates (vs 72,072 brute-force).
     """
     results: list = []
     seen:    set  = set()
 
-    bot_options = generate_5card_options(handstrs)
-
-    for bot_cards in bot_options:
+    # ── Bottom-first: bot → mid → top ────────────────────────────────────────
+    for bot_cards in generate_5card_options(handstrs):
         bot_set   = set(bot_cards)
         remaining = [cs for cs in handstrs if cs not in bot_set]
 
-        mid_options = generate_5card_options(remaining)
-
-        for mid_cards in mid_options:
+        for mid_cards in generate_5card_options(remaining):
             mid_set = set(mid_cards)
             top3 = [cs for cs in remaining if cs not in mid_set]
             if len(top3) != 3:
                 continue
 
             for top_v, mid_v in spare_variants(top3, mid_cards):
+                key = (tuple(sorted(top_v)),
+                       tuple(sorted(mid_v)),
+                       tuple(sorted(bot_cards)))
+                if key in seen:
+                    continue
+                seen.add(key)
+
+                h3 = Hand3(top_v);      h3.score_hand()
+                hm = Hand5(mid_v);      hm.score_hand()
+                hb = Hand5(bot_cards);  hb.score_hand()
+
+                if h3.score <= hm.score <= hb.score:
+                    results.append((h3, hm, hb))
+
+    # ── Top-first: top → bot → mid ────────────────────────────────────────────
+    for top_cards in _generate_3card_tops(handstrs):
+        top_set      = set(top_cards)
+        remaining_10 = [cs for cs in handstrs if cs not in top_set]
+
+        for bot_cards in generate_5card_options(remaining_10):
+            bot_set = set(bot_cards)
+            mid5    = [cs for cs in remaining_10 if cs not in bot_set]
+            if len(mid5) != 5:
+                continue
+
+            for top_v, mid_v in spare_variants(top_cards, mid5):
                 key = (tuple(sorted(top_v)),
                        tuple(sorted(mid_v)),
                        tuple(sorted(bot_cards)))

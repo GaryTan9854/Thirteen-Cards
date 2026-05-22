@@ -107,29 +107,41 @@ def _arrange(hand_cards, strategy: str) -> 'Hand13':
         from .evaluate import best_arrangement_mc
         result = best_arrangement_mc(cardstrs, top_k=20, n_sims=150)
         return result["arrangement"]
-    elif strategy == 'ai_model':
-        from ml.inference import AIArranger
-        ai = AIArranger.get()
-        if ai:
-            h = Hand13(cardstrs)
-            h.specialhand = 'normal'
-            return ai.arrange_hand13(h)
-    elif strategy == 'rule_base_1':
-        # Rule-Base 1：純 Σ% 選牌，無打槍加成、無攻守切換
-        from .arrange import best_arrangement_simple
+    elif strategy in ('ml', 'ml_neutral', 'ml_aggressive', 'ml_conservative'):
+        # ML Scoring Network：根據 attitude 選最佳排列
+        from .arrange import best_arrangement_ml
+        attitude = {'ml_aggressive': 0.8, 'ml_conservative': -0.8}.get(strategy, 0.0)
         h = Hand13(cardstrs)
-        h.specialhand = 'normal'
-        result = best_arrangement_simple(cardstrs)
+        sp = h.chk_special()
+        h.specialhand = sp
+        if sp != 'normal':
+            return h
+        result = best_arrangement_ml(cardstrs, attitude=attitude)
         if result:
             h.htop, h.hmid, h.hbot = result
             h.ss = [h.htop.score, h.hmid.score, h.hbot.score]
             h.score = sum(h.ss)
             h.totalscore = h.score
         return h
-    # rule_base_as | rule_base (default)：攻守雙模式
+    # rulealpha | rule_base (default)：RuleAlpha 雙路徑 + 精選候選 + attitude
+    from .arrange import best_arrangement_rulealpha
+    attitude = 0.0
+    if strategy == 'rulealpha_aggressive':
+        attitude = 0.8
+    elif strategy == 'rulealpha_conservative':
+        attitude = -0.8
     h = Hand13(cardstrs)
-    h.specialhand = 'normal'
-    h.arrange13()
+    sp = h.chk_special()
+    h.specialhand = sp
+    if sp != 'normal':
+        return h
+    result = best_arrangement_rulealpha(cardstrs, attitude=attitude)
+    if result:
+        h.htop, h.hmid, h.hbot = result
+        h.ss = [h.htop.score, h.hmid.score, h.hbot.score]
+        h.score = sum(h.ss)
+        h.totalscore = h.score
+        h.CanAttack = getattr(result[0], 'CanAttack', False)
     return h
 
 
