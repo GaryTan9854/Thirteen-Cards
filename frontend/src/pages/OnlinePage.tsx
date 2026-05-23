@@ -146,10 +146,17 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
       colsRef.current  = newCols
 
       // availH: exact visible space from carousel top to viewport bottom.
-      // Handles iOS address-bar shrinkage and variable mobile header height.
+      // On mobile, cap at 55 % of total viewport height so the carousel
+      // doesn't swallow the whole screen. Desktop keeps full available height.
       if (el) {
-        const top = el.getBoundingClientRect().top
-        if (top >= 0) setAvailH(window.innerHeight - top)
+        const top  = el.getBoundingClientRect().top
+        if (top >= 0) {
+          const full = window.innerHeight - top
+          const capped = w > 0 && w < 640
+            ? Math.min(full, Math.round(window.innerHeight * 0.55))
+            : full
+          setAvailH(capped)
+        }
       }
 
       setCw(w)
@@ -282,8 +289,8 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
          className="relative overflow-hidden"
          style={{
            // availH measured dynamically: fixes iOS address-bar + 2-row mobile header
-           // Fallback 100dvh adapts to actual visible area (not the static 100vh)
-           height: availH > 0 ? `${availH}px` : 'calc(100dvh - 80px)',
+           // Mobile capped at 55dvh so the carousel doesn't fill the whole screen
+           height: availH > 0 ? `${availH}px` : 'min(calc(100dvh - 80px), 55dvh)',
            marginTop: '-24px', marginBottom: '-24px',
            marginLeft: '-16px', marginRight: '-16px',
            cursor: 'grab', touchAction: 'none', userSelect: 'none',
