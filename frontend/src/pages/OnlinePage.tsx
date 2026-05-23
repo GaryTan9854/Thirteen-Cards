@@ -1218,12 +1218,12 @@ export default function OnlinePage() {
         {/* ── Background: two images side by side ── */}
         <div className="absolute inset-0 flex">
           <div className="w-1/2 overflow-hidden">
-            <img src="/beauties-left.jpg" alt=""
+            <img src="/assets/beauties-left.jpg" alt=""
               className="h-full w-full object-cover object-center select-none pointer-events-none"
               style={{ animation: 'floatA 13s ease-in-out infinite', transformOrigin: 'center center' }} />
           </div>
           <div className="w-1/2 overflow-hidden">
-            <img src="/beauties-right.jpg" alt=""
+            <img src="/assets/beauties-right.jpg" alt=""
               className="h-full w-full object-cover object-center select-none pointer-events-none"
               style={{ animation: 'floatB 16s ease-in-out infinite', transformOrigin: 'center center' }} />
           </div>
