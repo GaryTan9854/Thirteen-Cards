@@ -19,12 +19,21 @@ from typing import Any, Dict, List, Optional
 
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
+# On MBP (production):  ~/db/ exists  →  ~/db/thirteencards/{logs/,game_logs.db}
+# On MBA (local dev):   ~/db/ absent  →  ./logs/  and  ./game_logs.db
 
-_BASE    = Path(__file__).parent
-LOGS_DIR = _BASE / "logs"
-LOGS_DIR.mkdir(exist_ok=True)
+_BASE     = Path(__file__).parent
+_HOME_DB  = Path.home() / "db"
+_PROJ_DB  = _HOME_DB / "thirteencards"
 
-DB_PATH = _BASE / "game_logs.db"   # leagues only
+if _HOME_DB.exists():
+    LOGS_DIR = _PROJ_DB / "logs"
+    DB_PATH  = _PROJ_DB / "game_logs.db"
+else:
+    LOGS_DIR = _BASE / "logs"
+    DB_PATH  = _BASE / "game_logs.db"
+
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # ── SQLite — leagues only ──────────────────────────────────────────────────────

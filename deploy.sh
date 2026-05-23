@@ -51,7 +51,24 @@ if git remote | grep -q origin; then
   git push origin main 2>/dev/null || git push origin master 2>/dev/null || echo "   (git push skipped)"
 fi
 
-echo "📦 [1/4] Syncing source to MBP…"
+echo "💾 [1/5] Backing up data on MBP…"
+ssh $SSH_OPTS $REMOTE_USER@$REMOTE_HOST "
+  PROJ_DIR=\$HOME/db/thirteencards
+  BACKUP_DIR=\$HOME/db-backups/thirteencards
+  mkdir -p \$PROJ_DIR/logs \$BACKUP_DIR
+
+  DB=\$PROJ_DIR/game_logs.db
+  if [ -f \$DB ]; then
+    STAMP=\$(date +%Y%m%d_%H%M%S)
+    cp \$DB \$BACKUP_DIR/game_logs_\$STAMP.db
+    ls -t \$BACKUP_DIR/game_logs_*.db 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null || true
+    echo \"   game_logs.db → game_logs_\$STAMP.db\"
+  fi
+  NLOG=\$(ls \$PROJ_DIR/logs/*.jsonl 2>/dev/null | wc -l | tr -d ' ')
+  echo \"   \$NLOG JSONL log file(s) safe at ~/db/thirteencards/logs/\"
+"
+
+echo "📦 [2/5] Syncing source to MBP…"
 rsync -az -e "ssh $SSH_OPTS" \
   --exclude '__pycache__' \
   --exclude '*.pyc' \
@@ -66,7 +83,7 @@ rsync -az -e "ssh $SSH_OPTS" \
   "$(dirname "$0")/" \
   $REMOTE_USER@$REMOTE_HOST:$REMOTE_DIR/
 
-echo "🔨 [2/4] Building frontend on MBP…"
+echo "🔨 [3/5] Building frontend on MBP…"
 ssh $SSH_OPTS $REMOTE_USER@$REMOTE_HOST "
   zsh -lic '
   cd $REMOTE_DIR/frontend
@@ -81,7 +98,7 @@ ssh $SSH_OPTS $REMOTE_USER@$REMOTE_HOST "
   ls -lh $REMOTE_DIR/backend/static/assets/ 2>/dev/null || true
   '"
 
-echo "🚀 [3/4] Installing Python deps + restarting PM2…"
+echo "🚀 [4/5] Installing Python deps + restarting PM2…"
 ssh $SSH_OPTS $REMOTE_USER@$REMOTE_HOST "
   zsh -lic '
   cd $REMOTE_DIR/backend
@@ -104,6 +121,14 @@ ssh $SSH_OPTS $REMOTE_USER@$REMOTE_HOST "
   pm2 save --force
   '
 "
+
+echo "🗄️  [5/5] Pulling data backup MBP → MBA…"
+mkdir -p "$HOME/Documents/.db-backups/thirteencards"
+rsync -az -e "ssh $SSH_OPTS" \
+  $REMOTE_USER@$REMOTE_HOST:~/db/thirteencards/ \
+  "$HOME/Documents/.db-backups/thirteencards/"
+NFILES=$(find "$HOME/Documents/.db-backups/thirteencards" -type f 2>/dev/null | wc -l | tr -d ' ')
+echo "   ✓ $NFILES file(s) → $HOME/Documents/.db-backups/thirteencards/"
 
 echo ""
 echo "✅ Deploy complete → ThirteenCards v$NEXT_VER → https://thirteencards.visadelab.xyz"
