@@ -26,12 +26,12 @@ export default function GameResultDisplay({ result, strategies, multiplier = 1 }
   return (
     <>
       {/* ── 本局比分 strip ── */}
-      <div className="bg-green-900 rounded-2xl p-4 shadow-inner">
-        <div className="text-xs text-green-400 mb-2 font-semibold text-center">本局比分</div>
+      <div className="bg-slate-800 rounded-2xl p-4 shadow-inner">
+        <div className="text-xs text-sky-400 mb-2 font-semibold text-center">本局比分</div>
         <div className="grid grid-cols-4 gap-3">
           {(result.final_scores ?? []).map((fs: any) => (
             <div key={fs.name} className="flex flex-col items-center">
-              <span className="text-sm text-green-300">{fs.name}</span>
+              <span className="text-sm text-sky-300">{fs.name}</span>
               <span className={`text-xl font-bold ${scoreColor(fs.score)}`}>
                 {fmt(fs.score)}
               </span>

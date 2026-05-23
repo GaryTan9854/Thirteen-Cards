@@ -331,8 +331,8 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
       )}
 
       {/* ── Gradient overlays ── */}
-      <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-green-950 to-transparent pointer-events-none" />
-      <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-green-950 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-slate-900 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none" />
 
       {/* ── Title + buttons ── */}
       <div className="absolute inset-0 flex flex-col items-center justify-end pb-12 pointer-events-none"
@@ -355,7 +355,7 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
           </button>
           <button onClick={onSolo}
             className="px-10 py-3 rounded-2xl font-bold text-base text-white
-                       hover:opacity-90 active:scale-95 transition-all shadow-xl border border-green-400/40"
+                       hover:opacity-90 active:scale-95 transition-all shadow-xl border border-sky-400/40"
             style={{ background: 'rgba(22,101,52,0.75)', backdropFilter: 'blur(6px)' }}>
             獨自練功
           </button>
@@ -412,7 +412,7 @@ function OnlineBar({ players, self: self_, onLeave }: {
         <span key={p} className={`text-xs px-2 py-0.5 rounded-full font-medium
           ${p === self_
             ? 'bg-yellow-400 text-gray-900 font-bold'
-            : 'bg-green-800 text-green-200'}`}>
+            : 'bg-slate-700 text-sky-200'}`}>
           {p}
         </span>
       ))}
@@ -432,7 +432,7 @@ function OnlineBar({ players, self: self_, onLeave }: {
 function LogToggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="flex items-center gap-2 cursor-pointer select-none" onClick={() => onChange(!value)}>
-      <div className={`w-9 h-5 rounded-full transition-colors relative shrink-0 ${value ? 'bg-green-500' : 'bg-gray-600'}`}>
+      <div className={`w-9 h-5 rounded-full transition-colors relative shrink-0 ${value ? 'bg-sky-500' : 'bg-gray-600'}`}>
         <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${value ? 'translate-x-4' : 'translate-x-0.5'}`} />
       </div>
       <span className="text-sm text-gray-300">{label}</span>
@@ -1383,7 +1383,7 @@ export default function OnlinePage() {
                     if (soloActive) soloAppealDecision(true)
                     else send({ type: 'appeal_decision', accept: true })
                   }}
-                  className="flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white
+                  className="flex-1 py-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white
                              font-bold text-lg active:scale-95 transition">
                   ✅ 申訴
                 </button>
@@ -1437,7 +1437,7 @@ export default function OnlinePage() {
               {notices.length > 0 && (
                 <div className="space-y-1">
                   {notices.map((n, i) => (
-                    <div key={i} className="text-xs text-green-400 bg-green-900/40 px-3 py-1 rounded-lg
+                    <div key={i} className="text-xs text-sky-400 bg-slate-800/40 px-3 py-1 rounded-lg
                                            animate-pulse">
                       📢 {n}
                     </div>
@@ -1512,20 +1512,20 @@ export default function OnlinePage() {
         value={cfgStrategies[idx]}
         onChange={e => setCfgStrategies(prev => prev.map((s, j) => j === idx ? e.target.value : s))}
         className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5
-                   text-white text-xs focus:outline-none focus:border-green-400 cursor-pointer"
+                   text-white text-xs focus:outline-none focus:border-sky-400 cursor-pointer"
       >
         {modelOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
     )
     return (
-      <div className="bg-green-900/30 rounded-xl p-6 space-y-5">
+      <div className="bg-slate-800/30 rounded-xl p-6 space-y-5">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSoloSetupMode(false)}
             className="text-sm text-gray-400 hover:text-white transition">
             ← 返回
           </button>
-          <div className="text-xl font-bold text-green-300">🥋 獨自練功設定</div>
+          <div className="text-xl font-bold text-sky-300">🥋 獨自練功設定</div>
         </div>
 
         {/* 局數設定 */}
@@ -1539,7 +1539,7 @@ export default function OnlinePage() {
               <NumInput
                 value={val} onChange={set} min={min} max={max}
                 className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2
-                           text-white text-center font-bold focus:outline-none focus:border-green-400"
+                           text-white text-center font-bold focus:outline-none focus:border-sky-400"
               />
             </label>
           ))}
@@ -1552,8 +1552,8 @@ export default function OnlinePage() {
             {/* 你 */}
             <div className="space-y-1.5">
               <div className="text-xs text-gray-500">你</div>
-              <div className="text-xs font-semibold text-green-300 px-2 py-1.5 bg-green-900/60
-                              border border-green-700 rounded-lg truncate">
+              <div className="text-xs font-semibold text-sky-300 px-2 py-1.5 bg-slate-800/60
+                              border border-slate-600 rounded-lg truncate">
                 {player}
               </div>
               <ModelSelect idx={0} />
@@ -1566,7 +1566,7 @@ export default function OnlinePage() {
                   value={name}
                   onChange={e => setCfgAiNames(prev => prev.map((n, j) => j === i ? e.target.value : n))}
                   className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5
-                             text-white text-xs focus:outline-none focus:border-green-400 cursor-pointer"
+                             text-white text-xs focus:outline-none focus:border-sky-400 cursor-pointer"
                 >
                   {BEAUTIES.map(b => <option key={b} value={b}>{b}</option>)}
                 </select>
@@ -1577,7 +1577,7 @@ export default function OnlinePage() {
         </div>
 
         {/* 記錄 & 聯盟賽 */}
-        <div className="space-y-2 border-t border-green-700/40 pt-4">
+        <div className="space-y-2 border-t border-slate-600/40 pt-4">
           <div className="text-sm text-gray-400">記錄設定</div>
           <div className="flex flex-wrap gap-4">
             <LogToggle label="記錄此場遊戲" value={cfgRecordGame} onChange={setCfgRecordGame} />
@@ -1599,8 +1599,8 @@ export default function OnlinePage() {
               aiNames:      cfgAiNames,
             })
           }}
-          className="w-full py-3 rounded-xl bg-green-500 text-white font-bold text-lg
-                     hover:bg-green-400 active:scale-95 transition-all shadow-lg">
+          className="w-full py-3 rounded-xl bg-sky-500 text-white font-bold text-lg
+                     hover:bg-sky-400 active:scale-95 transition-all shadow-lg">
           🥋 開始練功
         </button>
       </div>
@@ -1612,9 +1612,9 @@ export default function OnlinePage() {
   function renderPhase() {
     if (submitted && phase === 'playing') {
       return (
-        <div className="bg-green-900/30 rounded-xl p-8 text-center space-y-3">
+        <div className="bg-slate-800/30 rounded-xl p-8 text-center space-y-3">
           <div className="text-4xl">✅</div>
-          <div className="text-xl font-bold text-green-400">已送出排法</div>
+          <div className="text-xl font-bold text-sky-400">已送出排法</div>
           {soloActive ? (
             <div className="text-sm text-gray-400">計算中…</div>
           ) : (
@@ -1695,7 +1695,7 @@ export default function OnlinePage() {
         </div>
         <div className="flex gap-3 pt-1">
           <button onClick={() => { send({ type: 'invite_response', accepted: true }); setInvited(null) }}
-            className="px-5 py-2 bg-green-500 rounded-lg text-white font-bold hover:bg-green-400">
+            className="px-5 py-2 bg-sky-500 rounded-lg text-white font-bold hover:bg-sky-400">
             ✓ 參與
           </button>
           <button onClick={() => { send({ type: 'invite_response', accepted: false }); setInvited(null) }}
@@ -1737,7 +1737,7 @@ export default function OnlinePage() {
     const slotIsHuman = [0, 1, 2].map(i => !!cfgInvitees[i])
 
     return (
-      <div className="bg-green-900/30 rounded-xl p-6 space-y-5">
+      <div className="bg-slate-800/30 rounded-xl p-6 space-y-5">
         <div className="text-xl font-bold text-yellow-300">⚙️ 設定新比賽</div>
 
         <div className="grid grid-cols-3 gap-4">
@@ -1810,7 +1810,7 @@ export default function OnlinePage() {
                   className={`px-4 py-2 rounded-full border text-sm font-medium transition
                     ${cfgInvitees.includes(p)
                       ? 'bg-yellow-400 text-gray-900 border-yellow-400'
-                      : 'bg-green-800 text-green-200 border-green-600 hover:border-yellow-400'}`}>
+                      : 'bg-slate-700 text-sky-200 border-slate-600 hover:border-yellow-400'}`}>
                   {p}
                 </button>
               ))}
@@ -1819,7 +1819,7 @@ export default function OnlinePage() {
         </div>
 
         {/* 記錄 & 聯盟賽 */}
-        <div className="space-y-2 border-t border-green-700/40 pt-3">
+        <div className="space-y-2 border-t border-slate-600/40 pt-3">
           <div className="flex flex-wrap gap-4">
             <LogToggle label="記錄此場遊戲" value={cfgRecordGame} onChange={setCfgRecordGame} />
             {cfgRecordGame && <LogToggle label="記錄每局牌局" value={cfgRecordRounds} onChange={setCfgRecordRounds} />}
@@ -1869,14 +1869,14 @@ export default function OnlinePage() {
   function renderInviting() {
     const invites = room?.invites ?? {}
     return (
-      <div className="bg-green-900/30 rounded-xl p-6 space-y-4">
+      <div className="bg-slate-800/30 rounded-xl p-6 space-y-4">
         <div className="text-xl font-bold text-yellow-300">📬 等待玩家回應</div>
         <div className="space-y-2">
           {Object.entries(invites).map(([p, status]) => (
             <div key={p} className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-2">
               <span className="font-medium text-gray-200">{p}</span>
               <span className={`text-sm font-bold
-                ${status === 'accepted' ? 'text-green-400'
+                ${status === 'accepted' ? 'text-sky-400'
                   : status === 'declined' ? 'text-red-400'
                   : 'text-yellow-400'}`}>
                 {status === 'accepted' ? '✓ 已接受' : status === 'declined' ? '✗ 拒絕' : '⏳ 等待中'}
@@ -1895,7 +1895,7 @@ export default function OnlinePage() {
     const hasSeats = Object.keys(room?.seats ?? {}).length > 0
     const seatNames = room?.seat_names ?? []
     return (
-      <div className="bg-green-900/30 rounded-xl p-6 space-y-5 text-center">
+      <div className="bg-slate-800/30 rounded-xl p-6 space-y-5 text-center">
         <div className="text-xl font-bold text-yellow-300">🎲 抽座位</div>
         <div className="text-sm text-gray-400">
           玩家：{(room?.players ?? []).join('、')}
@@ -1920,7 +1920,7 @@ export default function OnlinePage() {
                   ${name === player
                     ? 'bg-yellow-400 text-gray-900 ring-2 ring-yellow-300'
                     : (room?.players ?? []).includes(name)
-                      ? 'bg-green-800 text-white'
+                      ? 'bg-slate-700 text-white'
                       : 'bg-gray-700 text-gray-400'}`}>
                   <div className="text-[10px] opacity-60 mb-0.5">座位 {i + 1}</div>
                   <div className="font-bold">{name}</div>
@@ -1930,8 +1930,8 @@ export default function OnlinePage() {
 
             {isHost ? (
               <button onClick={() => send({ type: 'start_game' })}
-                className="px-10 py-3 rounded-xl bg-green-500 text-white font-bold text-lg
-                           hover:bg-green-400 active:scale-95 transition-all mt-2">
+                className="px-10 py-3 rounded-xl bg-sky-500 text-white font-bold text-lg
+                           hover:bg-sky-400 active:scale-95 transition-all mt-2">
                 ⚔️ 開始戰鬥！
               </button>
             ) : (
@@ -1948,7 +1948,7 @@ export default function OnlinePage() {
   function renderSpectator() {
     const currentRound = soloActive ? (soloStateRef.current?.currentRound ?? 1) : (room?.current_round ?? 1)
     return (
-      <div className="bg-green-900/30 rounded-xl p-8 text-center space-y-4">
+      <div className="bg-slate-800/30 rounded-xl p-8 text-center space-y-4">
         <div className="text-sm text-gray-500">
           第 {currentRound}/{effRoundsNormal} 局
           {effInAppeal ? ' 【申訴局】' : ''}
@@ -2096,7 +2096,7 @@ export default function OnlinePage() {
 
   function renderWait(msg: string) {
     return (
-      <div className="bg-green-900/30 rounded-xl p-8 text-center text-gray-400 space-y-2">
+      <div className="bg-slate-800/30 rounded-xl p-8 text-center text-gray-400 space-y-2">
         <div className="text-3xl animate-pulse">⏳</div>
         <div>{msg}</div>
       </div>

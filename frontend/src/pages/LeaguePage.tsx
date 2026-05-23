@@ -202,7 +202,7 @@ export default function LeaguePage() {
                           </div>
                           <div className="font-semibold text-gray-200 flex-1">{s.player}</div>
                           <div className={`font-bold tabular-nums text-lg
-                            ${s.total > 0 ? 'text-green-400' : s.total < 0 ? 'text-red-400' : 'text-gray-400'}`}>
+                            ${s.total > 0 ? 'text-sky-400' : s.total < 0 ? 'text-red-400' : 'text-gray-400'}`}>
                             {s.total > 0 ? '+' : ''}{s.total}
                           </div>
                         </div>

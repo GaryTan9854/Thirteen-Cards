@@ -52,13 +52,13 @@ export default function RulesPage() {
 
   return (
     <div className="space-y-4">
-      <div className="text-xl font-bold text-green-300">📖 遊戲說明</div>
+      <div className="text-xl font-bold text-sky-300">📖 遊戲說明</div>
 
       <div className="flex flex-wrap bg-gray-800 rounded-xl p-1 gap-1 w-fit">
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition
-              ${tab === t.id ? 'bg-green-500 text-white shadow' : 'text-gray-400 hover:text-white'}`}>
+              ${tab === t.id ? 'bg-sky-500 text-white shadow' : 'text-gray-400 hover:text-white'}`}>
             {t.label}
           </button>
         ))}
@@ -68,7 +68,7 @@ export default function RulesPage() {
       {tab === 'game' && (
         <div className="space-y-5 text-sm text-gray-300 leading-relaxed max-w-2xl">
           <section className="space-y-2">
-            <h2 className="text-base font-bold text-green-300">🃏 十三支（Chinese Poker）基本規則</h2>
+            <h2 className="text-base font-bold text-sky-300">🃏 十三支（Chinese Poker）基本規則</h2>
             <p>十三支是一種四人牌局遊戲，每人從一副標準 52 張撲克牌中各發 13 張牌。</p>
           </section>
 
@@ -100,7 +100,7 @@ export default function RulesPage() {
             <ul className="ml-4 list-disc space-y-1">
               <li>頭對頭、中對中、尾對尾，各自獨立比較</li>
               <li>每人共與其他三人進行 3 × 3 = 9 場單對單比較</li>
-              <li>每贏一場 <span className="text-green-400 font-bold">+1 分</span>，每輸一場 <span className="text-red-400 font-bold">−1 分</span></li>
+              <li>每贏一場 <span className="text-sky-400 font-bold">+1 分</span>，每輸一場 <span className="text-red-400 font-bold">−1 分</span></li>
               <li>四人分數為零和（即四人合計為 0）</li>
             </ul>
           </section>
@@ -178,7 +178,7 @@ export default function RulesPage() {
               <div className="grid gap-1.5">
                 {hands.map(h => (
                   <div key={h} className="bg-gray-800/60 rounded-lg px-3 py-2">
-                    <span className="font-semibold text-green-300">{h}</span>
+                    <span className="font-semibold text-sky-300">{h}</span>
                     <span className="text-gray-400 text-xs ml-3">{SPECIAL_DESC[h]}</span>
                   </div>
                 ))}
@@ -259,7 +259,7 @@ export default function RulesPage() {
               ].map(([label, calc]) => (
                 <div key={label} className="flex gap-4">
                   <span className="text-gray-400 w-40">{label}</span>
-                  <span className="text-green-300">{calc}</span>
+                  <span className="text-sky-300">{calc}</span>
                 </div>
               ))}
             </div>
@@ -307,8 +307,8 @@ export default function RulesPage() {
           <section className="space-y-2">
             <h3 className="font-bold text-gray-200">比賽模式</h3>
             <div className="space-y-2">
-              <div className="bg-green-900/30 border border-green-700/50 rounded-lg px-4 py-2.5">
-                <div className="font-bold text-green-300">🥋 獨自練功</div>
+              <div className="bg-slate-800/30 border border-slate-600/50 rounded-lg px-4 py-2.5">
+                <div className="font-bold text-sky-300">🥋 獨自練功</div>
                 <div className="text-gray-400 text-xs mt-1">玩家對陣 3 位 AI，不需要其他真人玩家。適合練習排牌與策略。</div>
               </div>
               <div className="bg-blue-900/30 border border-blue-700/50 rounded-lg px-4 py-2.5">

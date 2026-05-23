@@ -414,7 +414,7 @@ export default function GamePage({ embedded = false }: Props) {
   )
 
   return (
-    <div className={embedded ? '' : 'min-h-screen bg-green-950 text-white'}>
+    <div className={embedded ? '' : 'min-h-screen bg-slate-900 text-white'}>
 
       {/* ── 自己排牌 overlay ──────────────────────────────────────────────── */}
       {showManualUI && pendingHandRef.current && (
@@ -459,9 +459,9 @@ export default function GamePage({ embedded = false }: Props) {
       )}
 
       {!embedded && (
-        <div className="px-6 py-3 bg-green-900 shadow">
+        <div className="px-6 py-3 bg-slate-800 shadow">
           <h1 className="text-lg font-bold tracking-wide">🃏 Thirteen Cards
-            <span className="text-xs font-normal text-green-400 ml-2">十三支 AI 排牌模擬器</span>
+            <span className="text-xs font-normal text-sky-400 ml-2">十三支 AI 排牌模擬器</span>
           </h1>
         </div>
       )}
@@ -471,11 +471,11 @@ export default function GamePage({ embedded = false }: Props) {
           <div className="grid grid-cols-4 gap-2">
             {DEFAULT_NAMES.map((name, i) => (
               <div key={name} className="flex flex-col gap-1">
-                <span className="text-xs text-green-300 font-semibold">{name}</span>
+                <span className="text-xs text-sky-300 font-semibold">{name}</span>
                 <select
                   value={strategies[i]}
                   onChange={e => setStrategy(i, e.target.value)}
-                  className="text-xs rounded-lg bg-green-800 text-white border border-green-600 px-2 py-1.5 focus:outline-none"
+                  className="text-xs rounded-lg bg-slate-700 text-white border border-slate-600 px-2 py-1.5 focus:outline-none"
                 >
                   {STRATEGIES.map(s => (
                     <option key={s} value={s}>{STRATEGY_LABEL[s]}</option>
@@ -495,15 +495,15 @@ export default function GamePage({ embedded = false }: Props) {
         )}
 
         {!result && !loading && (
-          <div className="flex flex-col items-center justify-center py-16 gap-4 text-green-300">
+          <div className="flex flex-col items-center justify-center py-16 gap-4 text-sky-300">
             <div className="text-6xl">🃏</div>
             <p className="text-lg font-semibold">按「開始發牌」開始一局十三支</p>
-            <p className="text-sm text-green-400">AI 會自動為 4 位玩家安排最佳排列</p>
+            <p className="text-sm text-sky-400">AI 會自動為 4 位玩家安排最佳排列</p>
           </div>
         )}
 
         {loading && (
-          <div className="flex flex-col items-center justify-center py-16 gap-4 text-green-300">
+          <div className="flex flex-col items-center justify-center py-16 gap-4 text-sky-300">
             <div className="text-5xl animate-bounce">🃏</div>
             <p className="text-lg">AI 正在計算最佳排列…</p>
           </div>
@@ -535,7 +535,7 @@ export default function GamePage({ embedded = false }: Props) {
             </div>
             <div className="flex gap-3 justify-center">
               <button onClick={handleAppealYes}
-                className="flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-bold text-lg active:scale-95 transition">
+                className="flex-1 py-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-lg active:scale-95 transition">
                 ✅ 申訴
               </button>
               <button onClick={handleAppealNo}

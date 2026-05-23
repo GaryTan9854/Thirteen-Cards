@@ -101,9 +101,9 @@ export default function DuelPage() {
     <div className="flex flex-col gap-6">
       {/* ML Status bar */}
       {mlStatus && (
-        <div className="bg-green-900/50 rounded-xl p-3 text-sm flex gap-6 items-center">
-          <span className="text-green-300 font-semibold">ML 狀態</span>
-          <span className={mlStatus.dataset_exists ? 'text-green-400' : 'text-gray-500'}>
+        <div className="bg-slate-800/50 rounded-xl p-3 text-sm flex gap-6 items-center">
+          <span className="text-sky-300 font-semibold">ML 狀態</span>
+          <span className={mlStatus.dataset_exists ? 'text-sky-400' : 'text-gray-500'}>
             {mlStatus.dataset_exists ? `✓ 訓練資料 ${mlStatus.dataset_samples.toLocaleString()} 筆` : '✗ 尚無訓練資料'}
           </span>
           <span className={mlStatus.model_exists ? 'text-yellow-300' : 'text-gray-500'}>
@@ -118,17 +118,17 @@ export default function DuelPage() {
       )}
 
       {/* Config panel */}
-      <div className="bg-green-900 rounded-2xl p-5 flex flex-col gap-4">
-        <h2 className="font-bold text-lg text-green-100">⚔️ 策略對決設定</h2>
+      <div className="bg-slate-800 rounded-2xl p-5 flex flex-col gap-4">
+        <h2 className="font-bold text-lg text-sky-100">⚔️ 策略對決設定</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           {/* Strategy A */}
           <div>
-            <label className="text-xs text-green-400 mb-1 block">策略 A</label>
+            <label className="text-xs text-sky-400 mb-1 block">策略 A</label>
             <select
               value={stratA}
               onChange={e => setStratA(e.target.value)}
-              className="w-full bg-green-800 border border-green-600 rounded-lg px-3 py-2 text-white text-sm"
+              className="w-full bg-slate-700 border border-green-600 rounded-lg px-3 py-2 text-white text-sm"
             >
               {STRATEGIES.map(s => (
                 <option key={s} value={s}
@@ -140,15 +140,15 @@ export default function DuelPage() {
           </div>
 
           {/* vs */}
-          <div className="text-center text-2xl text-green-400 font-bold">VS</div>
+          <div className="text-center text-2xl text-sky-400 font-bold">VS</div>
 
           {/* Strategy B */}
           <div>
-            <label className="text-xs text-green-400 mb-1 block">策略 B</label>
+            <label className="text-xs text-sky-400 mb-1 block">策略 B</label>
             <select
               value={stratB}
               onChange={e => setStratB(e.target.value)}
-              className="w-full bg-green-800 border border-green-600 rounded-lg px-3 py-2 text-white text-sm"
+              className="w-full bg-slate-700 border border-green-600 rounded-lg px-3 py-2 text-white text-sm"
             >
               {STRATEGIES.map(s => (
                 <option key={s} value={s}
@@ -162,7 +162,7 @@ export default function DuelPage() {
 
         {/* Hands count */}
         <div className="flex items-center gap-4">
-          <label className="text-xs text-green-400 whitespace-nowrap">手牌對數</label>
+          <label className="text-xs text-sky-400 whitespace-nowrap">手牌對數</label>
           <input
             type="range" min={50} max={1000} step={50}
             value={nHands}
@@ -170,7 +170,7 @@ export default function DuelPage() {
             className="flex-1"
           />
           <span className="text-white font-bold w-16 text-right">{nHands} 對</span>
-          <span className="text-green-400 text-xs">= {nHands * 2} 手牌</span>
+          <span className="text-sky-400 text-xs">= {nHands * 2} 手牌</span>
         </div>
 
         <button
@@ -191,17 +191,17 @@ export default function DuelPage() {
         const eta = p ? Math.max(0, (total - done) / (p.rate / 60)) : null
 
         return (
-          <div className="bg-green-900 rounded-2xl p-5 flex flex-col gap-3">
+          <div className="bg-slate-800 rounded-2xl p-5 flex flex-col gap-3">
             {/* Header */}
             <div className="flex items-center justify-between">
-              <span className="text-green-300 font-semibold">⚔️ 對決進行中…</span>
-              <span className="text-green-400 text-sm">
+              <span className="text-sky-300 font-semibold">⚔️ 對決進行中…</span>
+              <span className="text-sky-400 text-sm">
                 {done > 0 ? `${done} / ${total} 對` : `共 ${total} 對手牌`}
               </span>
             </div>
 
             {/* Progress bar */}
-            <div className="h-3 bg-green-950 rounded-full overflow-hidden">
+            <div className="h-3 bg-slate-900 rounded-full overflow-hidden">
               <div
                 className="h-full bg-yellow-400 transition-all duration-500"
                 style={{ width: `${pct * 100}%` }}
@@ -211,27 +211,27 @@ export default function DuelPage() {
             {/* Stats row */}
             {p ? (
               <div className="grid grid-cols-4 gap-2 text-center text-sm">
-                <div className="bg-green-800/60 rounded-lg p-2">
-                  <div className="text-xs text-green-400 mb-0.5">A 勝</div>
+                <div className="bg-slate-700/60 rounded-lg p-2">
+                  <div className="text-xs text-sky-400 mb-0.5">A 勝</div>
                   <div className="font-bold text-white">{p.a_wins}</div>
                 </div>
-                <div className="bg-green-800/60 rounded-lg p-2">
-                  <div className="text-xs text-green-400 mb-0.5">B 勝</div>
+                <div className="bg-slate-700/60 rounded-lg p-2">
+                  <div className="text-xs text-sky-400 mb-0.5">B 勝</div>
                   <div className="font-bold text-white">{p.b_wins}</div>
                 </div>
-                <div className="bg-green-800/60 rounded-lg p-2">
-                  <div className="text-xs text-green-400 mb-0.5">A 均分</div>
+                <div className="bg-slate-700/60 rounded-lg p-2">
+                  <div className="text-xs text-sky-400 mb-0.5">A 均分</div>
                   <div className={`font-bold ${p.avg_score_a >= 0 ? 'text-yellow-300' : 'text-red-400'}`}>
                     {p.avg_score_a > 0 ? '+' : ''}{p.avg_score_a.toFixed(1)}
                   </div>
                 </div>
-                <div className="bg-green-800/60 rounded-lg p-2">
-                  <div className="text-xs text-green-400 mb-0.5">速度</div>
+                <div className="bg-slate-700/60 rounded-lg p-2">
+                  <div className="text-xs text-sky-400 mb-0.5">速度</div>
                   <div className="font-bold text-white">{p.rate.toFixed(0)}/min</div>
                 </div>
               </div>
             ) : (
-              <p className="text-green-400 text-sm text-center animate-pulse">準備中…</p>
+              <p className="text-sky-400 text-sm text-center animate-pulse">準備中…</p>
             )}
 
             {/* ETA */}

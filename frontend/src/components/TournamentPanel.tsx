@@ -69,7 +69,7 @@ export default function TournamentPanel({
     <div className="flex mb-1">
       <span className="w-14 shrink-0" />
       {names.map(n => (
-        <span key={n} className="flex-1 text-left text-green-400 font-semibold text-lg truncate pl-2">{n}</span>
+        <span key={n} className="flex-1 text-left text-sky-400 font-semibold text-lg truncate pl-2">{n}</span>
       ))}
     </div>
   )
@@ -167,12 +167,12 @@ export default function TournamentPanel({
       </div>
 
       {/* ── 累積比分綠框 ── */}
-      <div className="bg-green-900 rounded-2xl p-4 shadow-inner">
-        <div className="text-sm text-green-400 mb-2 font-semibold text-center">累積比分</div>
+      <div className="bg-slate-800 rounded-2xl p-4 shadow-inner">
+        <div className="text-sm text-sky-400 mb-2 font-semibold text-center">累積比分</div>
         <div className="grid grid-cols-4 gap-3">
           {names.map((name, i) => (
             <div key={name} className="flex flex-col items-center">
-              <span className="text-base text-green-300">{name}</span>
+              <span className="text-base text-sky-300">{name}</span>
               <span className={`text-2xl font-bold ${scoreColor(totalScores[i])}`}>
                 {fmt(totalScores[i])}
               </span>

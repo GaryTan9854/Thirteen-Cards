@@ -160,7 +160,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-green-950 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
 
       {/* Semi-transparent beauty panorama background */}
       <div className="absolute inset-0 flex pointer-events-none select-none">
@@ -171,7 +171,7 @@ export default function LoginPage() {
              className="w-1/2 h-full object-cover object-top"
              style={{ opacity: 0.18 }} />
       </div>
-      <div className="absolute inset-0 bg-gradient-to-b from-green-950/60 via-transparent to-green-950/60 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-transparent to-slate-900/60 pointer-events-none" />
 
       <div className="w-full max-w-sm relative z-10">
 
@@ -182,8 +182,8 @@ export default function LoginPage() {
             <span className="text-yellow-400">Thirteen</span>
             <span className="text-white"> Cards</span>
           </h1>
-          <p className="text-green-400 text-sm mt-1">十三支線上對戰</p>
-          {version && <p className="text-green-600 text-xs mt-1">v{version}</p>}
+          <p className="text-sky-400 text-sm mt-1">十三支線上對戰</p>
+          {version && <p className="text-sky-400 text-xs mt-1">v{version}</p>}
         </div>
 
         {/* ── Passkey quick-login ── */}
@@ -192,15 +192,15 @@ export default function LoginPage() {
             <button
               onClick={handlePasskeyLogin}
               disabled={bioLoading}
-              className="w-full py-4 rounded-2xl bg-green-800 border border-green-600
+              className="w-full py-4 rounded-2xl bg-slate-700 border border-slate-600
                          flex items-center justify-center gap-3
-                         hover:bg-green-700 active:scale-95 transition-all
+                         hover:bg-slate-600 active:scale-95 transition-all
                          disabled:opacity-50"
             >
               <span className="text-3xl">{bioLoading ? '⏳' : '👆'}</span>
               <div className="text-left">
                 <div className="text-white font-bold">指紋登入</div>
-                <div className="text-green-400 text-sm">{bioName}</div>
+                <div className="text-sky-400 text-sm">{bioName}</div>
               </div>
             </button>
             <button
@@ -214,10 +214,10 @@ export default function LoginPage() {
 
         {/* ── Passkey offer (after first name login) ── */}
         {showBioOffer && (
-          <div className="mb-4 p-5 bg-green-800 rounded-2xl border border-green-600 text-center space-y-3">
+          <div className="mb-4 p-5 bg-slate-700 rounded-2xl border border-slate-600 text-center space-y-3">
             <div className="text-3xl">👆</div>
             <div className="text-white font-bold">開啟指紋快速登入？</div>
-            <div className="text-green-400 text-sm">下次不需要輸入名字</div>
+            <div className="text-sky-400 text-sm">下次不需要輸入名字</div>
             <div className="flex gap-3">
               <button
                 onClick={() => handleBioOffer(true)}
@@ -237,7 +237,7 @@ export default function LoginPage() {
 
         {/* ── Name login (hidden if bio name is set, unless "切換玩家") ── */}
         {(!bioName || !hasSavedPasskey()) && !showBioOffer && (
-          <div className="bg-green-900 rounded-2xl shadow-2xl p-6 border border-green-700/60">
+          <div className="bg-slate-800 rounded-2xl shadow-2xl p-6 border border-slate-600/60">
             <h2 className="text-base font-semibold text-gray-200 mb-5">玩家登入</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -249,8 +249,8 @@ export default function LoginPage() {
                   placeholder="輸入你的名字"
                   value={name}
                   onChange={e => { setName(e.target.value); setError('') }}
-                  className="w-full bg-green-800 border border-green-600 rounded-xl px-3 py-2.5
-                             text-white placeholder-green-700
+                  className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5
+                             text-white placeholder-slate-600
                              focus:outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400
                              transition"
                 />

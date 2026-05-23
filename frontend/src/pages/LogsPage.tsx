@@ -44,7 +44,7 @@ function fmtTime(iso: string) {
 }
 
 function ScoreBadge({ score }: { score: number }) {
-  const color = score > 0 ? 'text-green-400' : score < 0 ? 'text-red-400' : 'text-gray-400'
+  const color = score > 0 ? 'text-sky-400' : score < 0 ? 'text-red-400' : 'text-gray-400'
   return <span className={`font-bold tabular-nums ${color}`}>{score > 0 ? '+' : ''}{score}</span>
 }
 
@@ -203,7 +203,7 @@ export default function LogsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <div className="text-xl font-bold text-green-300">📋 遊戲紀錄</div>
+        <div className="text-xl font-bold text-sky-300">📋 遊戲紀錄</div>
         <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
           {(['games', 'logins'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
@@ -232,10 +232,10 @@ export default function LogsPage() {
             <tbody>
               {logins.map(l => (
                 <tr key={l.id} className="border-b border-gray-800 hover:bg-gray-800/30">
-                  <td className="px-4 py-2 font-semibold text-green-300">{l.username}</td>
+                  <td className="px-4 py-2 font-semibold text-sky-300">{l.username}</td>
                   <td className="px-4 py-2">
                     <span className={`text-xs px-2 py-0.5 rounded-full
-                      ${l.action === 'login' ? 'bg-green-900 text-green-300' : 'bg-gray-700 text-gray-400'}`}>
+                      ${l.action === 'login' ? 'bg-slate-800 text-sky-300' : 'bg-gray-700 text-gray-400'}`}>
                       {l.action === 'login' ? '登入' : '登出'}
                     </span>
                   </td>
@@ -267,7 +267,7 @@ export default function LogsPage() {
                 >
                   <span className="text-xs text-gray-500 whitespace-nowrap">{fmtTime(g.start_time)}</span>
                   <span className={`text-xs px-2 py-0.5 rounded-full
-                    ${g.mode === 'solo' ? 'bg-green-900 text-green-300' : 'bg-blue-900 text-blue-300'}`}>
+                    ${g.mode === 'solo' ? 'bg-slate-800 text-sky-300' : 'bg-blue-900 text-blue-300'}`}>
                     {g.mode === 'solo' ? '獨練' : '連線'}
                   </span>
                   {g.is_league && (

@@ -37,9 +37,9 @@ function AppInner() {
   ]
 
   return (
-    <div className="min-h-screen bg-green-950 text-white flex flex-col">
+    <div className="min-h-screen bg-slate-900 text-white flex flex-col">
       {/* ── Header (desktop: single row; mobile: two rows) ── */}
-      <header className="bg-green-900 shadow shrink-0">
+      <header className="bg-slate-800 shadow shrink-0">
         {/* Row 1: Logo + Player + Logout */}
         <div className="flex items-center justify-between px-4 py-2.5 sm:px-6">
           {/* Logo — click to go home */}
@@ -51,12 +51,12 @@ function AppInner() {
               🃏 Thirteen Cards
             </h1>
             {version && (
-              <span className="text-xs font-normal text-green-400 leading-none">v{version}</span>
+              <span className="text-xs font-normal text-sky-400 leading-none">v{version}</span>
             )}
           </button>
 
           {/* Desktop tabs (hidden on small screens — shown below on mobile) */}
-          <div className="hidden sm:flex bg-green-800 rounded-xl p-1 gap-1">
+          <div className="hidden sm:flex bg-slate-700 rounded-xl p-1 gap-1">
             {TABS.map(t => (
               <button
                 key={t.id}
@@ -64,7 +64,7 @@ function AppInner() {
                 className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition
                   ${tab === t.id
                     ? 'bg-yellow-400 text-gray-900 shadow'
-                    : 'text-green-300 hover:text-white'}`}
+                    : 'text-sky-300 hover:text-white'}`}
               >
                 {t.label} {t.fullLabel}
               </button>
@@ -76,13 +76,13 @@ function AppInner() {
             <span className={`font-bold px-3 py-1 rounded-full text-sm
               ${isGary
                 ? 'bg-yellow-400 text-gray-900'
-                : 'bg-green-700 text-green-100'}`}>
+                : 'bg-slate-600 text-sky-100'}`}>
               {player}
             </span>
             <button
               onClick={logout}
               className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded
-                         hover:bg-green-800 transition"
+                         hover:bg-slate-700 transition"
             >
               登出
             </button>
@@ -90,7 +90,7 @@ function AppInner() {
         </div>
 
         {/* Row 2: Mobile tab bar */}
-        <div className="flex sm:hidden bg-green-800/60 border-t border-green-700/40 overflow-x-auto">
+        <div className="flex sm:hidden bg-slate-700/60 border-t border-slate-600/40 overflow-x-auto">
           {TABS.map(t => (
             <button
               key={t.id}
@@ -98,7 +98,7 @@ function AppInner() {
               className={`flex-1 min-w-[4rem] py-2 text-xs font-semibold transition flex flex-col items-center gap-0.5 shrink-0
                 ${tab === t.id
                   ? 'text-yellow-400 border-b-2 border-yellow-400'
-                  : 'text-green-400 hover:text-white'}`}
+                  : 'text-sky-400 hover:text-white'}`}
             >
               <span className="text-base leading-none">{t.label}</span>
               <span className="whitespace-nowrap">{t.fullLabel}</span>

@@ -131,7 +131,7 @@ function StatsPanel({ stats, special }: { stats?:StatsData; special?:SpecialData
           ))}
           <tr>
             <td className="py-0.5 pr-2 text-gray-400">報到</td>
-            <td colSpan={2} className={`py-0.5 font-bold ${hasSpecial?'text-green-400':'text-gray-500'}`}>
+            <td colSpan={2} className={`py-0.5 font-bold ${hasSpecial?'text-sky-400':'text-gray-500'}`}>
               <button onClick={()=>setShowBaodao(v=>!v)}
                 className="underline decoration-dotted text-left">
                 {hasSpecial ? `✅ ${special!.name} +${special!.score}` : 'NO ▾'}
@@ -155,7 +155,7 @@ function StatsPanel({ stats, special }: { stats?:StatsData; special?:SpecialData
               <div className="text-gray-400 font-bold text-[12px] mb-0.5">{score} 分</div>
               <div className="grid grid-cols-2 gap-x-3">
                 {items.map(b=>(
-                  <span key={b.name} className={b.achieved?'text-green-400 font-bold':'text-gray-600'}>
+                  <span key={b.name} className={b.achieved?'text-sky-400 font-bold':'text-gray-600'}>
                     {b.achieved?'✅ ':'— '}{b.name}
                   </span>
                 ))}
@@ -369,7 +369,7 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
           {/* Hand */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-green-400 font-semibold text-xs sm:text-sm">原始手牌</span>
+              <span className="text-sky-400 font-semibold text-xs sm:text-sm">原始手牌</span>
               {sorted && (
                 <button
                   onClick={()=>setSortIdx(i=>(i+1)%SORT_MODES.length)}

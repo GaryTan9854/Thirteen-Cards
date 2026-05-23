@@ -30,7 +30,7 @@ export default function PlayerPanel({ player, finalScore, strategy = 'rule_base_
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-lg font-bold text-gray-800">{player.name}</span>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
+          <span className="text-xs px-2 py-0.5 rounded-full bg-sky-100 text-slate-600 font-medium">
             {STRATEGY_LABEL[strategy] ?? strategy}
           </span>
           {player.can_attack && (
