@@ -60,6 +60,8 @@ rsync -az -e "ssh $SSH_OPTS" \
   --exclude 'node_modules/' \
   --exclude 'dist/' \
   --exclude 'backend/static/' \
+  --exclude 'backend/logs/' \
+  --exclude 'backend/game_logs.db' \
   --exclude '.git/' \
   "$(dirname "$0")/" \
   $REMOTE_USER@$REMOTE_HOST:$REMOTE_DIR/

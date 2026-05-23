@@ -1,14 +1,36 @@
-import sqlite3
-import os
+"""
+game_log.py — Monthly JSONL file-based logging.
+
+Directory layout (auto-created, never touched by deploy):
+  backend/logs/login_YYYY-MM.jsonl   — login / logout events
+  backend/logs/games_YYYY-MM.jsonl   — one game record per line
+  backend/logs/rounds_YYYY-MM.jsonl  — one round record per line (with game_id)
+
+Leagues are still stored in SQLite (game_logs.db) because they require
+cross-game relational queries and are not time-series data.
+"""
+
 import json
+import sqlite3
+import uuid
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "game_logs.db")
 
+# ── Paths ──────────────────────────────────────────────────────────────────────
+
+_BASE    = Path(__file__).parent
+LOGS_DIR = _BASE / "logs"
+LOGS_DIR.mkdir(exist_ok=True)
+
+DB_PATH = _BASE / "game_logs.db"   # leagues only
+
+
+# ── SQLite — leagues only ──────────────────────────────────────────────────────
 
 def _conn():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -16,40 +38,6 @@ def _conn():
 def init_db():
     with _conn() as c:
         c.executescript("""
-        CREATE TABLE IF NOT EXISTS login_logs (
-            id        INTEGER PRIMARY KEY AUTOINCREMENT,
-            username  TEXT NOT NULL,
-            action    TEXT NOT NULL,
-            timestamp TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS game_records (
-            game_id       TEXT PRIMARY KEY,
-            mode          TEXT NOT NULL,
-            start_time    TEXT NOT NULL,
-            end_time      TEXT,
-            participants  TEXT NOT NULL,
-            seat_models   TEXT NOT NULL,
-            rounds_normal INTEGER,
-            rounds_appeal INTEGER,
-            final_scores  TEXT NOT NULL,
-            winner        TEXT,
-            loser         TEXT,
-            is_league     INTEGER DEFAULT 0,
-            league_id     TEXT,
-            record_rounds INTEGER DEFAULT 0
-        );
-
-        CREATE TABLE IF NOT EXISTS round_records (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            game_id      TEXT NOT NULL,
-            round_number INTEGER NOT NULL,
-            multiplier   INTEGER DEFAULT 1,
-            scores       TEXT NOT NULL,
-            arrangements TEXT,
-            FOREIGN KEY (game_id) REFERENCES game_records(game_id)
-        );
-
         CREATE TABLE IF NOT EXISTS leagues (
             league_id    TEXT PRIMARY KEY,
             year         INTEGER,
@@ -63,63 +51,89 @@ def init_db():
 init_db()
 
 
-def log_auth(username: str, action: str):
-    with _conn() as c:
-        c.execute(
-            "INSERT INTO login_logs (username, action, timestamp) VALUES (?, ?, ?)",
-            (username, action, datetime.now().isoformat()),
-        )
+# ── JSONL helpers ──────────────────────────────────────────────────────────────
 
+def _month_tag(ts: Optional[str] = None) -> str:
+    """Return 'YYYY-MM' from an ISO timestamp string, or use today."""
+    if ts:
+        try:
+            return ts[:7]
+        except Exception:
+            pass
+    return datetime.now().strftime("%Y-%m")
+
+
+def _log_file(prefix: str, month: str) -> Path:
+    return LOGS_DIR / f"{prefix}_{month}.jsonl"
+
+
+def _append(path: Path, rec: Dict[str, Any]):
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+
+def _scan(prefix: str) -> List[Dict[str, Any]]:
+    """Read all records across all monthly files, newest file first."""
+    rows: List[Dict[str, Any]] = []
+    for fp in sorted(LOGS_DIR.glob(f"{prefix}_*.jsonl"), reverse=True):
+        try:
+            for line in fp.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line:
+                    rows.append(json.loads(line))
+        except Exception:
+            pass
+    return rows
+
+
+# ── Login logs ─────────────────────────────────────────────────────────────────
+
+def log_auth(username: str, action: str):
+    now = datetime.now().isoformat()
+    _append(_log_file("login", _month_tag()), {
+        "username":  username,
+        "action":    action,
+        "timestamp": now,
+    })
+
+
+def get_logins(limit: int = 200) -> List[Dict[str, Any]]:
+    rows = _scan("login")
+    rows.sort(key=lambda r: r.get("timestamp", ""), reverse=True)
+    return rows[:limit]
+
+
+# ── Game records ───────────────────────────────────────────────────────────────
 
 def save_game(game: Dict[str, Any]):
-    with _conn() as c:
-        c.execute(
-            """
-            INSERT OR REPLACE INTO game_records
-            (game_id, mode, start_time, end_time, participants, seat_models,
-             rounds_normal, rounds_appeal, final_scores, winner, loser,
-             is_league, league_id, record_rounds)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                game["game_id"],
-                game.get("mode", "solo"),
-                game.get("start_time", ""),
-                game.get("end_time", ""),
-                json.dumps(game.get("participants", []), ensure_ascii=False),
-                json.dumps(game.get("seat_models", {}), ensure_ascii=False),
-                game.get("rounds_normal"),
-                game.get("rounds_appeal"),
-                json.dumps(game.get("final_scores", {}), ensure_ascii=False),
-                game.get("winner"),
-                game.get("loser"),
-                1 if game.get("is_league") else 0,
-                game.get("league_id"),
-                1 if game.get("record_rounds") else 0,
-            ),
-        )
+    """Write one game record to its month's JSONL file."""
+    month = _month_tag(game.get("start_time"))
+    # Normalise any fields that might be JSON strings from old callers
+    rec = dict(game)
+    for field in ("participants", "seat_models", "final_scores"):
+        if isinstance(rec.get(field), str):
+            try:
+                rec[field] = json.loads(rec[field])
+            except Exception:
+                pass
+    _append(_log_file("games", month), rec)
 
 
 def save_rounds(game_id: str, rounds: List[Dict[str, Any]]):
-    with _conn() as c:
-        c.execute("DELETE FROM round_records WHERE game_id = ?", (game_id,))
-        for r in rounds:
-            c.execute(
-                """
-                INSERT INTO round_records
-                (game_id, round_number, multiplier, scores, arrangements)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (
-                    game_id,
-                    r.get("round_number", 0),
-                    r.get("multiplier", 1),
-                    json.dumps(r.get("scores", {}), ensure_ascii=False),
-                    json.dumps(r.get("arrangements"), ensure_ascii=False)
-                    if r.get("arrangements")
-                    else None,
-                ),
-            )
+    """Write per-round records to the current month's rounds file."""
+    if not rounds:
+        return
+    month = _month_tag()
+    for r in rounds:
+        rec = dict(r)
+        rec["game_id"] = game_id
+        for field in ("scores", "arrangements"):
+            if isinstance(rec.get(field), str):
+                try:
+                    rec[field] = json.loads(rec[field])
+                except Exception:
+                    pass
+        _append(_log_file("rounds", month), rec)
 
 
 def get_games(
@@ -127,48 +141,32 @@ def get_games(
     mode: Optional[str] = None,
     league_only: bool = False,
 ) -> List[Dict[str, Any]]:
-    with _conn() as c:
-        clauses, params = [], []
-        if mode:
-            clauses.append("mode = ?")
-            params.append(mode)
-        if league_only:
-            clauses.append("is_league = 1")
-        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
-        params.append(limit)
-        rows = c.execute(
-            f"SELECT * FROM game_records {where} ORDER BY start_time DESC LIMIT ?",
-            params,
-        ).fetchall()
-        return [_game_row(r) for r in rows]
+    rows = _scan("games")
+    rows.sort(key=lambda r: r.get("start_time", ""), reverse=True)
+    if mode:
+        rows = [r for r in rows if r.get("mode") == mode]
+    if league_only:
+        rows = [r for r in rows if r.get("is_league")]
+    return rows[:limit]
 
 
 def get_game(game_id: str) -> Optional[Dict[str, Any]]:
-    with _conn() as c:
-        row = c.execute(
-            "SELECT * FROM game_records WHERE game_id = ?", (game_id,)
-        ).fetchone()
-        if not row:
-            return None
-        game = _game_row(row)
-        rounds = c.execute(
-            "SELECT * FROM round_records WHERE game_id = ? ORDER BY round_number",
-            (game_id,),
-        ).fetchall()
-        game["rounds"] = [_round_row(r) for r in rounds]
-        return game
+    game: Optional[Dict[str, Any]] = None
+    for r in _scan("games"):
+        if r.get("game_id") == game_id:
+            game = r
+            break
+    if not game:
+        return None
+    rounds = [r for r in _scan("rounds") if r.get("game_id") == game_id]
+    rounds.sort(key=lambda r: r.get("round_number", 0))
+    game["rounds"] = rounds
+    return game
 
 
-def get_logins(limit: int = 200) -> List[Dict[str, Any]]:
-    with _conn() as c:
-        rows = c.execute(
-            "SELECT * FROM login_logs ORDER BY timestamp DESC LIMIT ?", (limit,)
-        ).fetchall()
-        return [dict(r) for r in rows]
-
+# ── Leagues (SQLite) ───────────────────────────────────────────────────────────
 
 def create_league(league: Dict[str, Any]) -> str:
-    import uuid
     lid = league.get("league_id") or str(uuid.uuid4())[:8]
     with _conn() as c:
         c.execute(
@@ -197,52 +195,22 @@ def get_leagues() -> List[Dict[str, Any]]:
 
 
 def get_league_results(league_id: str) -> Dict[str, Any]:
-    with _conn() as c:
-        games = c.execute(
-            "SELECT * FROM game_records WHERE league_id = ? AND is_league = 1 ORDER BY start_time",
-            (league_id,),
-        ).fetchall()
-        games_data = [_game_row(r) for r in games]
-        totals: Dict[str, int] = {}
-        for g in games_data:
-            for name, score in g["final_scores"].items():
-                totals[name] = totals.get(name, 0) + score
-        return {
-            "league_id": league_id,
-            "games": games_data,
-            "standings": sorted(
-                [{"player": k, "total": v} for k, v in totals.items()],
-                key=lambda x: x["total"],
-                reverse=True,
-            ),
-        }
-
-
-def _game_row(r) -> Dict[str, Any]:
+    games_data = [
+        g for g in get_games(limit=10000, league_only=True)
+        if g.get("league_id") == league_id
+    ]
+    totals: Dict[str, int] = {}
+    for g in games_data:
+        for name, score in g.get("final_scores", {}).items():
+            totals[name] = totals.get(name, 0) + int(score)
     return {
-        "game_id":       r["game_id"],
-        "mode":          r["mode"],
-        "start_time":    r["start_time"],
-        "end_time":      r["end_time"],
-        "participants":  json.loads(r["participants"] or "[]"),
-        "seat_models":   json.loads(r["seat_models"] or "{}"),
-        "rounds_normal": r["rounds_normal"],
-        "rounds_appeal": r["rounds_appeal"],
-        "final_scores":  json.loads(r["final_scores"] or "{}"),
-        "winner":        r["winner"],
-        "loser":         r["loser"],
-        "is_league":     bool(r["is_league"]),
-        "league_id":     r["league_id"],
-        "record_rounds": bool(r["record_rounds"]),
-    }
-
-
-def _round_row(r) -> Dict[str, Any]:
-    return {
-        "round_number": r["round_number"],
-        "multiplier":   r["multiplier"],
-        "scores":       json.loads(r["scores"] or "{}"),
-        "arrangements": json.loads(r["arrangements"]) if r["arrangements"] else None,
+        "league_id": league_id,
+        "games":     games_data,
+        "standings": sorted(
+            [{"player": k, "total": v} for k, v in totals.items()],
+            key=lambda x: x["total"],
+            reverse=True,
+        ),
     }
 
 
