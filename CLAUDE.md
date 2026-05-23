@@ -169,6 +169,33 @@ tail -f /tmp/train_scoring.log   # 監看進度
 - [ ] 訓練完成後跑 benchmark：ML vs rule-based vs monte_carlo（100手 × 50 sims）
 - [ ] 若 ML 勝率 > 55%，更新 OnlinePage.tsx AI strategy 選項加入 ml 選項
 
+## Log & League 系統（v7.2）
+
+### 資料庫
+- `backend/game_logs.db`（MBP 上，同目錄）
+- Tables: `login_logs`, `game_records`, `round_records`, `leagues`
+- `backend/game_log.py` — DB 操作模組
+
+### API
+- `POST /api/log/auth` — 登入/登出記錄
+- `POST /api/log/game` — 儲存遊戲紀錄（含局內容）
+- `GET /api/log/games` — 列出遊戲（Gary 查看）
+- `GET /api/log/game/{id}` — 遊戲詳情 + 每局
+- `GET /api/log/logins` — 登入紀錄
+- `POST /api/league` — 創建聯盟賽
+- `GET /api/league` — 列出聯盟賽
+- `GET /api/league/{id}` — 聯盟賽成績與排名
+
+### 前端
+- `AuthContext.tsx` — login/logout 自動呼叫 `/api/log/auth`
+- `OnlinePage.tsx` — 新增「記錄遊戲」/「記錄每局牌局」/「聯盟賽」三個 toggle（solo & online setup）
+- `LogsPage.tsx` — Gary 專用：登入紀錄 + 遊戲紀錄（可展開看局內容，回放按鈕 disabled）
+- `LeaguePage.tsx` — Gary 專用：創建聯盟賽 + 查看排名
+- `RulesPage.tsx` — 所有用戶：三份說明（遊戲規則 / 特殊牌型 / 賽制說明）
+
+### 備份注意
+- `game_logs.db` 在 MBP，需加入 `backup-dbs-from-mbp.sh`
+
 ## 版本規則
 - bump +0.1 每次 deploy；minor=20 時升 major
-- 目前 v7.0
+- 目前 v7.2
