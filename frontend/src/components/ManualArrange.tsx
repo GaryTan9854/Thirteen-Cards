@@ -362,7 +362,7 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
     <>
     <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center">
       <div className="bg-gray-900 rounded-2xl shadow-2xl flex flex-col gap-3 sm:gap-4 p-3 sm:p-5 overflow-y-auto"
-        style={{width:'95vw', maxWidth:'1060px', maxHeight:'94vh'}}>
+        style={{width:'95vw', maxWidth:'1060px', maxHeight:'94dvh', WebkitOverflowScrolling:'touch'}}>
 
         {/* ── Row 1: Hand (left) + Right panel: Stats & Groups (right) ── */}
         <div className="flex flex-col sm:flex-row sm:gap-5 sm:items-start gap-3">
@@ -459,7 +459,8 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
         )}
 
         {/* ── Row 5: Actions ── */}
-        <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center justify-between gap-2 flex-wrap"
+             style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           {/* Model toggle */}
           <button
             onClick={cycleModel}

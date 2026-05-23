@@ -125,20 +125,39 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
   const velRef      = useRef(0)   // smoothed drag velocity
   const lastMoveX   = useRef(0)
   const lastMoveT   = useRef(0)
+  // colsRef: 4 on desktop (≥640px wide), 1 on mobile — drives panel width
+  const colsRef     = useRef(4)
+  const [availH, setAvailH] = useState(0)  // measured from carousel top → viewport bottom
   const [hovered, setHovered] = useState<number | null>(null)
 
   // Keep cwRef in sync
   useEffect(() => { cwRef.current = cw }, [cw])
 
-  // Measure + init offset once
+  // Measure width + height + re-init offset when cols change (orientation/resize)
   useEffect(() => {
     function measure() {
-      const w = cRef.current?.clientWidth ?? window.innerWidth
+      const el  = cRef.current
+      const w   = el?.clientWidth ?? window.innerWidth
       cwRef.current = w
+
+      // Mobile (<640px) → 1 full-width beauty; desktop → 4 columns
+      const newCols    = w > 0 && w < 640 ? 1 : 4
+      const colsChanged = newCols !== colsRef.current
+      colsRef.current  = newCols
+
+      // availH: exact visible space from carousel top to viewport bottom.
+      // Handles iOS address-bar shrinkage and variable mobile header height.
+      if (el) {
+        const top = el.getBoundingClientRect().top
+        if (top >= 0) setAvailH(window.innerHeight - top)
+      }
+
       setCw(w)
-      if (!initialized.current && w > 0) {
+
+      // Re-init scroll position on first load OR when cols switch (orientation change)
+      if ((!initialized.current || colsChanged) && w > 0) {
         initialized.current = true
-        const cpW = (w / 4) * N
+        const cpW = (w / newCols) * N
         offRef.current = -cpW
         setOffPx(-cpW)
       }
@@ -148,9 +167,10 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
     return () => window.removeEventListener('resize', measure)
   }, [N])
 
-  // Normalization helper (keeps offset in middle-copy range)
+  // Normalization helper — reads colsRef so it's always current without stale closures
   const norm = useCallback((px: number) => {
-    const cpW = (cwRef.current / 4) * N
+    const pW  = cwRef.current / colsRef.current
+    const cpW = pW * N
     let o = px
     while (o < -2 * cpW) o += cpW
     while (o >= 0)        o -= cpW
@@ -252,15 +272,18 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
     dStart.current = { x, off: offRef.current }
   }
 
-  const pW  = cw / 4
+  // pW: full viewport width on mobile (1 beauty = 1 screen), cw/4 on desktop
+  const colsPerView = cw > 0 && cw < 640 ? 1 : 4
+  const pW  = cw > 0 ? cw / colsPerView : 0
   const cpW = pW * N
 
   return (
     <div ref={cRef}
          className="relative overflow-hidden"
          style={{
-           // Use height (not minHeight) so child h-full percentages work correctly
-           height: 'calc(100vh - 80px)',
+           // availH measured dynamically: fixes iOS address-bar + 2-row mobile header
+           // Fallback 100dvh adapts to actual visible area (not the static 100vh)
+           height: availH > 0 ? `${availH}px` : 'calc(100dvh - 80px)',
            marginTop: '-24px', marginBottom: '-24px',
            marginLeft: '-16px', marginRight: '-16px',
            cursor: 'grab', touchAction: 'none', userSelect: 'none',
@@ -287,9 +310,9 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
                 <div className="absolute inset-0"
                      style={{
                        backgroundImage: `url(/assets/beauties-${b.img}.jpg)`,
-                       // Scale image to exactly fill: cw wide × 100% tall
-                       backgroundSize: `${cw}px 100%`,
-                       // Shift horizontally to show the correct beauty column
+                       // 4 beauties per image × pW = image width that fills COLS panels
+                       // Desktop: 4 × cw/4 = cw  |  Mobile: 4 × cw = 4cw (one beauty = cw)
+                       backgroundSize: `${4 * pW}px 100%`,
                        backgroundPosition: `${-b.col * pW}px top`,
                        backgroundRepeat: 'no-repeat',
                        animation: `panelFloat${bi % 2 ? 'B' : 'A'} ${11 + (bi % 4) * 1.5}s ease-in-out infinite`,
@@ -335,8 +358,8 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
       <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none" />
 
       {/* ── Title + buttons ── */}
-      <div className="absolute inset-0 flex flex-col items-center justify-end pb-12 pointer-events-none"
-           style={{ zIndex: 10 }}>
+      <div className="absolute inset-0 flex flex-col items-center justify-end pointer-events-none"
+           style={{ zIndex: 10, paddingBottom: 'max(3rem, calc(1.5rem + env(safe-area-inset-bottom, 0px)))' }}>
         <div className="text-center mb-8 space-y-2">
           <div className="text-4xl font-black tracking-[0.3em]"
                style={{ color: '#fde047', textShadow: '0 0 40px rgba(251,191,36,0.6), 0 2px 8px rgba(0,0,0,0.95)' }}>
