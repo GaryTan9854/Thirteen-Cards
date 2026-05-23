@@ -32,7 +32,7 @@ export default function GameResultDisplay({ result, strategies, multiplier = 1 }
         <div className="grid grid-cols-4 gap-3">
           {(result.final_scores ?? []).map((fs: any) => (
             <div key={fs.name} className="flex flex-col items-center gap-1">
-              <BeautyAvatar name={fs.name} size={32} />
+              <BeautyAvatar name={fs.name} size={44} />
               <span className="text-xs text-sky-300 truncate max-w-full">{fs.name}</span>
               <span className={`text-xl font-bold font-cinzel ${scoreColor(fs.score)}`}>
                 {fmt(fs.score)}

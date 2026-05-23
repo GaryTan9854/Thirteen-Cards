@@ -312,7 +312,7 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
                        backgroundImage: `url(/assets/beauties-${b.img}.jpg)`,
                        // 4 beauties per image × pW = image width that fills COLS panels
                        // Desktop: 4 × cw/4 = cw  |  Mobile: 4 × cw = 4cw (one beauty = cw)
-                       backgroundSize: `${4 * pW}px 100%`,
+                       backgroundSize: `${4 * pW}px auto`,
                        backgroundPosition: `${-b.col * pW}px top`,
                        backgroundRepeat: 'no-repeat',
                        animation: `panelFloat${bi % 2 ? 'B' : 'A'} ${11 + (bi % 4) * 1.5}s ease-in-out infinite`,
