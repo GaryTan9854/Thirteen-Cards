@@ -8,5 +8,11 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* Chinese: 霞鶩文楷（楷書感）  |  Latin/numbers: Cinzel 透過 unicode-range 自動切換 */
+  font-family: 'LXGW WenKai Screen', 'Noto Serif TC', serif;
+}
+
+/* Cinzel — 只套用拉丁字母與數字，中文自動 fallback 到 LXGW */
+.font-cinzel {
+  font-family: 'Cinzel', 'LXGW WenKai Screen', serif;
 }

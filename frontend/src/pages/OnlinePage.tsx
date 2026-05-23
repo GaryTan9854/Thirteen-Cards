@@ -1690,6 +1690,7 @@ export default function OnlinePage() {
           circleMarks={cm}
           roundBadges={historyBadges}
           isEnded={false}
+          myName={player ?? ''}
           roundLabel={history.length === 0 ? '準備開始' : `上場共 ${history.length} 局`}
           voiceOn={voiceOn}
           onToggleVoice={toggleVoice}
@@ -2032,6 +2033,7 @@ export default function OnlinePage() {
           circleMarks={cm}
           roundBadges={historyBadges}
           isEnded={isEnded}
+          myName={player ?? ''}
           roundLabel={roundLabel}
           voiceOn={voiceOn}
           onToggleVoice={toggleVoice}

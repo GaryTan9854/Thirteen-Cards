@@ -47,7 +47,7 @@ function AppInner() {
             onClick={() => setTab('online')}
             className="flex items-baseline gap-2 hover:opacity-80 transition-opacity active:scale-95"
           >
-            <h1 className="text-lg font-bold tracking-wide leading-none">
+            <h1 className="text-lg font-bold tracking-wide leading-none font-cinzel">
               🃏 Thirteen Cards
             </h1>
             {version && (

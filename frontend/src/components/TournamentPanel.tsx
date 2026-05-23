@@ -17,6 +17,7 @@
  */
 
 import { useState, useMemo } from 'react'
+import BeautyAvatar from './BeautyAvatar'
 
 function scoreColor(n: number) {
   return n > 0 ? 'text-yellow-300' : n < 0 ? 'text-red-400' : 'text-gray-400'
@@ -40,11 +41,12 @@ interface Props {
   voiceOn:       boolean
   onToggleVoice: () => void
   actionButtons: React.ReactNode
+  myName?:       string               // logged-in player — enables camera upload on their avatar
 }
 
 export default function TournamentPanel({
   names, history, multipliers = [], circleMarks = {}, roundBadges = [],
-  isEnded, roundLabel, voiceOn, onToggleVoice, actionButtons,
+  isEnded, roundLabel, voiceOn, onToggleVoice, actionButtons, myName = '',
 }: Props) {
   const [historyView, setHistoryView] = useState<0 | 1 | 2>(0)
 
@@ -171,9 +173,10 @@ export default function TournamentPanel({
         <div className="text-sm text-sky-400 mb-2 font-semibold text-center">累積比分</div>
         <div className="grid grid-cols-4 gap-3">
           {names.map((name, i) => (
-            <div key={name} className="flex flex-col items-center">
-              <span className="text-base text-sky-300">{name}</span>
-              <span className={`text-2xl font-bold ${scoreColor(totalScores[i])}`}>
+            <div key={name} className="flex flex-col items-center gap-1">
+              <BeautyAvatar name={name} size={36} isMe={myName ? name === myName : false} />
+              <span className="text-xs text-sky-300 truncate max-w-full">{name}</span>
+              <span className={`text-2xl font-bold font-cinzel ${scoreColor(totalScores[i])}`}>
                 {fmt(totalScores[i])}
               </span>
               {roundCount > 0 && i === lowestPlayer && !isEnded && (

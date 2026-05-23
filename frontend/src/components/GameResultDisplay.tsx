@@ -4,8 +4,9 @@
  * Extracted from GamePage so both paths render identically.
  */
 
-import PlayerPanel from './PlayerPanel'
-import BattleLog   from './BattleLog'
+import PlayerPanel   from './PlayerPanel'
+import BattleLog    from './BattleLog'
+import BeautyAvatar from './BeautyAvatar'
 
 function scoreColor(n: number) {
   return n > 0 ? 'text-yellow-300' : n < 0 ? 'text-red-400' : 'text-gray-400'
@@ -30,9 +31,10 @@ export default function GameResultDisplay({ result, strategies, multiplier = 1 }
         <div className="text-xs text-sky-400 mb-2 font-semibold text-center">本局比分</div>
         <div className="grid grid-cols-4 gap-3">
           {(result.final_scores ?? []).map((fs: any) => (
-            <div key={fs.name} className="flex flex-col items-center">
-              <span className="text-sm text-sky-300">{fs.name}</span>
-              <span className={`text-xl font-bold ${scoreColor(fs.score)}`}>
+            <div key={fs.name} className="flex flex-col items-center gap-1">
+              <BeautyAvatar name={fs.name} size={32} />
+              <span className="text-xs text-sky-300 truncate max-w-full">{fs.name}</span>
+              <span className={`text-xl font-bold font-cinzel ${scoreColor(fs.score)}`}>
                 {fmt(fs.score)}
               </span>
               {multiplier > 1 && (
