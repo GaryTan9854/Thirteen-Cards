@@ -1,38 +1,27 @@
 /**
- * BeautyAvatar — circular avatar cropped from the pre-made 八大美女頭像 sprite sheet.
+ * BeautyAvatar — circular avatar using pre-made individual beauty portrait PNGs.
  *
- * Sprite:  /assets/beauty-avatars.jpg  (1536 × 1024 px, 4 cols × 2 rows)
- * Layout:  row 0 = 妲己/妹喜/褒姒/驪姬 (left beauties)
- *          row 1 = 西施/王昭君/楊貴妃/貂蟬 (right beauties)
+ * Assets: /assets/beauties/{name}.png  (362×362 or 337×337 square, black bg, circular portrait)
  *
- * - Every player name hashes consistently to one of the 8 beauties.
+ * - Every player name hashes consistently to one of the 8 beauties via DJB2.
  * - When isMe=true, a camera-icon overlay lets the player upload a custom photo.
  *   The photo is stored as a base64 JPEG in localStorage (no backend needed).
- * - If a custom photo exists it takes precedence over the beauty sprite.
+ * - If a custom photo exists it takes precedence over the beauty portrait.
  */
 
 import { useState, useRef, useEffect } from 'react'
 
-// ── Sprite geometry ────────────────────────────────────────────────────────────
-
-const SPRITE      = '/assets/beauty-avatars.jpg'
-const SPRITE_COLS = 4
-const SPRITE_ROWS = 2
-const CELL_W      = 384   // px per cell (original)
-const CELL_H      = 512   // px per cell (original)
-const Y_TRIM      = 0.05  // fraction of cell height to skip at top (trims black margin)
-
 // ── Beauty config ──────────────────────────────────────────────────────────────
 
 const BEAUTY_CONFIG = [
-  { row: 0, col: 0, name: '妲己',   label: '惑商' },
-  { row: 0, col: 1, name: '妹喜',   label: '亡夏' },
-  { row: 0, col: 2, name: '褒姒',   label: '烽火' },
-  { row: 0, col: 3, name: '驪姬',   label: '亂晉' },
-  { row: 1, col: 0, name: '西施',   label: '沉魚' },
-  { row: 1, col: 1, name: '王昭君', label: '落雁' },
-  { row: 1, col: 2, name: '楊貴妃', label: '羞花' },
-  { row: 1, col: 3, name: '貂蟬',   label: '閉月' },
+  { file: '妲己',   name: '妲己',   label: '惑商' },
+  { file: '妹喜',   name: '妹喜',   label: '亡夏' },
+  { file: '褒姒',   name: '褒姒',   label: '烽火' },
+  { file: '驪姬',   name: '驪姬',   label: '亂晉' },
+  { file: '西施',   name: '西施',   label: '沉魚' },
+  { file: '王昭君', name: '王昭君', label: '落雁' },
+  { file: '楊貴妃', name: '楊貴妃', label: '羞花' },
+  { file: '貂蟬',   name: '貂蟬',   label: '閉月' },
 ]
 
 /** Consistent DJB2 hash: same player name always → same beauty, across sessions. */
@@ -72,12 +61,12 @@ function cropToSquare(file: File, maxPx: number): Promise<string> {
 
 interface Props {
   name:       string
-  size?:      number   // diameter in px (default 48)
+  size?:      number   // diameter in px (default 80)
   isMe?:      boolean  // show camera overlay + enable upload
   className?: string
 }
 
-export default function BeautyAvatar({ name, size = 48, isMe = false, className = '' }: Props) {
+export default function BeautyAvatar({ name, size = 80, isMe = false, className = '' }: Props) {
   const [customSrc, setCustomSrc] = useState<string | null>(null)
   const [hovering,  setHovering]  = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -92,7 +81,7 @@ export default function BeautyAvatar({ name, size = 48, isMe = false, className 
     const file = e.target.files?.[0]
     if (!file) return
     try {
-      const dataUrl = await cropToSquare(file, 160)
+      const dataUrl = await cropToSquare(file, 200)
       localStorage.setItem(STORAGE_KEY(name), dataUrl)
       setCustomSrc(dataUrl)
     } catch {
@@ -101,35 +90,26 @@ export default function BeautyAvatar({ name, size = 48, isMe = false, className 
     e.target.value = ''  // reset so the same file can be re-selected
   }
 
-  // ── Sprite crop geometry ──────────────────────────────────────────────────
   const bi = playerBeautyIndex(name)
   const b  = BEAUTY_CONFIG[bi]
-
-  // Scale so one cell-width = avatar size
-  const imgW  = SPRITE_COLS * size                         // rendered sprite width
-  const imgH  = (CELL_H / CELL_W) * imgW                  // rendered sprite height (aspect-correct)
-  const cellH = imgH / SPRITE_ROWS                        // rendered height of one row
-
-  const xOff = -(b.col * size)
-  const yOff = -(b.row * cellH + Y_TRIM * cellH)          // row start + trim top black margin
-
-  const beautyStyle: React.CSSProperties = {
-    backgroundImage:    `url(${SPRITE})`,
-    backgroundSize:     `${imgW}px ${imgH}px`,
-    backgroundPosition: `${xOff}px ${yOff}px`,
-    backgroundRepeat:   'no-repeat',
-  }
+  const src = `/assets/beauties/${b.file}.png`
 
   const wrapStyle: React.CSSProperties = {
     width:        size,
     height:       size,
     borderRadius: '50%',
-    border:       '1.5px solid rgba(251,191,36,0.65)',
     overflow:     'hidden',
     flexShrink:   0,
     position:     'relative',
     cursor:       isMe ? 'pointer' : 'default',
     display:      'inline-block',
+  }
+
+  const imgStyle: React.CSSProperties = {
+    width:      '100%',
+    height:     '100%',
+    objectFit:  'cover',
+    display:    'block',
   }
 
   return (
@@ -141,13 +121,12 @@ export default function BeautyAvatar({ name, size = 48, isMe = false, className 
       onMouseLeave={() => isMe && setHovering(false)}
       onClick={() => isMe && inputRef.current?.click()}
     >
-      {/* Sprite portrait or custom photo */}
-      {customSrc ? (
-        <img src={customSrc} alt={name}
-             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-      ) : (
-        <div style={{ width: '100%', height: '100%', ...beautyStyle }} />
-      )}
+      {/* Beauty portrait or custom photo */}
+      <img
+        src={customSrc ?? src}
+        alt={b.name}
+        style={imgStyle}
+      />
 
       {/* Camera overlay — only when isMe and hovering */}
       {isMe && hovering && (

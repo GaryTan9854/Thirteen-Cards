@@ -174,7 +174,7 @@ export default function TournamentPanel({
         <div className="grid grid-cols-4 gap-3">
           {names.map((name, i) => (
             <div key={name} className="flex flex-col items-center gap-1">
-              <BeautyAvatar name={name} size={48} isMe={myName ? name === myName : false} />
+              <BeautyAvatar name={name} size={80} isMe={myName ? name === myName : false} />
               <span className="text-xs text-sky-300 truncate max-w-full">{name}</span>
               <span className={`text-2xl font-bold font-cinzel ${scoreColor(totalScores[i])}`}>
                 {fmt(totalScores[i])}
