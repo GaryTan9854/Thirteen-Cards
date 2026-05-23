@@ -223,7 +223,9 @@ export default function OnlinePage() {
   const gunQueueRef  = useRef<GunNotif[]>([])
   const [voiceOn,      setVoiceOn]          = useState(true)
   const voiceRef     = useRef(true)
-  const ttsGenRef    = useRef(0)
+  const ttsGenRef          = useRef(0)
+  const soloPhaseRef       = useRef<string>('lobby')
+  const soloAppealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function toggleVoice() {
     const next = !voiceRef.current
@@ -466,7 +468,11 @@ export default function OnlinePage() {
     const gen  = info.appeal_generation
     if (isAi) {
       // AI always appeals → auto-decide + announce
-      setTimeout(() => {
+      // Store the timer ID so startSoloRound can cancel it if the user clicks "下一局 →" first.
+      soloAppealTimerRef.current = setTimeout(() => {
+        soloAppealTimerRef.current = null
+        // Guard: if the user already advanced past appeal_pending, do nothing.
+        if (soloPhaseRef.current !== 'appeal_pending') return
         const label = gen >= 1 ? '終局申訴' : '申訴'
         if (voiceRef.current) speak(`${name} 決定${label}！`, 0.88)
         if (onDecide) onDecide(true)
@@ -587,12 +593,28 @@ export default function OnlinePage() {
     setLastResult(null)
     setHistoryBadges([])
     setSoloActive(true)
+    soloPhaseRef.current = 'playing'
     setSoloPhase('playing')
     startSoloRound()
   }
 
   async function startSoloRound() {
     const state = soloStateRef.current!
+
+    // If the user pressed "下一局 →" while the AI auto-decide timer is still pending
+    // (appeal_pending phase, AI is loser), commit the appeal immediately and cancel
+    // the timer so it cannot clobber the 'playing' phase after the deal completes.
+    if (soloPhaseRef.current === 'appeal_pending') {
+      if (soloAppealTimerRef.current !== null) {
+        clearTimeout(soloAppealTimerRef.current)
+        soloAppealTimerRef.current = null
+      }
+      setAppealInfo(null)
+      state.appealGeneration++
+      state.appealPlayed  = 0
+      state.isTiebreaking = false
+    }
+
     state.currentRound++
 
     // Deal hands
@@ -606,6 +628,7 @@ export default function OnlinePage() {
     setSubmittedList([])
     setLastResult(null)
     setAppealInfo(null)
+    soloPhaseRef.current = 'playing'
     setSoloPhase('playing')
 
     if (state.multiplier > 1 && voiceRef.current) {
@@ -752,6 +775,7 @@ export default function OnlinePage() {
     setNextMultiplier(state.multiplier)
     if (circleSeat >= 0) setCircleMarks(prev => ({ ...prev, [state.currentRound - 1]: circleSeat }))
 
+    soloPhaseRef.current = newPhase
     setSoloPhase(newPhase)
 
     if (isBoring && state.multiplier > 1 && voiceRef.current) {
@@ -789,6 +813,7 @@ export default function OnlinePage() {
           '等待下一局開始',
         ], undefined, 0.9), 800)
       }
+      soloPhaseRef.current = 'round_end'
       setSoloPhase('round_end')
     } else {
       // Declined appeal → end game immediately
@@ -805,6 +830,7 @@ export default function OnlinePage() {
         next_multiplier: state2.multiplier,
       }
       setLastResult(endMsg)
+      soloPhaseRef.current = 'ended'
       setSoloPhase('ended')
       scheduleEndGameVoice(endMsg)
     }
@@ -955,6 +981,7 @@ export default function OnlinePage() {
           : <>
               {inRoom && <OnlineBar players={onlinePlayers} self={player} onLeave={() => {
                 setSoloActive(false)
+                soloPhaseRef.current = 'lobby'
                 setSoloPhase('lobby')
                 setRoom(null)
                 setMyHand(null)
@@ -1539,6 +1566,7 @@ export default function OnlinePage() {
               <button onClick={() => {
                 if (soloActive) {
                   setSoloActive(false)
+                  soloPhaseRef.current = 'lobby'
                   setSoloPhase('lobby')
                   soloStateRef.current = null
                   setLastResult(null)

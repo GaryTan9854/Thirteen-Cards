@@ -122,6 +122,8 @@ frontend/src/
 - [x] TunaLogin 認證
 - [x] RuleAlpha2 AI 策略（實驗，可在 Solo/Online 設定頁選用）
 - [x] ManualArrange 支援 rulealpha2 下拉，並依遊戲設定預選策略
+- [x] 各座獨立模型設定（你 + AI 1/2/3 各自一個 dropdown），替代原本單一 AI 模型選項
+- [x] 遊戲模擬（Gary superuser tab）已移除
 
 ## 機器學習系統（進行中）
 
@@ -169,4 +171,4 @@ tail -f /tmp/train_scoring.log   # 監看進度
 
 ## 版本規則
 - bump +0.1 每次 deploy；minor=20 時升 major
-- 目前 v6.20
+- 目前 v7.0
