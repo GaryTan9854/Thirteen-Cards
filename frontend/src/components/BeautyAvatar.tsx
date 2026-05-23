@@ -64,9 +64,10 @@ interface Props {
   size?:      number   // diameter in px (default 80)
   isMe?:      boolean  // show camera overlay + enable upload
   className?: string
+  idx?:       number   // override beauty index (use seat position to avoid hash collisions)
 }
 
-export default function BeautyAvatar({ name, size = 80, isMe = false, className = '' }: Props) {
+export default function BeautyAvatar({ name, size = 80, isMe = false, className = '', idx }: Props) {
   const [customSrc, setCustomSrc] = useState<string | null>(null)
   const [hovering,  setHovering]  = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -90,7 +91,7 @@ export default function BeautyAvatar({ name, size = 80, isMe = false, className 
     e.target.value = ''  // reset so the same file can be re-selected
   }
 
-  const bi = playerBeautyIndex(name)
+  const bi = idx !== undefined ? idx % BEAUTY_CONFIG.length : playerBeautyIndex(name)
   const b  = BEAUTY_CONFIG[bi]
   const src = `/assets/beauties/${b.file}.png`
 
