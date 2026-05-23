@@ -13,12 +13,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => localStorage.getItem('tc_player')
   )
 
+  function _logAuth(p: string, action: string) {
+    fetch('/api/log/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ player: p, action }),
+    }).catch(() => {})
+  }
+
   function login(name: string) {
     localStorage.setItem('tc_player', name)
     setPlayer(name)
+    _logAuth(name, 'login')
   }
 
   function logout() {
+    const p = localStorage.getItem('tc_player')
+    if (p) _logAuth(p, 'logout')
     localStorage.removeItem('tc_player')
     setPlayer(null)
   }

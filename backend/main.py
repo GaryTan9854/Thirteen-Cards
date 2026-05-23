@@ -3,15 +3,16 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import os
 
 from game.game import play_one_game
 from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
+import game_log as gl
 
-APP_VERSION = "7.1"
+APP_VERSION = "7.2"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -723,6 +724,83 @@ async def ws_endpoint(player_name: str, websocket: WebSocket):
             "online_players": online,
             "left":           player_name,
         })
+
+
+# ── Log: auth ────────────────────────────────────────
+class AuthLogReq(BaseModel):
+    player: str
+    action: str   # 'login' | 'logout'
+
+@app.post("/api/log/auth")
+def api_log_auth(req: AuthLogReq):
+    gl.log_auth(req.player, req.action)
+    return {"ok": True}
+
+
+# ── Log: game record ──────────────────────────────────
+class RoundRecordReq(BaseModel):
+    round_number: int
+    multiplier:   int = 1
+    scores:       Dict[str, Any]
+    arrangements: Optional[Dict[str, Any]] = None
+
+class GameLogReq(BaseModel):
+    game_id:       str
+    mode:          str          # 'solo' | 'online'
+    start_time:    str
+    end_time:      str
+    participants:  List[str]
+    seat_models:   Dict[str, str]
+    rounds_normal: int
+    rounds_appeal: int
+    final_scores:  Dict[str, Any]
+    winner:        Optional[str] = None
+    loser:         Optional[str] = None
+    is_league:     bool = False
+    league_id:     Optional[str] = None
+    record_rounds: bool = False
+    rounds:        Optional[List[RoundRecordReq]] = None
+
+@app.post("/api/log/game")
+def api_log_game(req: GameLogReq):
+    gl.save_game(req.dict())
+    if req.rounds:
+        gl.save_rounds(req.game_id, [r.dict() for r in req.rounds])
+    return {"ok": True}
+
+@app.get("/api/log/games")
+def api_list_games(limit: int = 100, mode: Optional[str] = None, league_only: bool = False):
+    return {"games": gl.get_games(limit, mode, league_only)}
+
+@app.get("/api/log/game/{game_id}")
+def api_get_game(game_id: str):
+    g = gl.get_game(game_id)
+    return g if g else {"error": "not_found"}
+
+@app.get("/api/log/logins")
+def api_list_logins(limit: int = 200):
+    return {"logins": gl.get_logins(limit)}
+
+
+# ── League ────────────────────────────────────────────
+class LeagueCreateReq(BaseModel):
+    league_id:    Optional[str] = None
+    year:         int
+    name:         str
+    participants: List[str] = []
+
+@app.post("/api/league")
+def api_create_league(req: LeagueCreateReq):
+    lid = gl.create_league(req.dict())
+    return {"ok": True, "league_id": lid}
+
+@app.get("/api/league")
+def api_list_leagues():
+    return {"leagues": gl.get_leagues()}
+
+@app.get("/api/league/{league_id}")
+def api_league_results(league_id: str):
+    return gl.get_league_results(league_id)
 
 
 # ── Serve React frontend ──────────────────────────────

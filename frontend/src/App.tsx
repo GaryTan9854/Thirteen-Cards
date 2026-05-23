@@ -3,6 +3,9 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import LoginPage  from './pages/LoginPage'
 import DuelPage   from './pages/DuelPage'
 import OnlinePage from './pages/OnlinePage'
+import LogsPage   from './pages/LogsPage'
+import LeaguePage from './pages/LeaguePage'
+import RulesPage  from './pages/RulesPage'
 
 // ─── Inner app (needs AuthProvider above) ─────────────────────────────────────
 
@@ -25,8 +28,11 @@ function AppInner() {
 
   const TABS = [
     { id: 'online', label: '🌐', fullLabel: '連線遊戲' },
+    { id: 'rules',  label: '📖', fullLabel: '遊戲說明' },
     ...(isGary ? [
-      { id: 'duel', label: '⚔️', fullLabel: '策略對決' },
+      { id: 'duel',   label: '⚔️', fullLabel: '策略對決' },
+      { id: 'logs',   label: '📋', fullLabel: '遊戲紀錄' },
+      { id: 'league', label: '🏆', fullLabel: '聯盟賽'   },
     ] : []),
   ]
 
@@ -52,7 +58,7 @@ function AppInner() {
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition
+                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition
                   ${tab === t.id
                     ? 'bg-yellow-400 text-gray-900 shadow'
                     : 'text-green-300 hover:text-white'}`}
@@ -80,33 +86,22 @@ function AppInner() {
           </div>
         </div>
 
-        {/* Row 2: Mobile tab bar (visible only on small screens) */}
-        {TABS.length > 1 && (
-          <div className="flex sm:hidden bg-green-800/60 border-t border-green-700/40">
-            {TABS.map(t => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`flex-1 py-2 text-xs font-semibold transition flex flex-col items-center gap-0.5
-                  ${tab === t.id
-                    ? 'text-yellow-400 border-b-2 border-yellow-400'
-                    : 'text-green-400 hover:text-white'}`}
-              >
-                <span className="text-base leading-none">{t.label}</span>
-                <span>{t.fullLabel}</span>
-              </button>
-            ))}
-          </div>
-        )}
-        {/* Single-tab shortcut: show inline mobile tab for 連線遊戲 only */}
-        {TABS.length === 1 && (
-          <div className="flex sm:hidden bg-green-800/60 border-t border-green-700/40">
-            <div className="flex-1 py-2 text-xs font-semibold flex flex-col items-center gap-0.5 text-yellow-400 border-b-2 border-yellow-400">
-              <span className="text-base leading-none">{TABS[0].label}</span>
-              <span>{TABS[0].fullLabel}</span>
-            </div>
-          </div>
-        )}
+        {/* Row 2: Mobile tab bar */}
+        <div className="flex sm:hidden bg-green-800/60 border-t border-green-700/40 overflow-x-auto">
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex-1 min-w-[4rem] py-2 text-xs font-semibold transition flex flex-col items-center gap-0.5 shrink-0
+                ${tab === t.id
+                  ? 'text-yellow-400 border-b-2 border-yellow-400'
+                  : 'text-green-400 hover:text-white'}`}
+            >
+              <span className="text-base leading-none">{t.label}</span>
+              <span className="whitespace-nowrap">{t.fullLabel}</span>
+            </button>
+          ))}
+        </div>
       </header>
 
       {/* Page content */}
@@ -120,7 +115,10 @@ function AppInner() {
           <OnlinePage />
         </div>
 
-        {isGary && tab === 'duel' && <DuelPage />}
+        {tab === 'rules'  && <RulesPage />}
+        {isGary && tab === 'duel'   && <DuelPage />}
+        {isGary && tab === 'logs'   && <LogsPage />}
+        {isGary && tab === 'league' && <LeaguePage />}
       </main>
     </div>
   )

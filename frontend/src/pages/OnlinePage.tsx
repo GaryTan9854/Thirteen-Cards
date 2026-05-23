@@ -146,6 +146,40 @@ function OnlineBar({ players, self: self_, onLeave }: {
   )
 }
 
+// ─── Log toggle + league select helpers ───────────────────────────────────────
+
+function LogToggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-center gap-2 cursor-pointer select-none" onClick={() => onChange(!value)}>
+      <div className={`w-9 h-5 rounded-full transition-colors relative shrink-0 ${value ? 'bg-green-500' : 'bg-gray-600'}`}>
+        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${value ? 'translate-x-4' : 'translate-x-0.5'}`} />
+      </div>
+      <span className="text-sm text-gray-300">{label}</span>
+    </label>
+  )
+}
+
+function LeagueSelect({ leagues, value, onChange }: {
+  leagues: { league_id: string; name: string; year: number }[]
+  value: string
+  onChange: (v: string) => void
+}) {
+  if (leagues.length === 0)
+    return <div className="text-xs text-yellow-400">尚無聯盟賽記錄。請先在「聯盟賽」頁面創建。</div>
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="w-full bg-gray-800 border border-yellow-600 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-yellow-400"
+    >
+      <option value="">— 選擇聯盟賽 —</option>
+      {leagues.map(l => (
+        <option key={l.league_id} value={l.league_id}>{l.year} {l.name}</option>
+      ))}
+    </select>
+  )
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function OnlinePage() {
@@ -171,12 +205,22 @@ export default function OnlinePage() {
   const [notices,       setNotices]       = useState<string[]>([])
 
   // ── Setup form (host only) ──
-  const [cfgNormal,     setCfgNormal]     = useState(4)
-  const [cfgAppeal,     setCfgAppeal]     = useState(1)
-  const [cfgTimeLimit,  setCfgTimeLimit]  = useState(30)
-  const [cfgInvitees,   setCfgInvitees]   = useState<string[]>([])
-  const [cfgStrategies, setCfgStrategies] = useState<string[]>(['rulealpha', 'rulealpha', 'rulealpha', 'rulealpha'])
-  const [cfgAiNames,    setCfgAiNames]    = useState<string[]>(() => randomBeauties())
+  const [cfgNormal,       setCfgNormal]       = useState(4)
+  const [cfgAppeal,       setCfgAppeal]       = useState(1)
+  const [cfgTimeLimit,    setCfgTimeLimit]    = useState(30)
+  const [cfgInvitees,     setCfgInvitees]     = useState<string[]>([])
+  const [cfgStrategies,   setCfgStrategies]   = useState<string[]>(['rulealpha', 'rulealpha', 'rulealpha', 'rulealpha'])
+  const [cfgAiNames,      setCfgAiNames]      = useState<string[]>(() => randomBeauties())
+  const [cfgRecordGame,   setCfgRecordGame]   = useState(true)
+  const [cfgRecordRounds, setCfgRecordRounds] = useState(false)
+  const [cfgIsLeague,     setCfgIsLeague]     = useState(false)
+  const [cfgLeagueId,     setCfgLeagueId]     = useState('')
+  const [leaguesList,     setLeaguesList]     = useState<{league_id:string, name:string, year:number}[]>([])
+
+  // ── Game logging refs ──
+  const gameIdRef        = useRef<string>('')
+  const gameStartTimeRef = useRef<string>('')
+  const roundLogRef      = useRef<{round_number:number, multiplier:number, scores:Record<string,number>, arrangements?:Record<string,any>}[]>([])
 
   // ── Round state ──
   const [myHand,          setMyHand]          = useState<string[] | null>(null)
@@ -254,6 +298,14 @@ export default function OnlinePage() {
     const t = setTimeout(() => setGrandSlammer(null), 5000)
     return () => clearTimeout(t)
   }, [grandSlammer])
+
+  // ── Load leagues for setup dropdowns ──────────────────────────────────────
+  useEffect(() => {
+    fetch('/api/league')
+      .then(r => r.json())
+      .then(d => setLeaguesList(d.leagues ?? []))
+      .catch(() => {})
+  }, [])
 
   // ── Connection (only when inRoom) ──────────────────────────────────────────
 
@@ -378,6 +430,16 @@ export default function OnlinePage() {
         // Update multipliers
         applyRoundMeta(msg)
         fireRoundEffects(msg.result ?? {}, msg)
+        // Capture round for logging (host only)
+        if (cfgRecordRounds && room?.host === player) {
+          const scores: Record<string, number> = {}
+          for (const fs of (msg.result?.final_scores ?? [])) scores[fs.name] = fs.score
+          const arrs: Record<string, any> = {}
+          for (const p of (msg.result?.players ?? [])) {
+            arrs[p.name] = { top: p.top?.cards ?? [], mid: p.mid?.cards ?? [], bot: p.bot?.cards ?? [] }
+          }
+          roundLogRef.current.push({ round_number: msg.round, multiplier: msg.multiplier ?? 1, scores, arrangements: arrs })
+        }
         // If an appeal was triggered, voice the prompt after effects settle
         if (msg.appeal_pending) {
           setAppealInfo(msg.appeal_pending)
@@ -399,6 +461,20 @@ export default function OnlinePage() {
         }
         // End-game voice
         scheduleEndGameVoice(msg)
+        // Log game (host only)
+        if (room?.host === player) {
+          const seatNames: string[] = msg.seat_names ?? []
+          const history: number[][] = msg.history ?? []
+          const humanSet = new Set(room?.players ?? [])
+          submitGameLog({
+            seatNames,
+            history,
+            roundsNormal: room?.rounds_normal ?? cfgNormal,
+            roundsAppeal: room?.rounds_appeal ?? cfgAppeal,
+            models: seatNames.map((n, i) => humanSet.has(n) ? 'manual' : (cfgStrategies[i] ?? 'rulealpha')),
+            mode: 'online',
+          })
+        }
         break
       }
 
@@ -560,6 +636,49 @@ export default function OnlinePage() {
     }
   }
 
+  // ── Game logging ───────────────────────────────────────────────────────────
+
+  function submitGameLog(opts: {
+    seatNames:    string[]
+    history:      number[][]
+    roundsNormal: number
+    roundsAppeal: number
+    models:       string[]
+    mode:         'solo' | 'online'
+  }) {
+    if (!cfgRecordGame && !cfgIsLeague) return
+    const { seatNames, history, roundsNormal, roundsAppeal, models, mode } = opts
+    const finalScores: Record<string, number> = {}
+    seatNames.forEach((name, i) => {
+      finalScores[name] = history.reduce((s, r) => s + (r[i] ?? 0), 0)
+    })
+    const sorted = [...seatNames].sort((a, b) => (finalScores[b] ?? 0) - (finalScores[a] ?? 0))
+    const seatModels: Record<string, string> = {}
+    seatNames.forEach((name, i) => { seatModels[name] = models[i] ?? 'manual' })
+
+    fetch('/api/log/game', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        game_id:       gameIdRef.current,
+        mode,
+        start_time:    gameStartTimeRef.current,
+        end_time:      new Date().toISOString(),
+        participants:  seatNames,
+        seat_models:   seatModels,
+        rounds_normal: roundsNormal,
+        rounds_appeal: roundsAppeal,
+        final_scores:  finalScores,
+        winner:        sorted[0] ?? null,
+        loser:         sorted[sorted.length - 1] ?? null,
+        is_league:     cfgIsLeague,
+        league_id:     cfgIsLeague ? (cfgLeagueId || null) : null,
+        record_rounds: cfgRecordRounds,
+        rounds:        cfgRecordRounds ? roundLogRef.current : [],
+      }),
+    }).catch(() => {})
+  }
+
   // ── Solo game ──────────────────────────────────────────────────────────────
 
   function startSoloGame(cfg: {
@@ -592,6 +711,10 @@ export default function OnlinePage() {
     setAppealInfo(null)
     setLastResult(null)
     setHistoryBadges([])
+    // Init game log
+    gameIdRef.current        = crypto.randomUUID()
+    gameStartTimeRef.current = new Date().toISOString()
+    roundLogRef.current      = []
     setSoloActive(true)
     soloPhaseRef.current = 'playing'
     setSoloPhase('playing')
@@ -659,6 +782,20 @@ export default function OnlinePage() {
     const rawScores   = seatNames.map(n => scoreByName[n] ?? 0)
     const curMult     = state.multiplier
     const scaledScores = rawScores.map(s => s * curMult)
+
+    // Per-round log capture
+    if (cfgRecordRounds) {
+      const arrs: Record<string, any> = {}
+      for (const p of (res.players ?? [])) {
+        arrs[p.name] = { top: p.top?.cards ?? [], mid: p.mid?.cards ?? [], bot: p.bot?.cards ?? [] }
+      }
+      roundLogRef.current.push({
+        round_number: state.currentRound,
+        multiplier:   curMult,
+        scores:       scoreByName,
+        arrangements: arrs,
+      })
+    }
 
     state.history.push(scaledScores)
     state.roundMultipliers.push(curMult)
@@ -794,6 +931,14 @@ export default function OnlinePage() {
 
     if (isEnded) {
       scheduleEndGameVoice(fakeMsg)
+      submitGameLog({
+        seatNames:    seatNames,
+        history:      [...state.history],
+        roundsNormal: state.roundsNormal,
+        roundsAppeal: state.roundsAppeal,
+        models:       seatNames.map((_, i) => i === 0 ? 'manual' : (state.strategies[i] ?? 'rulealpha')),
+        mode:         'solo',
+      })
     }
   }
 
@@ -832,6 +977,15 @@ export default function OnlinePage() {
       setLastResult(endMsg)
       soloPhaseRef.current = 'ended'
       setSoloPhase('ended')
+      const state3 = soloStateRef.current!
+      submitGameLog({
+        seatNames:    seatNames,
+        history,
+        roundsNormal: state3.roundsNormal,
+        roundsAppeal: state3.roundsAppeal,
+        models:       seatNames.map((_, i) => i === 0 ? 'manual' : (state3.strategies[i] ?? 'rulealpha')),
+        mode:         'solo',
+      })
       scheduleEndGameVoice(endMsg)
     }
   }
@@ -1147,6 +1301,19 @@ export default function OnlinePage() {
           </div>
         </div>
 
+        {/* 記錄 & 聯盟賽 */}
+        <div className="space-y-2 border-t border-green-700/40 pt-4">
+          <div className="text-sm text-gray-400">記錄設定</div>
+          <div className="flex flex-wrap gap-4">
+            <LogToggle label="記錄此場遊戲" value={cfgRecordGame} onChange={setCfgRecordGame} />
+            {cfgRecordGame && <LogToggle label="記錄每局牌局" value={cfgRecordRounds} onChange={setCfgRecordRounds} />}
+            <LogToggle label="聯盟賽" value={cfgIsLeague} onChange={setCfgIsLeague} />
+          </div>
+          {cfgIsLeague && (
+            <LeagueSelect leagues={leaguesList} value={cfgLeagueId} onChange={setCfgLeagueId} />
+          )}
+        </div>
+
         <button
           onClick={() => {
             setSoloSetupMode(false)
@@ -1376,6 +1543,18 @@ export default function OnlinePage() {
           )}
         </div>
 
+        {/* 記錄 & 聯盟賽 */}
+        <div className="space-y-2 border-t border-green-700/40 pt-3">
+          <div className="flex flex-wrap gap-4">
+            <LogToggle label="記錄此場遊戲" value={cfgRecordGame} onChange={setCfgRecordGame} />
+            {cfgRecordGame && <LogToggle label="記錄每局牌局" value={cfgRecordRounds} onChange={setCfgRecordRounds} />}
+            <LogToggle label="聯盟賽" value={cfgIsLeague} onChange={setCfgIsLeague} />
+          </div>
+          {cfgIsLeague && (
+            <LeagueSelect leagues={leaguesList} value={cfgLeagueId} onChange={setCfgLeagueId} />
+          )}
+        </div>
+
         <button
           onClick={() => {
             if (cfgInvitees.length === 0) {
@@ -1387,6 +1566,9 @@ export default function OnlinePage() {
                 aiNames:      cfgAiNames,
               })
             } else {
+              gameIdRef.current        = crypto.randomUUID()
+              gameStartTimeRef.current = new Date().toISOString()
+              roundLogRef.current      = []
               send({
                 type:           'game_config',
                 rounds_normal:  cfgNormal,
