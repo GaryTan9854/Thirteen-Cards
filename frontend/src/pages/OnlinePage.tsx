@@ -153,7 +153,7 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
         if (top >= 0) {
           const full = window.innerHeight - top
           const capped = w > 0 && w < 640
-            ? Math.min(full, Math.round(window.innerHeight * 0.55))
+            ? Math.min(full, Math.round(window.innerHeight * 0.38))
             : full
           setAvailH(capped)
         }
@@ -284,13 +284,18 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
   const pW  = cw > 0 ? cw / colsPerView : 0
   const cpW = pW * N
 
+  // Mobile: scale background to fit container height (full figure visible, correct aspect ratio)
+  // Sprite cell ratio: 384px wide × 1023px tall → cell_W/cell_H ≈ 0.3753
+  const isMobile    = cw > 0 && cw < 640
+  const mobileCellW = isMobile && availH > 0 ? availH * (384 / 1023) : pW
+
   return (
     <div ref={cRef}
          className="relative overflow-hidden"
          style={{
            // availH measured dynamically: fixes iOS address-bar + 2-row mobile header
-           // Mobile capped at 55dvh so the carousel doesn't fill the whole screen
-           height: availH > 0 ? `${availH}px` : 'min(calc(100dvh - 80px), 55dvh)',
+           // Mobile capped at 38dvh — small enough to see full figure at reduced scale
+           height: availH > 0 ? `${availH}px` : 'min(calc(100dvh - 80px), 38dvh)',
            marginTop: '-24px', marginBottom: '-24px',
            marginLeft: '-16px', marginRight: '-16px',
            cursor: 'grab', touchAction: 'none', userSelect: 'none',
@@ -319,8 +324,12 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
                        backgroundImage: `url(/assets/beauties-${b.img}.jpg)`,
                        // 4 beauties per image × pW = image width that fills COLS panels
                        // Desktop: 4 × cw/4 = cw  |  Mobile: 4 × cw = 4cw (one beauty = cw)
-                       backgroundSize: `${4 * pW}px auto`,
-                       backgroundPosition: `${-b.col * pW}px top`,
+                       // Mobile: fit-by-height so the full figure is visible; center in panel
+                       // Desktop: fit-by-width to fill all 4 columns
+                       backgroundSize: isMobile ? 'auto 100%' : `${4 * pW}px auto`,
+                       backgroundPosition: isMobile
+                         ? `${pW / 2 - (b.col + 0.5) * mobileCellW}px top`
+                         : `${-b.col * pW}px top`,
                        backgroundRepeat: 'no-repeat',
                        animation: `panelFloat${bi % 2 ? 'B' : 'A'} ${11 + (bi % 4) * 1.5}s ease-in-out infinite`,
                        animationDelay: `${-(bi * 1.8)}s`,

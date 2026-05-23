@@ -1,6 +1,6 @@
 # ThirteenCards — CLAUDE.md
 
-十三支 (Chinese Poker / Big Two Variant) 遊戲平台。當前版本 v6.20。
+十三支 (Chinese Poker / Big Two Variant) 遊戲平台。當前版本 v7.19。
 
 ## 部署
 - **MBA** = 開發 / git source of truth (`~/Documents/ThirteenCards/`)
@@ -169,12 +169,21 @@ tail -f /tmp/train_scoring.log   # 監看進度
 - [ ] 訓練完成後跑 benchmark：ML vs rule-based vs monte_carlo（100手 × 50 sims）
 - [ ] 若 ML 勝率 > 55%，更新 OnlinePage.tsx AI strategy 選項加入 ml 選項
 
-## Log & League 系統（v7.2）
+## Log & League 系統（v7.19）
 
-### 資料庫
-- `backend/game_logs.db`（MBP 上，同目錄）
-- Tables: `login_logs`, `game_records`, `round_records`, `leagues`
-- `backend/game_log.py` — DB 操作模組
+### 資料存放（visadelab 標準模式）
+- **MBP 路徑**（存在 `~/db/` 時）：
+  - `~/db/thirteencards/logs/` — JSONL 月份檔（不在 rsync 範圍，不被 deploy 覆蓋）
+  - `~/db/thirteencards/game_logs.db` — SQLite（僅 leagues 表）
+  - `~/db-backups/thirteencards/` — 時戳備份，保留最新 5 份（deploy.sh step 1）
+- **MBA 備份**：`~/Documents/.db-backups/thirteencards/`（deploy.sh step 5 pull-back）
+  - `~/Documents/backup-dbs-from-mbp.sh` 亦涵蓋此目錄（rsync 整個 `~/db/`）
+- **本機開發**（`~/db/` 不存在）：fallback 到 `backend/logs/` + `backend/game_logs.db`
+
+### JSONL 檔案格式（月份一檔）
+- `login_YYYY-MM.jsonl` — 登入/登出事件（每行一筆）
+- `games_YYYY-MM.jsonl` — 遊戲紀錄（以 start_time 決定月份）
+- `rounds_YYYY-MM.jsonl` — 每局牌局（注入 game_id）
 
 ### API
 - `POST /api/log/auth` — 登入/登出記錄
@@ -182,20 +191,23 @@ tail -f /tmp/train_scoring.log   # 監看進度
 - `GET /api/log/games` — 列出遊戲（Gary 查看）
 - `GET /api/log/game/{id}` — 遊戲詳情 + 每局
 - `GET /api/log/logins` — 登入紀錄
-- `POST /api/league` — 創建聯盟賽
+- `POST /api/league` — 創建聯盟賽（SQLite）
 - `GET /api/league` — 列出聯盟賽
 - `GET /api/league/{id}` — 聯盟賽成績與排名
 
 ### 前端
 - `AuthContext.tsx` — login/logout 自動呼叫 `/api/log/auth`
-- `OnlinePage.tsx` — 新增「記錄遊戲」/「記錄每局牌局」/「聯盟賽」三個 toggle（solo & online setup）
-- `LogsPage.tsx` — Gary 專用：登入紀錄 + 遊戲紀錄（可展開看局內容，回放按鈕 disabled）
+- `OnlinePage.tsx` — 「記錄遊戲」/「記錄每局牌局」/「聯盟賽」toggle
+- `LogsPage.tsx` — Gary 專用：登入紀錄 + 遊戲紀錄
 - `LeaguePage.tsx` — Gary 專用：創建聯盟賽 + 查看排名
-- `RulesPage.tsx` — 所有用戶：三份說明（遊戲規則 / 特殊牌型 / 賽制說明）
+- `RulesPage.tsx` — 所有用戶：規則說明
 
-### 備份注意
-- `game_logs.db` 在 MBP，需加入 `backup-dbs-from-mbp.sh`
+## 美女頭像系統（v7.14+）
+- 8 個 PNG 檔在 `frontend/public/assets/beauties/`：妲己、妹喜、褒姒、驪姬、西施、王昭君、楊貴妃、貂蟬
+- `components/BeautyAvatar.tsx` — `idx` prop 決定座位對應（0→妲己，1→妹喜，...），確保每座位各不同且名稱吻合
+- `isMe` prop 啟用相機上傳功能（裁切存 localStorage `tc_avatar_{name}`）
+- 用於 `TournamentPanel`（累積比分格，size=104）；`GameResultDisplay`（本局比分）不顯示頭像
 
 ## 版本規則
 - bump +0.1 每次 deploy；minor=20 時升 major
-- 目前 v7.2
+- 目前 v7.19
