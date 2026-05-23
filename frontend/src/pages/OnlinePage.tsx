@@ -121,6 +121,10 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
   const dStart      = useRef({ x: 0, off: 0 })
   const raf         = useRef<number>()
   const lastT       = useRef(0)
+  const momentumRef = useRef(0)   // px/frame inertia after drag release
+  const velRef      = useRef(0)   // smoothed drag velocity
+  const lastMoveX   = useRef(0)
+  const lastMoveT   = useRef(0)
   const [hovered, setHovered] = useState<number | null>(null)
 
   // Keep cwRef in sync
@@ -153,14 +157,24 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
     return o
   }, [N])
 
-  // Auto-drift (slow, elegant)
+  // Auto-drift + momentum decay
   useEffect(() => {
-    const SPEED = 18  // px / second
+    const SPEED  = 18    // px/second auto-drift
+    const DECAY  = 0.93  // momentum multiplier per frame (~60fps)
+    const THRESH = 0.25  // px/frame below which momentum is killed
+
     function tick(t: number) {
-      if (!dragging.current && lastT.current && cwRef.current > 0) {
-        const dt = Math.min(t - lastT.current, 50) / 1000
-        offRef.current = norm(offRef.current - SPEED * dt)
-        setOffPx(offRef.current)
+      if (cwRef.current > 0 && !dragging.current) {
+        const dt = lastT.current ? Math.min(t - lastT.current, 50) / 1000 : 0
+        if (Math.abs(momentumRef.current) > THRESH) {
+          momentumRef.current *= DECAY
+          offRef.current = norm(offRef.current + momentumRef.current)
+          setOffPx(offRef.current)
+        } else if (dt > 0) {
+          momentumRef.current = 0
+          offRef.current = norm(offRef.current - SPEED * dt)
+          setOffPx(offRef.current)
+        }
       }
       lastT.current = t
       raf.current = requestAnimationFrame(tick)
@@ -171,8 +185,19 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
 
   // Document-level drag — so dragging works even when cursor leaves the component
   useEffect(() => {
+    function trackVel(clientX: number) {
+      const now = performance.now()
+      const dt  = now - lastMoveT.current
+      if (dt > 0 && lastMoveT.current > 0) {
+        const rawV = (clientX - lastMoveX.current) / dt * 16  // px per 16ms frame
+        velRef.current = velRef.current * 0.6 + rawV * 0.4    // smooth
+      }
+      lastMoveX.current = clientX
+      lastMoveT.current = now
+    }
     const moveHandler = (e: MouseEvent) => {
       if (!dragging.current) return
+      trackVel(e.clientX)
       const o = norm(dStart.current.off + (e.clientX - dStart.current.x))
       offRef.current = o
       setOffPx(o)
@@ -180,11 +205,18 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
     const touchHandler = (e: TouchEvent) => {
       if (!dragging.current) return
       e.preventDefault()
+      trackVel(e.touches[0].clientX)
       const o = norm(dStart.current.off + (e.touches[0].clientX - dStart.current.x))
       offRef.current = o
       setOffPx(o)
     }
-    const upHandler = () => { dragging.current = false }
+    const upHandler = () => {
+      if (dragging.current) {
+        momentumRef.current = Math.max(-30, Math.min(30, velRef.current))
+        velRef.current = 0
+      }
+      dragging.current = false
+    }
     document.addEventListener('mousemove', moveHandler)
     document.addEventListener('mouseup',   upHandler)
     document.addEventListener('touchmove', touchHandler as EventListener, { passive: false })
@@ -197,8 +229,26 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
     }
   }, [norm])
 
+  // Trackpad two-finger swipe — macOS sends its own deceleration events after finger lift
+  useEffect(() => {
+    const el = cRef.current
+    if (!el) return
+    const wheelHandler = (e: WheelEvent) => {
+      e.preventDefault()
+      momentumRef.current = 0  // wheel has OS-level momentum; don't fight it
+      offRef.current = norm(offRef.current - e.deltaX)
+      setOffPx(offRef.current)
+    }
+    el.addEventListener('wheel', wheelHandler, { passive: false })
+    return () => el.removeEventListener('wheel', wheelHandler)
+  }, [norm])
+
   function onDown(x: number) {
     dragging.current = true
+    momentumRef.current = 0
+    velRef.current = 0
+    lastMoveX.current = x
+    lastMoveT.current = performance.now()
     dStart.current = { x, off: offRef.current }
   }
 
