@@ -1744,7 +1744,7 @@ export default function OnlinePage() {
                 下局 {nextMultiplier}✕
               </span>
             )}
-            {isEnded ? (
+            {isEnded ? (<>
               <button onClick={() => {
                 if (soloActive) {
                   setSoloActive(false)
@@ -1755,7 +1755,7 @@ export default function OnlinePage() {
                   setCircleMarks({})
                   setRoundMultipliers([])
                   setNextMultiplier(1)
-                  if (!inRoom) setInRoom(false)  // stay on pre-lobby if not in room
+                  if (!inRoom) setInRoom(false)
                 } else {
                   send({ type: 'new_game' })
                 }
@@ -1764,6 +1764,25 @@ export default function OnlinePage() {
                            hover:bg-orange-300 active:scale-95 transition whitespace-nowrap animate-pulse">
                 再來一場
               </button>
+              <button onClick={() => {
+                setSoloActive(false)
+                soloPhaseRef.current = 'lobby'
+                setSoloPhase('lobby')
+                soloStateRef.current = null
+                setRoom(null)
+                setMyHand(null)
+                setLastResult(null)
+                setAppealInfo(null)
+                setCircleMarks({})
+                setRoundMultipliers([])
+                setNextMultiplier(1)
+                setInRoom(false)
+              }}
+                className="text-xs px-3 py-1 rounded-full bg-gray-600 text-gray-200 font-semibold
+                           hover:bg-gray-500 active:scale-95 transition whitespace-nowrap">
+                回到首頁
+              </button>
+            </>
             ) : isHost ? (
               <button onClick={() => {
                 if (soloActive) startSoloRound()
