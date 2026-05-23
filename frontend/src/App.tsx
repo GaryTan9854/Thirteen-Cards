@@ -42,15 +42,18 @@ function AppInner() {
       <header className="bg-green-900 shadow shrink-0">
         {/* Row 1: Logo + Player + Logout */}
         <div className="flex items-center justify-between px-4 py-2.5 sm:px-6">
-          {/* Logo */}
-          <div className="flex items-baseline gap-2">
+          {/* Logo — click to go home */}
+          <button
+            onClick={() => setTab('online')}
+            className="flex items-baseline gap-2 hover:opacity-80 transition-opacity active:scale-95"
+          >
             <h1 className="text-lg font-bold tracking-wide leading-none">
               🃏 Thirteen Cards
             </h1>
             {version && (
               <span className="text-xs font-normal text-green-400 leading-none">v{version}</span>
             )}
-          </div>
+          </button>
 
           {/* Desktop tabs (hidden on small screens — shown below on mobile) */}
           <div className="hidden sm:flex bg-green-800 rounded-xl p-1 gap-1">

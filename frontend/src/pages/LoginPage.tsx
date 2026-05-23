@@ -160,8 +160,20 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-green-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen bg-green-950 flex items-center justify-center p-4 relative overflow-hidden">
+
+      {/* Semi-transparent beauty panorama background */}
+      <div className="absolute inset-0 flex pointer-events-none select-none">
+        <img src="/assets/beauties-left.jpg" alt=""
+             className="w-1/2 h-full object-cover object-top"
+             style={{ opacity: 0.18 }} />
+        <img src="/assets/beauties-right.jpg" alt=""
+             className="w-1/2 h-full object-cover object-top"
+             style={{ opacity: 0.18 }} />
+      </div>
+      <div className="absolute inset-0 bg-gradient-to-b from-green-950/60 via-transparent to-green-950/60 pointer-events-none" />
+
+      <div className="w-full max-w-sm relative z-10">
 
         {/* Logo */}
         <div className="text-center mb-8">
@@ -261,3 +273,4 @@ export default function LoginPage() {
     </div>
   )
 }
+

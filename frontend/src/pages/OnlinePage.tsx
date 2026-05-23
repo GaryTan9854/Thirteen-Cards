@@ -84,6 +84,223 @@ interface SoloState {
 
 const BEAUTIES = ['西施', '王昭君', '貂蟬', '楊貴妃', '妺喜', '妲己', '褒姒', '驪姬']
 
+// ─── Beauty Carousel ──────────────────────────────────────────────────────────
+
+const BEAUTY_DATA = [
+  { name: '妲己',  label: '惑商', img: 'left'  as const, col: 0,
+    poem: ['狐媚傾城夜未央，', '酒池歌舞亂朝綱。', '千秋只見鹿臺火，', '一笑終教殷室亡。'] },
+  { name: '妹喜',  label: '亡夏', img: 'left'  as const, col: 1,
+    poem: ['瓊臺玉盞醉君王，', '裂帛聲中社稷荒。', '萬頃瑤池歌不盡，', '夏桀沉迷國自亡。'] },
+  { name: '褒姒',  label: '烽火', img: 'left'  as const, col: 2,
+    poem: ['冷艷無言動帝心，', '千烽一戲失諸侯。', '驪山月暗周天晚，', '空使西風哭鎬京。'] },
+  { name: '驪姬',  label: '亂晉', img: 'left'  as const, col: 3,
+    poem: ['巧語深宮計已成，', '驪姬一笑晉廷驚。', '太子魂斷申生淚，', '萬里秋風戰骨橫。'] },
+  { name: '西施',  label: '沉魚', img: 'right' as const, col: 0,
+    poem: ['沉魚落雁之容，', '閉月羞花之貌。', '春秋越國有佳人，', '容光照水映芳華。'] },
+  { name: '王昭君', label: '落雁', img: 'right' as const, col: 1,
+    poem: ['落雁驚鴻之姿，', '遠嫁塞外和親。', '琵琶一曲動胡天，', '青冢獨留美名傳。'] },
+  { name: '楊貴妃', label: '羞花', img: 'right' as const, col: 2,
+    poem: ['羞花閉月之貌，', '傾國傾城之姿。', '回眸一笑百媚生，', '六宮粉黛無顏色。'] },
+  { name: '貂蟬',  label: '閉月', img: 'right' as const, col: 3,
+    poem: ['閉月羞花之貌，', '聰慧巧計之心。', '連環計策亂董卓，', '義薄雲天美名揚。'] },
+]
+
+function BeautyCarousel({ player, onEnterRoom, onSolo }: {
+  player: string | null; onEnterRoom: () => void; onSolo: () => void
+}) {
+  const N = BEAUTY_DATA.length  // 8
+  const COPIES = 3
+
+  const cRef       = useRef<HTMLDivElement>(null)
+  const [cw, setCw] = useState(0)
+  const offRef     = useRef(0)
+  const [offPx, setOffPx] = useState(0)
+  const initialized = useRef(false)
+  const dragging   = useRef(false)
+  const dStart     = useRef({ x: 0, off: 0 })
+  const raf        = useRef<number>()
+  const lastT      = useRef(0)
+  const [hovered, setHovered] = useState<number | null>(null)
+
+  // Measure container width
+  useEffect(() => {
+    function measure() { setCw(cRef.current?.clientWidth ?? window.innerWidth) }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [])
+
+  // Init offset once measured
+  useEffect(() => {
+    if (cw > 0 && !initialized.current) {
+      initialized.current = true
+      const cpW = (cw / 4) * N
+      offRef.current = -cpW
+      setOffPx(-cpW)
+    }
+  }, [cw, N])
+
+  // Auto-drift animation (restarts when cw known)
+  useEffect(() => {
+    if (cw === 0) return
+    const pW  = cw / 4
+    const cpW = pW * N
+    function norm(px: number) {
+      let o = px
+      if (o < -2 * cpW) o += cpW
+      if (o >= 0)        o -= cpW
+      return o
+    }
+    const SPEED = 55  // px / second
+    function tick(t: number) {
+      if (!dragging.current && lastT.current) {
+        const dt = Math.min(t - lastT.current, 50) / 1000
+        offRef.current = norm(offRef.current - SPEED * dt)
+        setOffPx(offRef.current)
+      }
+      lastT.current = t
+      raf.current = requestAnimationFrame(tick)
+    }
+    raf.current = requestAnimationFrame(tick)
+    return () => { if (raf.current) cancelAnimationFrame(raf.current) }
+  }, [cw, N])
+
+  function onDown(x: number) {
+    dragging.current = true
+    dStart.current = { x, off: offRef.current }
+  }
+  function onMove(x: number) {
+    if (!dragging.current) return
+    const pW  = cw / 4
+    const cpW = pW * N
+    let o = dStart.current.off + (x - dStart.current.x)
+    if (o < -2 * cpW) o += cpW
+    if (o >= 0)        o -= cpW
+    offRef.current = o
+    setOffPx(o)
+  }
+  function onUp() { dragging.current = false }
+
+  const pW  = cw / 4
+  const cpW = pW * N
+
+  return (
+    <div ref={cRef}
+         className="relative overflow-hidden"
+         style={{
+           minHeight: 'calc(100vh - 80px)',
+           marginTop: '-24px', marginBottom: '-24px',
+           marginLeft: '-16px', marginRight: '-16px',
+           cursor: 'grab', touchAction: 'none', userSelect: 'none',
+         }}
+         onMouseDown={e => onDown(e.clientX)}
+         onMouseMove={e => onMove(e.clientX)}
+         onMouseUp={onUp}
+         onMouseLeave={onUp}
+         onTouchStart={e => onDown(e.touches[0].clientX)}
+         onTouchMove={e => onMove(e.touches[0].clientX)}
+         onTouchEnd={onUp}>
+
+      {/* ── Scrolling strip ── */}
+      {cw > 0 && (
+        <div className="absolute top-0 left-0 h-full flex"
+             style={{ width: `${COPIES * cpW}px`, transform: `translateX(${offPx}px)` }}>
+          {Array.from({ length: N * COPIES }, (_, i) => {
+            const bi = i % N
+            const b  = BEAUTY_DATA[bi]
+            const isH = hovered === bi
+            return (
+              <div key={i}
+                   className="relative h-full overflow-hidden flex-shrink-0"
+                   style={{ width: `${pW}px` }}
+                   onMouseEnter={() => setHovered(bi)}
+                   onMouseLeave={() => setHovered(null)}>
+
+                {/* Beauty image — full image shifted so correct column is visible */}
+                <img src={`/assets/beauties-${b.img}.jpg`} draggable={false} alt=""
+                     className="absolute top-0 h-full pointer-events-none select-none"
+                     style={{
+                       width: `${cw}px`,
+                       left: `${-b.col * pW}px`,
+                       objectFit: 'cover',
+                       objectPosition: 'center top',
+                       animation: `panelFloat${bi % 2 ? 'B' : 'A'} ${11 + (bi % 4) * 1.5}s ease-in-out infinite`,
+                       animationDelay: `${-(bi * 1.3)}s`,
+                     }} />
+
+                {/* Poem overlay */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center px-2"
+                     style={{
+                       background: isH
+                         ? 'linear-gradient(to bottom, transparent 5%, rgba(0,0,0,0.62) 45%, rgba(0,0,0,0.62) 55%, transparent 95%)'
+                         : 'transparent',
+                       opacity: isH ? 1 : 0,
+                       transition: 'opacity 0.4s ease, background 0.4s ease',
+                       pointerEvents: 'none',
+                     }}>
+                  <div className="text-center space-y-1.5"
+                       style={{ transform: isH ? 'translateY(0)' : 'translateY(12px)', transition: 'transform 0.5s ease' }}>
+                    <div className="font-bold text-sm tracking-widest"
+                         style={{ color: '#fde047', textShadow: '0 0 18px rgba(251,191,36,0.95), 0 1px 4px rgba(0,0,0,0.9)' }}>
+                      {b.name}
+                    </div>
+                    <div className="text-xs tracking-widest"
+                         style={{ color: 'rgba(253,224,71,0.6)', textShadow: '0 1px 4px rgba(0,0,0,0.9)', marginBottom: '6px' }}>
+                      ── {b.label} ──
+                    </div>
+                    {b.poem.map((line, li) => (
+                      <div key={li} className="text-xs leading-relaxed"
+                           style={{
+                             color: 'rgba(255,255,255,0.93)',
+                             textShadow: '0 1px 6px rgba(0,0,0,0.95)',
+                             letterSpacing: '0.08em',
+                           }}>
+                        {line}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── Gradient overlays ── */}
+      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-green-950 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-green-950 to-transparent pointer-events-none" />
+
+      {/* ── Content: title + buttons ── */}
+      <div className="absolute inset-0 flex flex-col items-center justify-end pb-12 pointer-events-none"
+           style={{ zIndex: 10 }}>
+        <div className="text-center mb-8 space-y-2">
+          <div className="text-4xl font-black tracking-[0.3em]"
+               style={{ color: '#fde047', textShadow: '0 0 40px rgba(251,191,36,0.6), 0 2px 8px rgba(0,0,0,0.95)' }}>
+            十三支
+          </div>
+          <div className="text-sm tracking-widest"
+               style={{ color: 'rgba(254,240,138,0.72)', textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>
+            歡迎，{player}！
+          </div>
+        </div>
+        <div className="flex gap-4 pointer-events-auto">
+          <button onClick={onEnterRoom}
+            className="px-10 py-3 rounded-2xl bg-yellow-400 text-gray-900 font-bold text-base
+                       hover:bg-yellow-300 active:scale-95 transition-all shadow-2xl border border-yellow-200/40">
+            進入大廳
+          </button>
+          <button onClick={onSolo}
+            className="px-10 py-3 rounded-2xl font-bold text-base text-white
+                       hover:opacity-90 active:scale-95 transition-all shadow-xl border border-green-400/40"
+            style={{ background: 'rgba(22,101,52,0.75)', backdropFilter: 'blur(6px)' }}>
+            獨自練功
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function randomBeauties(): string[] {
   const pool = [...BEAUTIES]
   const out: string[] = []
@@ -1182,15 +1399,13 @@ export default function OnlinePage() {
       </div>
 
       <style>{`
-        @keyframes floatA {
-          0%, 100% { transform: scale(1.05) translate(0%, 0%); }
-          35%       { transform: scale(1.08) translate(0.9%, -1%); }
-          65%       { transform: scale(1.06) translate(-0.5%, 0.6%); }
+        @keyframes panelFloatA {
+          0%, 100% { transform: scale(1.04) translateY(0); }
+          50%       { transform: scale(1.07) translateY(-0.7%); }
         }
-        @keyframes floatB {
-          0%, 100% { transform: scale(1.06) translate(0%, 0%); }
-          40%       { transform: scale(1.09) translate(-0.8%, 0.9%); }
-          70%       { transform: scale(1.05) translate(0.6%, -0.5%); }
+        @keyframes panelFloatB {
+          0%, 100% { transform: scale(1.05) translateY(0); }
+          50%       { transform: scale(1.08) translateY(0.6%); }
         }
         @keyframes grandSlam {
           0%   { transform: scale(0.3) rotate(-8deg); opacity: 0; }
@@ -1212,71 +1427,11 @@ export default function OnlinePage() {
 
   function renderEnterLobby() {
     return (
-      <div className="relative -mx-4 -my-6 overflow-hidden flex items-center justify-center"
-           style={{ minHeight: 'calc(100vh - 80px)' }}>
-
-        {/* ── Background: two images side by side ── */}
-        <div className="absolute inset-0 flex">
-          <div className="w-1/2 overflow-hidden">
-            <img src="/assets/beauties-left.jpg" alt=""
-              className="h-full w-full object-cover object-center select-none pointer-events-none"
-              style={{ animation: 'floatA 13s ease-in-out infinite', transformOrigin: 'center center' }} />
-          </div>
-          <div className="w-1/2 overflow-hidden">
-            <img src="/assets/beauties-right.jpg" alt=""
-              className="h-full w-full object-cover object-center select-none pointer-events-none"
-              style={{ animation: 'floatB 16s ease-in-out infinite', transformOrigin: 'center center' }} />
-          </div>
-        </div>
-
-        {/* ── Gradient overlays ── */}
-        {/* top fade → blend into header */}
-        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-green-950 to-transparent pointer-events-none" />
-        {/* bottom fade */}
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-green-950 to-transparent pointer-events-none" />
-        {/* side vignettes */}
-        <div className="absolute inset-y-0 left-0 w-28 bg-gradient-to-r from-green-950/80 to-transparent pointer-events-none" />
-        <div className="absolute inset-y-0 right-0 w-28 bg-gradient-to-l from-green-950/80 to-transparent pointer-events-none" />
-        {/* centre seam blend */}
-        <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-20 pointer-events-none"
-             style={{ background: 'linear-gradient(to right, transparent, rgba(1,32,14,0.45), transparent)' }} />
-        {/* overall dark wash */}
-        <div className="absolute inset-0 bg-black/20 pointer-events-none" />
-
-        {/* ── Content ── */}
-        <div className="relative z-10 flex flex-col items-center gap-10 px-6">
-          {/* Title */}
-          <div className="text-center space-y-3">
-            <div className="text-5xl font-black tracking-[0.25em] text-yellow-300"
-                 style={{ textShadow: '0 0 40px rgba(251,191,36,0.55), 0 2px 6px rgba(0,0,0,0.95)' }}>
-              十三支
-            </div>
-            <div className="text-base font-semibold tracking-widest text-yellow-100/80"
-                 style={{ textShadow: '0 1px 6px rgba(0,0,0,0.9)' }}>
-              歡迎，{player}！
-            </div>
-          </div>
-
-          {/* Buttons */}
-          <div className="flex flex-col items-center gap-4 w-48">
-            <button
-              onClick={() => setInRoom(true)}
-              className="w-full py-3.5 rounded-2xl bg-yellow-400 text-gray-900 font-bold text-lg
-                         hover:bg-yellow-300 active:scale-95 transition-all shadow-2xl
-                         border border-yellow-200/40">
-              進入大廳
-            </button>
-            <button
-              onClick={() => setSoloSetupMode(true)}
-              className="w-full py-3.5 rounded-2xl font-bold text-lg text-white
-                         hover:bg-green-600/80 active:scale-95 transition-all shadow-xl
-                         border border-green-400/40"
-              style={{ background: 'rgba(22,101,52,0.72)', backdropFilter: 'blur(6px)' }}>
-              獨自練功
-            </button>
-          </div>
-        </div>
-      </div>
+      <BeautyCarousel
+        player={player}
+        onEnterRoom={() => setInRoom(true)}
+        onSolo={() => setSoloSetupMode(true)}
+      />
     )
   }
 
