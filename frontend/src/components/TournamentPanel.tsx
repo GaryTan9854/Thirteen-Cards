@@ -170,23 +170,23 @@ export default function TournamentPanel({
 
       {/* ── 累積比分綠框 ── */}
       <div className="bg-slate-800 rounded-2xl p-4 shadow-inner">
-        <div className="text-sm text-sky-400 mb-2 font-semibold text-center">累積比分</div>
+        <div className="text-[17px] text-sky-400 mb-2 font-semibold text-center">累積比分</div>
         <div className="grid grid-cols-4 gap-3">
           {names.map((name, i) => (
             <div key={name} className="flex flex-col items-center gap-1">
-              <BeautyAvatar name={name} size={80} idx={i} isMe={myName ? name === myName : false} />
-              <span className="text-xs text-sky-300 truncate max-w-full">{name}</span>
+              <BeautyAvatar name={name} size={104} idx={i} isMe={myName ? name === myName : false} />
+              <span className="text-[15px] text-sky-300 truncate max-w-full">{name}</span>
               <span className={`text-2xl font-bold font-cinzel ${scoreColor(totalScores[i])}`}>
                 {fmt(totalScores[i])}
               </span>
               {roundCount > 0 && i === lowestPlayer && !isEnded && (
-                <span className="text-sm text-orange-400 mt-0.5">▼ 最低</span>
+                <span className="text-[17px] text-orange-400 mt-0.5">▼ 最低</span>
               )}
               {isEnded && i === winnerIdx && (
-                <span className="text-sm text-yellow-400 mt-0.5">🏆 冠軍</span>
+                <span className="text-[17px] text-yellow-400 mt-0.5">🏆 冠軍</span>
               )}
               {isEnded && i === lowestPlayer && (
-                <span className="text-sm text-orange-400 mt-0.5">🍽️ 請客</span>
+                <span className="text-[17px] text-orange-400 mt-0.5">🍽️ 請客</span>
               )}
             </div>
           ))}
@@ -194,7 +194,7 @@ export default function TournamentPanel({
 
         {isEnded && (
           <div className="mt-3 bg-gray-800 rounded-xl px-4 py-2.5">
-            <div className="flex items-center justify-between text-sm gap-2">
+            <div className="flex items-center justify-between text-[17px] gap-2">
               <span className="text-gray-400 font-semibold whitespace-nowrap">🏁 本場結束！</span>
               <span className="text-gray-300 whitespace-nowrap">
                 <strong className="text-orange-300">{names[lowestPlayer]}</strong> 請客 🍽️

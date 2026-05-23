@@ -27,7 +27,7 @@ export default function GameResultDisplay({ result, strategies, multiplier = 1 }
     <>
       {/* ── 本局比分 strip ── */}
       <div className="bg-slate-800 rounded-2xl p-4 shadow-inner">
-        <div className="text-xs text-sky-400 mb-2 font-semibold text-center">本局比分</div>
+        <div className="text-[15px] text-sky-400 mb-2 font-semibold text-center">本局比分</div>
         <div className="grid grid-cols-4 gap-3">
           {(result.final_scores ?? []).map((fs: any) => (
             <div key={fs.name} className="flex flex-col items-center gap-1">
