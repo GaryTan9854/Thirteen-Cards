@@ -108,52 +108,56 @@ const BEAUTY_DATA = [
 function BeautyCarousel({ player, onEnterRoom, onSolo }: {
   player: string | null; onEnterRoom: () => void; onSolo: () => void
 }) {
-  const N = BEAUTY_DATA.length  // 8
+  const N = BEAUTY_DATA.length   // 8
   const COPIES = 3
 
-  const cRef       = useRef<HTMLDivElement>(null)
-  const [cw, setCw] = useState(0)
-  const offRef     = useRef(0)
+  const cRef        = useRef<HTMLDivElement>(null)
+  const cwRef       = useRef(0)                    // always-current width (no stale closures)
+  const [cw, setCw] = useState(0)                  // triggers re-render for strip layout
+  const offRef      = useRef(0)
   const [offPx, setOffPx] = useState(0)
   const initialized = useRef(false)
-  const dragging   = useRef(false)
-  const dStart     = useRef({ x: 0, off: 0 })
-  const raf        = useRef<number>()
-  const lastT      = useRef(0)
+  const dragging    = useRef(false)
+  const dStart      = useRef({ x: 0, off: 0 })
+  const raf         = useRef<number>()
+  const lastT       = useRef(0)
   const [hovered, setHovered] = useState<number | null>(null)
 
-  // Measure container width
+  // Keep cwRef in sync
+  useEffect(() => { cwRef.current = cw }, [cw])
+
+  // Measure + init offset once
   useEffect(() => {
-    function measure() { setCw(cRef.current?.clientWidth ?? window.innerWidth) }
+    function measure() {
+      const w = cRef.current?.clientWidth ?? window.innerWidth
+      cwRef.current = w
+      setCw(w)
+      if (!initialized.current && w > 0) {
+        initialized.current = true
+        const cpW = (w / 4) * N
+        offRef.current = -cpW
+        setOffPx(-cpW)
+      }
+    }
     measure()
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
-  }, [])
+  }, [N])
 
-  // Init offset once measured
-  useEffect(() => {
-    if (cw > 0 && !initialized.current) {
-      initialized.current = true
-      const cpW = (cw / 4) * N
-      offRef.current = -cpW
-      setOffPx(-cpW)
-    }
-  }, [cw, N])
+  // Normalization helper (keeps offset in middle-copy range)
+  const norm = useCallback((px: number) => {
+    const cpW = (cwRef.current / 4) * N
+    let o = px
+    while (o < -2 * cpW) o += cpW
+    while (o >= 0)        o -= cpW
+    return o
+  }, [N])
 
-  // Auto-drift animation (restarts when cw known)
+  // Auto-drift (slow, elegant)
   useEffect(() => {
-    if (cw === 0) return
-    const pW  = cw / 4
-    const cpW = pW * N
-    function norm(px: number) {
-      let o = px
-      if (o < -2 * cpW) o += cpW
-      if (o >= 0)        o -= cpW
-      return o
-    }
-    const SPEED = 55  // px / second
+    const SPEED = 18  // px / second
     function tick(t: number) {
-      if (!dragging.current && lastT.current) {
+      if (!dragging.current && lastT.current && cwRef.current > 0) {
         const dt = Math.min(t - lastT.current, 50) / 1000
         offRef.current = norm(offRef.current - SPEED * dt)
         setOffPx(offRef.current)
@@ -163,23 +167,40 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
     }
     raf.current = requestAnimationFrame(tick)
     return () => { if (raf.current) cancelAnimationFrame(raf.current) }
-  }, [cw, N])
+  }, [norm])
+
+  // Document-level drag — so dragging works even when cursor leaves the component
+  useEffect(() => {
+    const moveHandler = (e: MouseEvent) => {
+      if (!dragging.current) return
+      const o = norm(dStart.current.off + (e.clientX - dStart.current.x))
+      offRef.current = o
+      setOffPx(o)
+    }
+    const touchHandler = (e: TouchEvent) => {
+      if (!dragging.current) return
+      e.preventDefault()
+      const o = norm(dStart.current.off + (e.touches[0].clientX - dStart.current.x))
+      offRef.current = o
+      setOffPx(o)
+    }
+    const upHandler = () => { dragging.current = false }
+    document.addEventListener('mousemove', moveHandler)
+    document.addEventListener('mouseup',   upHandler)
+    document.addEventListener('touchmove', touchHandler as EventListener, { passive: false })
+    document.addEventListener('touchend',  upHandler)
+    return () => {
+      document.removeEventListener('mousemove', moveHandler)
+      document.removeEventListener('mouseup',   upHandler)
+      document.removeEventListener('touchmove', touchHandler as EventListener)
+      document.removeEventListener('touchend',  upHandler)
+    }
+  }, [norm])
 
   function onDown(x: number) {
     dragging.current = true
     dStart.current = { x, off: offRef.current }
   }
-  function onMove(x: number) {
-    if (!dragging.current) return
-    const pW  = cw / 4
-    const cpW = pW * N
-    let o = dStart.current.off + (x - dStart.current.x)
-    if (o < -2 * cpW) o += cpW
-    if (o >= 0)        o -= cpW
-    offRef.current = o
-    setOffPx(o)
-  }
-  function onUp() { dragging.current = false }
 
   const pW  = cw / 4
   const cpW = pW * N
@@ -188,20 +209,16 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
     <div ref={cRef}
          className="relative overflow-hidden"
          style={{
-           minHeight: 'calc(100vh - 80px)',
+           // Use height (not minHeight) so child h-full percentages work correctly
+           height: 'calc(100vh - 80px)',
            marginTop: '-24px', marginBottom: '-24px',
            marginLeft: '-16px', marginRight: '-16px',
            cursor: 'grab', touchAction: 'none', userSelect: 'none',
          }}
          onMouseDown={e => onDown(e.clientX)}
-         onMouseMove={e => onMove(e.clientX)}
-         onMouseUp={onUp}
-         onMouseLeave={onUp}
-         onTouchStart={e => onDown(e.touches[0].clientX)}
-         onTouchMove={e => onMove(e.touches[0].clientX)}
-         onTouchEnd={onUp}>
+         onTouchStart={e => onDown(e.touches[0].clientX)}>
 
-      {/* ── Scrolling strip ── */}
+      {/* ── Scrolling strip: 3 copies × 8 panels ── */}
       {cw > 0 && (
         <div className="absolute top-0 left-0 h-full flex"
              style={{ width: `${COPIES * cpW}px`, transform: `translateX(${offPx}px)` }}>
@@ -216,45 +233,42 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
                    onMouseEnter={() => setHovered(bi)}
                    onMouseLeave={() => setHovered(null)}>
 
-                {/* Beauty image — full image shifted so correct column is visible */}
-                <img src={`/assets/beauties-${b.img}.jpg`} draggable={false} alt=""
-                     className="absolute top-0 h-full pointer-events-none select-none"
+                {/* Background-image approach: exact pixel fit, no distortion artifacts */}
+                <div className="absolute inset-0"
                      style={{
-                       width: `${cw}px`,
-                       left: `${-b.col * pW}px`,
-                       objectFit: 'cover',
-                       objectPosition: 'center top',
+                       backgroundImage: `url(/assets/beauties-${b.img}.jpg)`,
+                       // Scale image to exactly fill: cw wide × 100% tall
+                       backgroundSize: `${cw}px 100%`,
+                       // Shift horizontally to show the correct beauty column
+                       backgroundPosition: `${-b.col * pW}px top`,
+                       backgroundRepeat: 'no-repeat',
                        animation: `panelFloat${bi % 2 ? 'B' : 'A'} ${11 + (bi % 4) * 1.5}s ease-in-out infinite`,
-                       animationDelay: `${-(bi * 1.3)}s`,
+                       animationDelay: `${-(bi * 1.8)}s`,
                      }} />
 
-                {/* Poem overlay */}
+                {/* Poem overlay — fade + slide in on hover */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center px-2"
                      style={{
                        background: isH
-                         ? 'linear-gradient(to bottom, transparent 5%, rgba(0,0,0,0.62) 45%, rgba(0,0,0,0.62) 55%, transparent 95%)'
+                         ? 'linear-gradient(to bottom, transparent 5%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.6) 60%, transparent 95%)'
                          : 'transparent',
                        opacity: isH ? 1 : 0,
-                       transition: 'opacity 0.4s ease, background 0.4s ease',
+                       transition: 'opacity 0.45s ease, background 0.45s ease',
                        pointerEvents: 'none',
                      }}>
                   <div className="text-center space-y-1.5"
-                       style={{ transform: isH ? 'translateY(0)' : 'translateY(12px)', transition: 'transform 0.5s ease' }}>
+                       style={{ transform: isH ? 'translateY(0)' : 'translateY(14px)', transition: 'transform 0.5s ease' }}>
                     <div className="font-bold text-sm tracking-widest"
-                         style={{ color: '#fde047', textShadow: '0 0 18px rgba(251,191,36,0.95), 0 1px 4px rgba(0,0,0,0.9)' }}>
+                         style={{ color: '#fde047', textShadow: '0 0 20px rgba(251,191,36,0.95), 0 1px 4px rgba(0,0,0,0.9)' }}>
                       {b.name}
                     </div>
                     <div className="text-xs tracking-widest"
-                         style={{ color: 'rgba(253,224,71,0.6)', textShadow: '0 1px 4px rgba(0,0,0,0.9)', marginBottom: '6px' }}>
+                         style={{ color: 'rgba(253,224,71,0.55)', textShadow: '0 1px 4px rgba(0,0,0,0.9)', marginBottom: 6 }}>
                       ── {b.label} ──
                     </div>
                     {b.poem.map((line, li) => (
                       <div key={li} className="text-xs leading-relaxed"
-                           style={{
-                             color: 'rgba(255,255,255,0.93)',
-                             textShadow: '0 1px 6px rgba(0,0,0,0.95)',
-                             letterSpacing: '0.08em',
-                           }}>
+                           style={{ color: 'rgba(255,255,255,0.93)', textShadow: '0 1px 6px rgba(0,0,0,0.95)', letterSpacing: '0.08em' }}>
                         {line}
                       </div>
                     ))}
@@ -267,10 +281,10 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
       )}
 
       {/* ── Gradient overlays ── */}
-      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-green-950 to-transparent pointer-events-none" />
-      <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-green-950 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-green-950 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-green-950 to-transparent pointer-events-none" />
 
-      {/* ── Content: title + buttons ── */}
+      {/* ── Title + buttons ── */}
       <div className="absolute inset-0 flex flex-col items-center justify-end pb-12 pointer-events-none"
            style={{ zIndex: 10 }}>
         <div className="text-center mb-8 space-y-2">
