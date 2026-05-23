@@ -1182,6 +1182,16 @@ export default function OnlinePage() {
       </div>
 
       <style>{`
+        @keyframes floatA {
+          0%, 100% { transform: scale(1.05) translate(0%, 0%); }
+          35%       { transform: scale(1.08) translate(0.9%, -1%); }
+          65%       { transform: scale(1.06) translate(-0.5%, 0.6%); }
+        }
+        @keyframes floatB {
+          0%, 100% { transform: scale(1.06) translate(0%, 0%); }
+          40%       { transform: scale(1.09) translate(-0.8%, 0.9%); }
+          70%       { transform: scale(1.05) translate(0.6%, -0.5%); }
+        }
         @keyframes grandSlam {
           0%   { transform: scale(0.3) rotate(-8deg); opacity: 0; }
           60%  { transform: scale(1.12) rotate(2deg); opacity: 1; }
@@ -1202,24 +1212,70 @@ export default function OnlinePage() {
 
   function renderEnterLobby() {
     return (
-      <div className="flex flex-col items-center justify-center gap-6 py-16">
-        <div className="text-6xl">🃏</div>
-        <div className="text-center space-y-1">
-          <div className="text-2xl font-bold text-yellow-300">歡迎，{player}！</div>
-          <div className="text-sm text-gray-500">加入大廳即可與其他玩家連線或獨自練習</div>
+      <div className="relative -mx-4 -my-6 overflow-hidden flex items-center justify-center"
+           style={{ minHeight: 'calc(100vh - 80px)' }}>
+
+        {/* ── Background: two images side by side ── */}
+        <div className="absolute inset-0 flex">
+          <div className="w-1/2 overflow-hidden">
+            <img src="/beauties-left.jpg" alt=""
+              className="h-full w-full object-cover object-center select-none pointer-events-none"
+              style={{ animation: 'floatA 13s ease-in-out infinite', transformOrigin: 'center center' }} />
+          </div>
+          <div className="w-1/2 overflow-hidden">
+            <img src="/beauties-right.jpg" alt=""
+              className="h-full w-full object-cover object-center select-none pointer-events-none"
+              style={{ animation: 'floatB 16s ease-in-out infinite', transformOrigin: 'center center' }} />
+          </div>
         </div>
-        <button
-          onClick={() => setInRoom(true)}
-          className="px-10 py-3 rounded-xl bg-yellow-400 text-gray-900 font-bold text-lg
-                     hover:bg-yellow-300 active:scale-95 transition-all shadow-lg">
-          進入大廳
-        </button>
-        <button
-          onClick={() => setSoloSetupMode(true)}
-          className="px-10 py-3 rounded-xl bg-green-600 text-white font-bold text-lg
-                     hover:bg-green-500 active:scale-95 transition-all shadow-lg">
-          獨自練功
-        </button>
+
+        {/* ── Gradient overlays ── */}
+        {/* top fade → blend into header */}
+        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-green-950 to-transparent pointer-events-none" />
+        {/* bottom fade */}
+        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-green-950 to-transparent pointer-events-none" />
+        {/* side vignettes */}
+        <div className="absolute inset-y-0 left-0 w-28 bg-gradient-to-r from-green-950/80 to-transparent pointer-events-none" />
+        <div className="absolute inset-y-0 right-0 w-28 bg-gradient-to-l from-green-950/80 to-transparent pointer-events-none" />
+        {/* centre seam blend */}
+        <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-20 pointer-events-none"
+             style={{ background: 'linear-gradient(to right, transparent, rgba(1,32,14,0.45), transparent)' }} />
+        {/* overall dark wash */}
+        <div className="absolute inset-0 bg-black/20 pointer-events-none" />
+
+        {/* ── Content ── */}
+        <div className="relative z-10 flex flex-col items-center gap-10 px-6">
+          {/* Title */}
+          <div className="text-center space-y-3">
+            <div className="text-5xl font-black tracking-[0.25em] text-yellow-300"
+                 style={{ textShadow: '0 0 40px rgba(251,191,36,0.55), 0 2px 6px rgba(0,0,0,0.95)' }}>
+              十三支
+            </div>
+            <div className="text-base font-semibold tracking-widest text-yellow-100/80"
+                 style={{ textShadow: '0 1px 6px rgba(0,0,0,0.9)' }}>
+              歡迎，{player}！
+            </div>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex flex-col items-center gap-4 w-48">
+            <button
+              onClick={() => setInRoom(true)}
+              className="w-full py-3.5 rounded-2xl bg-yellow-400 text-gray-900 font-bold text-lg
+                         hover:bg-yellow-300 active:scale-95 transition-all shadow-2xl
+                         border border-yellow-200/40">
+              進入大廳
+            </button>
+            <button
+              onClick={() => setSoloSetupMode(true)}
+              className="w-full py-3.5 rounded-2xl font-bold text-lg text-white
+                         hover:bg-green-600/80 active:scale-95 transition-all shadow-xl
+                         border border-green-400/40"
+              style={{ background: 'rgba(22,101,52,0.72)', backdropFilter: 'blur(6px)' }}>
+              獨自練功
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
