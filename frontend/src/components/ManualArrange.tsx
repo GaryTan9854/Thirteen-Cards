@@ -73,14 +73,15 @@ function CardTile({ cs, size='md' }: { cs:string; size?:'xs'|'sm'|'md'|'lg' }) {
 
 // ─── RowDisplay ───────────────────────────────────────────────────────────────
 
-function RowDisplay({ label, cards, slots }: { label:string; cards:string[]; slots:number }) {
+function RowDisplay({ label, cards, slots, size='md' }: { label:string; cards:string[]; slots:number; size?:'md'|'lg' }) {
+  const emptyDim = size === 'lg' ? 'w-14 h-20' : 'w-11 h-16'
   return (
     <div className="flex items-center gap-2 py-2 border-b border-gray-700 last:border-0">
       <span className="w-10 text-xs text-gray-400 shrink-0">{label}</span>
       <div className="flex gap-2">
-        {cards.map((cs,i) => <CardTile key={i} cs={cs} size="md" />)}
+        {cards.map((cs,i) => <CardTile key={i} cs={cs} size={size} />)}
         {Array.from({length: slots - cards.length}).map((_,i) => (
-          <span key={'e'+i} className="w-11 h-16 shrink-0 rounded-lg border-2 border-dashed border-gray-600" />
+          <span key={'e'+i} className={`${emptyDim} shrink-0 rounded-lg border-2 border-dashed border-gray-600`} />
         ))}
       </div>
     </div>
@@ -190,9 +191,20 @@ interface Props {
   countdown?:      number    // if provided, show timer; auto-submit at 0
   submittedCount?: number    // how many players have submitted (online mode)
   totalPlayers?:   number    // total human players in this round (online mode)
+  // 2d: round header info
+  roundLabel?:     string    // e.g. "第 3 / 16 局"
+  playerNames?:    string[]  // all 4 seat names for cumulative display
+  cumScores?:      number[]  // all 4 cumulative scores so far
 }
 
-export default function ManualArrange({ hand, onConfirm, countdown, submittedCount, totalPlayers }: Props) {
+function scoreColor(n: number) {
+  return n > 0 ? 'text-yellow-300' : n < 0 ? 'text-red-400' : 'text-gray-400'
+}
+
+export default function ManualArrange({ hand, onConfirm, countdown, submittedCount, totalPlayers,
+  roundLabel, playerNames, cumScores }: Props) {
+
+  const isDesktop = useMemo(() => window.innerWidth >= 640, [])
 
   // ── Sort / animate ──
   const [sorted,   setSorted]   = useState(false)
@@ -326,11 +338,27 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
     <>
     <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center">
       <div className="bg-gray-900 rounded-2xl shadow-2xl flex flex-col gap-3 sm:gap-4 p-3 sm:p-5 overflow-y-auto"
-        style={{width:'95vw', maxWidth:'1060px', maxHeight:'94dvh', WebkitOverflowScrolling:'touch'}}>
+        style={{width:'95vw', maxWidth:'780px', maxHeight:'94dvh', WebkitOverflowScrolling:'touch'}}>
 
         {/* ── Actions (TOP) ── */}
-        <div className="flex flex-col gap-2">
-          {/* Row 1: 離開 + 確定送出 */}
+        <div className="flex flex-col gap-1.5">
+          {/* Round info + cumulative scores */}
+          {(roundLabel || (playerNames && cumScores)) && (
+            <div className="flex items-center gap-2 flex-wrap text-xs">
+              {roundLabel && (
+                <span className="text-yellow-300 font-semibold">{roundLabel}</span>
+              )}
+              {playerNames && cumScores && playerNames.map((n, i) => (
+                <span key={n} className="text-gray-400">
+                  <span className="text-sky-300">{n[0] ?? n}</span>
+                  <span className={`ml-0.5 font-bold ${scoreColor(cumScores[i] ?? 0)}`}>
+                    {(cumScores[i] ?? 0) > 0 ? '+' : ''}{cumScores[i] ?? 0}
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
+          {/* Row: 離開 + 確定送出 */}
           <div className="flex items-center gap-2">
             <button onClick={() => setLeaveConfirmPending(true)}
               className="px-4 py-1.5 rounded-lg bg-gray-700 text-gray-300 text-sm hover:bg-gray-600">
@@ -344,7 +372,7 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
               確定送出
             </button>
           </div>
-          {/* Row 2: 報到 (only when special hand detected) */}
+          {/* 報到 (only when special hand detected) */}
           {isBaodaoHand && (
             <button
               onClick={() => onConfirm(arr.top, arr.mid, arr.bot, true)}
@@ -355,21 +383,14 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
           )}
         </div>
 
-        {/* ── Toggle buttons: 原始手牌 / 手牌特徵 ── */}
+        {/* ── Toggle: 原始手牌 ── */}
         <div className="flex items-center gap-2">
           <button onClick={() => setShowHand(v => !v)}
             className={`text-xs px-2.5 py-1 rounded-full border transition-colors
               ${showHand
                 ? 'bg-sky-800 border-sky-600 text-sky-200'
                 : 'bg-gray-700 border-gray-500 text-gray-300 hover:border-sky-500'}`}>
-            原始手牌 {showHand ? '▲' : '▼'}
-          </button>
-          <button onClick={() => setShowStats(v => !v)}
-            className={`text-xs px-2.5 py-1 rounded-full border transition-colors
-              ${showStats
-                ? 'bg-sky-800 border-sky-600 text-sky-200'
-                : 'bg-gray-700 border-gray-500 text-gray-300 hover:border-sky-500'}`}>
-            手牌特徵 {showStats ? '▲' : '▼'}
+            {showHand ? '收起原始手牌' : '展開原始手牌'}
           </button>
           {showHand && sorted && (
             <button
@@ -381,20 +402,37 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
           )}
         </div>
 
-        {/* ── Collapsible Hand + Stats ── */}
-        {(showHand || showStats) && (
-          <div className="flex flex-col sm:flex-row sm:gap-5 sm:items-start gap-2">
-            {showHand && (
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-nowrap gap-0.5 transition-opacity duration-200"
-                  style={{opacity: fade ? 0 : 1}}>
-                  {displayHand.map((cs,i) => <CardTile key={cs+i} cs={cs} size="xs" />)}
-                </div>
-              </div>
-            )}
-            {showStats && <StatsPanel stats={info?.stats} special={info?.special} />}
+        {/* ── Collapsible Hand ── */}
+        {showHand && (
+          <div className="flex-1 min-w-0">
+            {/* Mobile: xs cards (fit 13 in one row) */}
+            <div className="flex sm:hidden flex-nowrap gap-0.5 transition-opacity duration-200"
+              style={{opacity: fade ? 0 : 1}}>
+              {displayHand.map((cs,i) => <CardTile key={cs+i} cs={cs} size="xs" />)}
+            </div>
+            {/* Desktop: sm cards */}
+            <div className="hidden sm:flex flex-nowrap gap-1 transition-opacity duration-200"
+              style={{opacity: fade ? 0 : 1}}>
+              {displayHand.map((cs,i) => <CardTile key={cs+i+'d'} cs={cs} size="sm" />)}
+            </div>
           </div>
         )}
+
+        {/* ── 手牌特徵 section (header always visible, content toggles) ── */}
+        <div>
+          <button onClick={() => setShowStats(v => !v)}
+            className={`text-xs px-2.5 py-1 rounded-full border transition-colors
+              ${showStats
+                ? 'bg-sky-800 border-sky-600 text-sky-200'
+                : 'bg-gray-700 border-gray-500 text-gray-300 hover:border-sky-500'}`}>
+            手牌特徵 {showStats ? '▲' : '▼'}
+          </button>
+          {showStats && (
+            <div className="mt-2">
+              <StatsPanel stats={info?.stats} special={info?.special} />
+            </div>
+          )}
+        </div>
 
         {/* ── Arrangement (left) | Group buttons (right) ── */}
         <div className="flex flex-col sm:flex-row sm:gap-4 gap-3 sm:items-start">
@@ -409,9 +447,9 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
                 <span>尾：{curVariant.bot_desc}</span>
               </div>
             )}
-            <RowDisplay label="頭墩" cards={arr.top} slots={3} />
-            <RowDisplay label="中墩" cards={arr.mid} slots={5} />
-            <RowDisplay label="尾墩" cards={arr.bot} slots={5} />
+            <RowDisplay label="頭墩" cards={arr.top} slots={3} size={isDesktop ? 'lg' : 'md'} />
+            <RowDisplay label="中墩" cards={arr.mid} slots={5} size={isDesktop ? 'lg' : 'md'} />
+            <RowDisplay label="尾墩" cards={arr.bot} slots={5} size={isDesktop ? 'lg' : 'md'} />
           </div>
 
           {/* Group buttons panel (right) */}
@@ -433,10 +471,10 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
                           <button key={gi} onClick={()=>pickGroup(gi)}
                             className={`text-[16px] px-2 py-1.5 rounded-lg border transition-colors text-left
                               ${active
-                                ?'bg-yellow-400 text-gray-900 border-yellow-400 font-bold'
+                                ?'bg-sky-800 border-sky-500 text-sky-100 font-bold'
                                 : matched
-                                  ?'bg-gray-800 text-gray-200 border-orange-500 font-semibold'
-                                  :'bg-gray-800 text-gray-300 border-gray-600 hover:border-yellow-500'}`}>
+                                  ?'bg-gray-700 text-gray-200 border-orange-400 font-semibold'
+                                  :'bg-gray-700 border-gray-500 text-gray-300 hover:border-sky-500'}`}>
                             {g.label}
                             {active && cnt>1 && <span className="ml-1 opacity-70 text-sm">{varIdx+1}/{cnt}</span>}
                           </button>

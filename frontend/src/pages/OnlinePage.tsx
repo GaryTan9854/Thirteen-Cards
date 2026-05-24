@@ -288,8 +288,8 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
 
   // Mobile: scale background to fit container height (full figure visible, correct aspect ratio)
   // Sprite cell ratio: 384px wide × 1023px tall → cell_W/cell_H ≈ 0.3753
-  const isMobile    = cw > 0 && cw < 640
-  const mobileCellW = isMobile && availH > 0 ? availH * (384 / 1023) : pW
+  // Note: mobile uses same backgroundSize/Position logic as desktop (fill width, clip height)
+  // This avoids dark bars from the old 'auto 100%' approach
 
   return (
     <div ref={cRef}
@@ -328,10 +328,8 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
                        // Desktop: 4 × cw/4 = cw  |  Mobile: 4 × cw = 4cw (one beauty = cw)
                        // Mobile: fit-by-height so the full figure is visible; center in panel
                        // Desktop: fit-by-width to fill all 4 columns
-                       backgroundSize: isMobile ? 'auto 100%' : `${4 * pW}px auto`,
-                       backgroundPosition: isMobile
-                         ? `${pW / 2 - (b.col + 0.5) * mobileCellW}px top`
-                         : `${-b.col * pW}px top`,
+                       backgroundSize: `${4 * pW}px auto`,
+                       backgroundPosition: `${-b.col * pW}px top`,
                        backgroundRepeat: 'no-repeat',
                        animation: `panelFloat${bi % 2 ? 'B' : 'A'} ${11 + (bi % 4) * 1.5}s ease-in-out infinite`,
                        animationDelay: `${-(bi * 1.8)}s`,
@@ -1344,6 +1342,13 @@ export default function OnlinePage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  // Compute round header info for ManualArrange overlay (2d)
+  const arrangeSeats   = soloActive ? (soloStateRef.current?.seatNames ?? []) : (room?.seat_names ?? [])
+  const arrangeHistory = soloActive ? (soloStateRef.current?.history   ?? []) : (room?.history    ?? [])
+  const arrangeRound   = soloActive ? (soloStateRef.current?.currentRound ?? 0) : (room?.current_round ?? 0)
+  const arrangeCumScores = arrangeSeats.map((_, i) => arrangeHistory.reduce((s: number, r: number[]) => s + (r[i] ?? 0), 0))
+  const arrangeRoundLabel = arrangeRound > 0 ? `第 ${arrangeRound} / ${effRoundsNormal} 局` : undefined
+
   const arrangePortal = myHand && !submitted && phase === 'playing'
     ? createPortal(
         <ManualArrange
@@ -1352,6 +1357,9 @@ export default function OnlinePage() {
           countdown={countdown ?? undefined}
           submittedCount={submittedList.length}
           totalPlayers={soloActive ? 1 : (room?.players.length ?? 1)}
+          roundLabel={arrangeRoundLabel}
+          playerNames={arrangeSeats.length > 0 ? arrangeSeats : undefined}
+          cumScores={arrangeSeats.length > 0 ? arrangeCumScores : undefined}
         />,
         document.body
       )
@@ -1640,7 +1648,7 @@ export default function OnlinePage() {
           <div className="text-sm text-gray-400">記錄設定</div>
           <div className="flex flex-wrap gap-4">
             <LogToggle label="記錄此場遊戲" value={cfgRecordGame} onChange={setCfgRecordGame} />
-            {cfgRecordGame && <LogToggle label="記錄每局牌局" value={cfgRecordRounds} onChange={setCfgRecordRounds} />}
+            {cfgRecordGame && <LogToggle label="記錄每局手牌" value={cfgRecordRounds} onChange={setCfgRecordRounds} />}
             <LogToggle label="聯盟賽" value={cfgIsLeague} onChange={setCfgIsLeague} />
           </div>
           {cfgIsLeague && (
@@ -1882,7 +1890,7 @@ export default function OnlinePage() {
         <div className="space-y-2 border-t border-slate-600/40 pt-3">
           <div className="flex flex-wrap gap-4">
             <LogToggle label="記錄此場遊戲" value={cfgRecordGame} onChange={setCfgRecordGame} />
-            {cfgRecordGame && <LogToggle label="記錄每局牌局" value={cfgRecordRounds} onChange={setCfgRecordRounds} />}
+            {cfgRecordGame && <LogToggle label="記錄每局手牌" value={cfgRecordRounds} onChange={setCfgRecordRounds} />}
             <LogToggle label="聯盟賽" value={cfgIsLeague} onChange={setCfgIsLeague} />
           </div>
           {cfgIsLeague && (

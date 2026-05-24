@@ -1,19 +1,17 @@
 /**
  * TournamentPanel — shared cumulative score bar.
  *
- * Exact extraction of GamePage's TournamentBar + HistoryPanel.
- * Used identically by GamePage (simulation) and OnlinePage (online).
- *
  * Props:
  *   names        – player names in seat order [0..3]
  *   history      – per-round score rows (already scaled/multiplied)
- *   multipliers  – per-round multiplier labels (optional, GamePage only)
- *   circleMarks  – { roundIdx: playerIdx } to circle (optional, GamePage only)
- *   isEnded      – show 冠軍/請客 labels
+ *   multipliers  – per-round multiplier labels (optional)
+ *   circleMarks  – { roundIdx: playerIdx } to circle (optional)
+ *   roundBadges  – per-round per-seat event labels
+ *   isEnded      – show 🏆/🍽️ icons
  *   roundLabel   – badge text e.g. "第 2 / 16 局"
- *   voiceOn      – current voice state
- *   onToggleVoice
- *   actionButtons – right-side action buttons (different per page)
+ *   voiceOn / onToggleVoice
+ *   actionButtons – action buttons (下一局 / 再來一場 / etc.)
+ *   myName       – logged-in player (enables camera upload on avatar)
  */
 
 import { useState, useMemo } from 'react'
@@ -35,43 +33,49 @@ interface Props {
   history:       number[][]
   multipliers?:  number[]
   circleMarks?:  Record<number, number>
-  roundBadges?:  string[][][]         // per round → per seat: event labels shown beside score
+  roundBadges?:  string[][][]
   isEnded:       boolean
   roundLabel:    string
   voiceOn:       boolean
   onToggleVoice: () => void
   actionButtons: React.ReactNode
-  myName?:       string               // logged-in player — enables camera upload on their avatar
+  myName?:       string
 }
 
 export default function TournamentPanel({
   names, history, multipliers = [], circleMarks = {}, roundBadges = [],
   isEnded, roundLabel, voiceOn, onToggleVoice, actionButtons, myName = '',
 }: Props) {
-  const [historyView, setHistoryView] = useState<0 | 1 | 2>(0)
+  const [historyView,  setHistoryView]  = useState<0 | 1 | 2>(0)
+  const [pressedBadge, setPressedBadge] = useState<{r: number; j: number} | null>(null)
 
   const totalScores  = useMemo(() => computeTotals(history), [history])
   const lowestPlayer = lowestIdx(totalScores)
   const winnerIdx    = totalScores.indexOf(Math.max(...totalScores))
   const roundCount   = history.length
+  const lastScores   = roundCount > 0 ? history[roundCount - 1] : null
 
   const BTN = "text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold hover:bg-yellow-300 active:scale-95 transition whitespace-nowrap"
 
-  // ── HistoryPanel ───────────────────────────────────────────────────────────
+  // ── HistoryPanel ──────────────────────────────────────────────────────────
   const SPLIT = 10
   const runningTotals = useMemo(
     () => history.map((_, i) => computeTotals(history.slice(0, i + 1))),
     [history]
   )
-  const displayRows  = historyView === 2 ? runningTotals : history
-  const leftRounds   = displayRows.slice(0, SPLIT)
-  const rightRounds  = displayRows.slice(SPLIT)
+  const displayRows = historyView === 2 ? runningTotals : history
+  const leftRounds  = displayRows.slice(0, SPLIT)
+  const rightRounds = displayRows.slice(SPLIT)
 
   const ColHeader = () => (
     <div className="flex mb-1">
       <span className="w-14 shrink-0" />
       {names.map(n => (
-        <span key={n} className="flex-1 text-left text-sky-400 font-semibold text-lg truncate pl-2">{n}</span>
+        <span key={n} className="flex-1 text-left text-sky-400 font-semibold text-lg pl-2 truncate">
+          {/* mobile: first char only; desktop: full name */}
+          <span className="sm:hidden">{n[0] ?? n}</span>
+          <span className="hidden sm:inline">{n}</span>
+        </span>
       ))}
     </div>
   )
@@ -79,8 +83,8 @@ export default function TournamentPanel({
   const ColRows = ({ rounds, base }: { rounds: number[][], base: number }) => (
     <>
       {rounds.map((scores, i) => {
-        const roundIdx     = base + i
-        const mul          = multipliers[roundIdx] ?? 1
+        const roundIdx      = base + i
+        const mul           = multipliers[roundIdx] ?? 1
         const circledPlayer = circleMarks[roundIdx] ?? -1
         const badgesPerSeat = roundBadges[roundIdx] ?? []
         return (
@@ -92,20 +96,36 @@ export default function TournamentPanel({
               </span>
             </div>
             {scores.map((s, j) => {
-              const pBadges = badgesPerSeat[j] ?? []
+              const pBadges  = badgesPerSeat[j] ?? []
+              const isPressed = pressedBadge?.r === roundIdx && pressedBadge?.j === j
               return (
-                <span key={j} className="flex-1 flex flex-row items-center gap-1 pt-0.5 pl-2">
+                <span key={j}
+                  className="flex-1 flex flex-row items-center gap-1 pt-0.5 pl-2 relative"
+                  onMouseDown={() => pBadges.length > 0 && setPressedBadge({ r: roundIdx, j })}
+                  onMouseUp={() => setPressedBadge(null)}
+                  onMouseLeave={() => setPressedBadge(null)}
+                  onTouchStart={() => pBadges.length > 0 && setPressedBadge({ r: roundIdx, j })}
+                  onTouchEnd={() => setPressedBadge(null)}
+                >
                   {j === circledPlayer && !(isEnded && roundIdx === roundCount - 1)
                     ? <span className={`${scoreColor(s)} text-lg tabular-nums min-w-[2.8rem] outline outline-1 outline-orange-400 rounded-full inline-flex items-center justify-center h-[1.8rem] leading-none px-1`}>{fmt(s)}</span>
                     : <span className={`${scoreColor(s)} text-lg tabular-nums min-w-[2.8rem] inline-block`}>{fmt(s)}</span>
                   }
-                  <span className="flex flex-wrap gap-0.5">
-                  {pBadges.map(b => (
-                    <span key={b} className="text-[13px] px-1 rounded bg-purple-900/70 text-purple-300 font-bold leading-tight whitespace-nowrap">
-                      {b}
-                    </span>
-                  ))}
-                  </span>
+                  {/* Badges: desktop shows inline; mobile shows only on long-press */}
+                  {pBadges.length > 0 && (
+                    <>
+                      <span className="hidden sm:flex flex-wrap gap-0.5">
+                        {pBadges.map(b => (
+                          <span key={b} className="text-[13px] px-1 rounded bg-purple-900/70 text-purple-300 font-bold leading-tight whitespace-nowrap">{b}</span>
+                        ))}
+                      </span>
+                      {isPressed && (
+                        <span className="sm:hidden absolute left-0 bottom-full z-10 bg-gray-900 border border-purple-500 rounded px-2 py-1 text-purple-300 text-xs whitespace-nowrap shadow-lg pointer-events-none">
+                          {pBadges.join(' · ')}
+                        </span>
+                      )}
+                    </>
+                  )}
                 </span>
               )
             })}
@@ -152,61 +172,71 @@ export default function TournamentPanel({
     <div className="flex flex-col gap-3">
 
       {/* ── 控制列 ── */}
-      <div className="flex flex-col gap-2">
-        {/* Row 1: 局數標籤 + 語音 + 成績表 */}
+      <div className="flex flex-col gap-1.5">
+        {/* Row 1: 動作按鈕（下一局 / 再來一場 / 等待…） */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {actionButtons}
+        </div>
+        {/* Row 2: 局數標籤 + 成績表 toggle + 語音（同一行，省一行） */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold whitespace-nowrap select-none">
             {roundLabel}
           </span>
           <div className="flex-1" />
+          <button onClick={() => setHistoryView(v => ((v + 1) % 3) as 0 | 1 | 2)} className={BTN}>
+            {historyView === 0 ? '▸ 成績表' : historyView === 1 ? '▾ 單場' : '▾ 累計'}
+          </button>
           <button onClick={onToggleVoice}
             className={`${BTN} ${!voiceOn ? 'opacity-50' : ''}`}
             title={voiceOn ? '語音開啟（點擊關閉）' : '語音關閉（點擊開啟）'}>
             {voiceOn ? '🔊' : '🔇'}
           </button>
-          <button onClick={() => setHistoryView(v => ((v + 1) % 3) as 0 | 1 | 2)} className={BTN}>
-            {historyView === 0 ? '▸ 成績表' : historyView === 1 ? '▾ 單場' : '▾ 累計'}
-          </button>
-        </div>
-        {/* Row 2: 動作按鈕（下一局 / 再來一場 / 等待…） */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {actionButtons}
         </div>
       </div>
 
-      {/* ── 累積比分綠框 ── */}
+      {/* ── 累積比分 ── */}
       <div className="bg-slate-800 rounded-2xl p-4 shadow-inner">
         <div className="text-[17px] text-sky-400 mb-2 font-semibold text-center">累積比分</div>
         <div className="grid grid-cols-4 gap-3">
           {names.map((name, i) => (
-            <div key={name} className="flex flex-col items-center gap-1">
+            <div key={name} className="relative flex flex-col items-center gap-1">
+              {/* 本局得分 (desktop only) — top-right corner, bold */}
+              {lastScores && !isEnded && (
+                <span className={`hidden sm:block absolute top-0 right-0 text-[17px] font-bold leading-none ${scoreColor(lastScores[i] ?? 0)}`}>
+                  {fmt(lastScores[i] ?? 0)}
+                </span>
+              )}
               <BeautyAvatar name={name} size={104} idx={i} isMe={myName ? name === myName : false} />
               <span className="text-[15px] text-sky-300 truncate max-w-full">{name}</span>
-              <span className={`text-2xl font-bold font-cinzel ${scoreColor(totalScores[i])}`}>
+              {/* 累積分 — double-underline when currently lowest */}
+              <span className={`text-2xl font-bold font-cinzel ${scoreColor(totalScores[i])} ${
+                roundCount > 0 && i === lowestPlayer && !isEnded
+                  ? 'underline decoration-double decoration-orange-400'
+                  : ''
+              }`}>
                 {fmt(totalScores[i])}
               </span>
-              {roundCount > 0 && i === lowestPlayer && !isEnded && (
-                <span className="text-[17px] text-orange-400 mt-0.5">▼ 最低</span>
-              )}
+              {/* 冠軍 / 請客 — icon only, no text */}
               {isEnded && i === winnerIdx && (
-                <span className="text-[17px] text-yellow-400 mt-0.5">🏆 冠軍</span>
+                <span className="text-2xl mt-0.5">🏆</span>
               )}
               {isEnded && i === lowestPlayer && (
-                <span className="text-[17px] text-orange-400 mt-0.5">🍽️ 請客</span>
+                <span className="text-2xl mt-0.5">🍽️</span>
               )}
             </div>
           ))}
         </div>
 
+        {/* 本場結束 — 2 lines, centered */}
         {isEnded && (
-          <div className="mt-3 bg-gray-800 rounded-xl px-4 py-2.5">
-            <div className="flex items-center justify-between text-[17px] gap-2">
-              <span className="text-gray-400 font-semibold whitespace-nowrap">🏁 本場結束！</span>
-              <span className="text-gray-300 whitespace-nowrap">
-                <strong className="text-orange-300">{names[lowestPlayer]}</strong> 請客 🍽️
+          <div className="mt-3 bg-gray-800 rounded-xl px-4 py-3 text-center space-y-1">
+            <div className="text-[17px] text-gray-300 font-semibold">🏁 本場結束！</div>
+            <div className="flex items-center justify-center gap-8 text-[16px]">
+              <span className="text-gray-300">
+                <strong className="text-orange-300">{names[lowestPlayer]}</strong> 🍽️
               </span>
-              <span className="text-gray-300 whitespace-nowrap">
-                冠軍：<strong className="text-yellow-300">{names[winnerIdx]}</strong>
+              <span className="text-gray-300">
+                🏆 <strong className="text-yellow-300">{names[winnerIdx]}</strong>
               </span>
             </div>
           </div>
