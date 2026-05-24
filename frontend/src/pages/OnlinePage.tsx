@@ -394,7 +394,7 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
                          hover:bg-yellow-300 active:scale-95 transition-all shadow-2xl border border-yellow-200/40">
               進入大廳
             </button>
-            <button onClick={onSolo}
+            <button autoFocus onClick={onSolo}
               className="px-10 py-3 rounded-2xl font-bold text-base text-white
                          hover:opacity-90 active:scale-95 transition-all shadow-xl border border-sky-400/40"
               style={{ background: 'rgba(22,101,52,0.75)', backdropFilter: 'blur(6px)' }}>
@@ -593,6 +593,11 @@ export default function OnlinePage() {
   const ttsGenRef          = useRef(0)
   const soloPhaseRef       = useRef<string>('lobby')
   const soloAppealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ── Enter-key focus refs ──
+  const nextRoundBtnRef = useRef<HTMLButtonElement>(null)
+  const playAgainBtnRef = useRef<HTMLButtonElement>(null)
+  const startSoloBtnRef = useRef<HTMLButtonElement>(null)
 
   function toggleVoice() {
     const next = !voiceRef.current
@@ -1402,6 +1407,28 @@ export default function OnlinePage() {
     return () => window.removeEventListener('tc-go-home', onLogoClick)
   }, [])
 
+  // ── Enter-key auto-focus: move focus to the primary action button at each phase ──
+  useEffect(() => {
+    if (phase === 'round_end' && isHost) {
+      const t = setTimeout(() => nextRoundBtnRef.current?.focus(), 80)
+      return () => clearTimeout(t)
+    }
+  }, [phase, isHost])
+
+  useEffect(() => {
+    if (isEnded) {
+      const t = setTimeout(() => playAgainBtnRef.current?.focus(), 80)
+      return () => clearTimeout(t)
+    }
+  }, [isEnded])
+
+  useEffect(() => {
+    if (soloSetupMode && !soloActive) {
+      const t = setTimeout(() => startSoloBtnRef.current?.focus(), 80)
+      return () => clearTimeout(t)
+    }
+  }, [soloSetupMode, soloActive])
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   // Compute round header info for ManualArrange overlay (2d)
@@ -1615,8 +1642,9 @@ export default function OnlinePage() {
                     </span>
                   )}
                   {isEnded ? (<>
-                    <button onClick={() => {
+                    <button ref={playAgainBtnRef} onClick={() => {
                       if (soloActive) {
+                        // Reset game state → go to solo setup screen (not lobby)
                         setSoloActive(false)
                         soloPhaseRef.current = 'lobby'
                         setSoloPhase('lobby')
@@ -1625,7 +1653,8 @@ export default function OnlinePage() {
                         setCircleMarks({})
                         setRoundMultipliers([])
                         setNextMultiplier(1)
-                        if (!inRoom) setInRoom(false)
+                        setHistoryBadges([])
+                        setSoloSetupMode(true)
                       } else {
                         send({ type: 'new_game' })
                       }
@@ -1634,26 +1663,13 @@ export default function OnlinePage() {
                                  hover:bg-orange-300 active:scale-95 transition whitespace-nowrap animate-pulse">
                       再來一場
                     </button>
-                    <button onClick={() => {
-                      setSoloActive(false)
-                      soloPhaseRef.current = 'lobby'
-                      setSoloPhase('lobby')
-                      soloStateRef.current = null
-                      setRoom(null)
-                      setMyHand(null)
-                      setLastResult(null)
-                      setAppealInfo(null)
-                      setCircleMarks({})
-                      setRoundMultipliers([])
-                      setNextMultiplier(1)
-                      setInRoom(false)
-                    }}
+                    <button onClick={goHome}
                       className="text-xs px-3 py-1 rounded-full bg-gray-600 text-gray-200 font-semibold
                                  hover:bg-gray-500 active:scale-95 transition whitespace-nowrap">
                       回到首頁
                     </button>
                   </>) : isHost ? (
-                    <button onClick={() => {
+                    <button ref={nextRoundBtnRef} onClick={() => {
                       if (soloActive) startSoloRound()
                       else send({ type: 'next_round' })
                     }}
@@ -1717,7 +1733,7 @@ export default function OnlinePage() {
                        hover:bg-yellow-300 active:scale-95 transition-all shadow-2xl border border-yellow-200/40">
             進入大廳
           </button>
-          <button onClick={() => setSoloSetupMode(true)}
+          <button autoFocus onClick={() => setSoloSetupMode(true)}
             className="flex-1 py-3 rounded-2xl font-bold text-base text-white
                        hover:opacity-90 active:scale-95 transition-all shadow-xl border border-sky-400/40"
             style={{ background: 'rgba(22,101,52,0.85)', backdropFilter: 'blur(6px)' }}>
@@ -1818,7 +1834,7 @@ export default function OnlinePage() {
           )}
         </div>
 
-        <button
+        <button ref={startSoloBtnRef}
           onClick={() => {
             setSoloSetupMode(false)
             startSoloGame({

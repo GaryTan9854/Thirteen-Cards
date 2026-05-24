@@ -284,6 +284,10 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
     }
   }
 
+  // ── Button refs for Enter-key navigation ──
+  const confirmBtnRef = useRef<HTMLButtonElement>(null)
+  const baodaoBtnRef  = useRef<HTMLButtonElement>(null)
+
   // ── Auto-submit when countdown hits 0 (online mode) ──
   const arrRef = useRef(arr)
   useEffect(() => { arrRef.current = arr }, [arr])
@@ -297,9 +301,19 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
     }
   }, [countdown])
 
-  // ── Hand / Stats visibility (collapsed by default on mobile) ──
-  const [showHand,  setShowHand]  = useState(() => window.innerWidth >= 640)
-  const [showStats, setShowStats] = useState(() => window.innerWidth >= 640)
+  // ── Hand / Stats visibility — default OFF; remember per login session ──
+  const [showHand,  setShowHand]  = useState(() => {
+    const s = sessionStorage.getItem('tc_hand_open')
+    return s !== null ? s === 'true' : false
+  })
+  const [showStats, setShowStats] = useState(() => {
+    const s = sessionStorage.getItem('tc_stats_open')
+    return s !== null ? s === 'true' : false
+  })
+
+  // Persist visibility prefs to session storage
+  useEffect(() => { sessionStorage.setItem('tc_hand_open',  String(showHand))  }, [showHand])
+  useEffect(() => { sessionStorage.setItem('tc_stats_open', String(showStats)) }, [showStats])
 
   // ── Leave confirmation ──
   const [leaveConfirmPending, setLeaveConfirmPending] = useState(false)
@@ -316,6 +330,16 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
   // ── 報到 detection ──
   const isBaodaoHand = !!(info && info.special && info.special.name !== 'normal')
   const [baodaoConfirmPending, setBaodaoConfirmPending] = useState(false)
+
+  // Auto-focus the primary action button once hand data is loaded
+  useEffect(() => {
+    if (!info) return
+    const t = setTimeout(() => {
+      if (isBaodaoHand) baodaoBtnRef.current?.focus()
+      else confirmBtnRef.current?.focus()
+    }, 80)
+    return () => clearTimeout(t)
+  }, [info, isBaodaoHand])
 
   function handleNormalSubmit() {
     if (!canConfirm) return
@@ -374,7 +398,7 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
               離開
             </button>
             <div className="flex-1" />
-            <button onClick={handleNormalSubmit}
+            <button ref={confirmBtnRef} onClick={handleNormalSubmit}
               disabled={!canConfirm}
               className="px-6 py-1.5 rounded-lg bg-orange-500 text-white font-bold text-sm
                          hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed">
@@ -383,7 +407,7 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
           </div>
           {/* 報到 (only when special hand detected) */}
           {isBaodaoHand && (
-            <button
+            <button ref={baodaoBtnRef}
               onClick={() => onConfirm(arr.top, arr.mid, arr.bot, true)}
               className="w-full py-2 rounded-lg bg-red-600 text-white font-bold text-sm
                          hover:bg-red-500 active:scale-95 transition-all animate-pulse">
