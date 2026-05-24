@@ -1328,9 +1328,10 @@ export default function OnlinePage() {
 
   // ── Derived state ──────────────────────────────────────────────────────────
 
-  const phase  = soloActive ? soloPhase : (room?.phase ?? 'lobby')
-  const isHost = soloActive ? true : room?.host === player
-  const isGary = player === 'Gary'
+  const phase   = soloActive ? soloPhase : (room?.phase ?? 'lobby')
+  const isHost  = soloActive ? true : room?.host === player
+  const isGary  = player === 'Gary'
+  const isEnded = phase === 'ended'
 
   // Effective game parameters (solo or online)
   const effRoundsNormal  = soloActive ? (soloStateRef.current?.roundsNormal  ?? cfgNormal)  : (room?.rounds_normal  ?? cfgNormal)
@@ -1495,15 +1496,90 @@ export default function OnlinePage() {
                 </div>
               )}
 
-              {/* Gary admin bar — always visible */}
-              {isGary && (
-                <div className="flex justify-end">
-                  <button
-                    onClick={async () => { await fetch('/api/online/reset', { method: 'POST' }) }}
-                    className="text-xs text-gray-600 hover:text-red-400 px-2 py-0.5 rounded transition"
-                    title="強制重置房間（Gary 限定）">
-                    ⚙ 重置
-                  </button>
+              {/* Nav header portal: 🔊 + ⚙重置 (Gary) */}
+              {(() => {
+                const slot = document.getElementById('tournament-header-slot')
+                return slot ? createPortal(
+                  <div className="flex items-center gap-1">
+                    {isGary && (
+                      <button
+                        onClick={async () => { await fetch('/api/online/reset', { method: 'POST' }) }}
+                        className="text-xs text-gray-400 hover:text-red-400 px-2 py-1 rounded hover:bg-slate-700 transition"
+                        title="強制重置房間（Gary 限定）">
+                        ⚙ 重置
+                      </button>
+                    )}
+                    <button onClick={toggleVoice}
+                      className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-slate-700 transition"
+                      title={voiceOn ? '語音開啟（點擊關閉）' : '語音關閉（點擊開啟）'}>
+                      {voiceOn ? '🔊' : '🔇'}
+                    </button>
+                  </div>,
+                  slot
+                ) : null
+              })()}
+
+              {/* Action bar: 下一局 / 再來一場 — above phase content (round result phases only) */}
+              {(phase === 'round_end' || phase === 'ended') && (
+                <div className="flex justify-end items-center gap-2">
+                  {nextMultiplier > 1 && (
+                    <span className="text-xs px-3 py-1 rounded-full bg-orange-500 text-white font-bold
+                                     whitespace-nowrap select-none animate-pulse">
+                      下局 {nextMultiplier}✕
+                    </span>
+                  )}
+                  {isEnded ? (<>
+                    <button onClick={() => {
+                      if (soloActive) {
+                        setSoloActive(false)
+                        soloPhaseRef.current = 'lobby'
+                        setSoloPhase('lobby')
+                        soloStateRef.current = null
+                        setLastResult(null)
+                        setCircleMarks({})
+                        setRoundMultipliers([])
+                        setNextMultiplier(1)
+                        if (!inRoom) setInRoom(false)
+                      } else {
+                        send({ type: 'new_game' })
+                      }
+                    }}
+                      className="text-xs px-3 py-1 rounded-full bg-orange-400 text-gray-900 font-bold
+                                 hover:bg-orange-300 active:scale-95 transition whitespace-nowrap animate-pulse">
+                      再來一場
+                    </button>
+                    <button onClick={() => {
+                      setSoloActive(false)
+                      soloPhaseRef.current = 'lobby'
+                      setSoloPhase('lobby')
+                      soloStateRef.current = null
+                      setRoom(null)
+                      setMyHand(null)
+                      setLastResult(null)
+                      setAppealInfo(null)
+                      setCircleMarks({})
+                      setRoundMultipliers([])
+                      setNextMultiplier(1)
+                      setInRoom(false)
+                    }}
+                      className="text-xs px-3 py-1 rounded-full bg-gray-600 text-gray-200 font-semibold
+                                 hover:bg-gray-500 active:scale-95 transition whitespace-nowrap">
+                      回到首頁
+                    </button>
+                  </>) : isHost ? (
+                    <button onClick={() => {
+                      if (soloActive) startSoloRound()
+                      else send({ type: 'next_round' })
+                    }}
+                      className="text-sm px-6 py-2 rounded-xl bg-orange-400 text-gray-900 font-bold
+                                 hover:bg-orange-300 active:scale-95 transition whitespace-nowrap animate-pulse">
+                      下一局 →
+                    </button>
+                  ) : (
+                    <span className="text-xs text-gray-400 whitespace-nowrap">
+                      等待 {room?.host}…
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -1736,8 +1812,6 @@ export default function OnlinePage() {
           isEnded={false}
           myName={player ?? ''}
           roundLabel={history.length === 0 ? '準備開始' : `上場共 ${history.length} 局`}
-          voiceOn={voiceOn}
-          onToggleVoice={toggleVoice}
           actionButtons={<>
             <button
               onClick={() => send({ type: 'new_game' })}
@@ -2079,69 +2153,6 @@ export default function OnlinePage() {
           isEnded={isEnded}
           myName={player ?? ''}
           roundLabel={roundLabel}
-          voiceOn={voiceOn}
-          onToggleVoice={toggleVoice}
-          actionButtons={<>
-            {(nextMultiplier > 1) && (
-              <span className="text-xs px-3 py-1 rounded-full bg-orange-500 text-white font-bold
-                               whitespace-nowrap select-none animate-pulse">
-                下局 {nextMultiplier}✕
-              </span>
-            )}
-            {isEnded ? (<>
-              <button onClick={() => {
-                if (soloActive) {
-                  setSoloActive(false)
-                  soloPhaseRef.current = 'lobby'
-                  setSoloPhase('lobby')
-                  soloStateRef.current = null
-                  setLastResult(null)
-                  setCircleMarks({})
-                  setRoundMultipliers([])
-                  setNextMultiplier(1)
-                  if (!inRoom) setInRoom(false)
-                } else {
-                  send({ type: 'new_game' })
-                }
-              }}
-                className="text-xs px-3 py-1 rounded-full bg-orange-400 text-gray-900 font-bold
-                           hover:bg-orange-300 active:scale-95 transition whitespace-nowrap animate-pulse">
-                再來一場
-              </button>
-              <button onClick={() => {
-                setSoloActive(false)
-                soloPhaseRef.current = 'lobby'
-                setSoloPhase('lobby')
-                soloStateRef.current = null
-                setRoom(null)
-                setMyHand(null)
-                setLastResult(null)
-                setAppealInfo(null)
-                setCircleMarks({})
-                setRoundMultipliers([])
-                setNextMultiplier(1)
-                setInRoom(false)
-              }}
-                className="text-xs px-3 py-1 rounded-full bg-gray-600 text-gray-200 font-semibold
-                           hover:bg-gray-500 active:scale-95 transition whitespace-nowrap">
-                回到首頁
-              </button>
-            </>
-            ) : isHost ? (
-              <button onClick={() => {
-                if (soloActive) startSoloRound()
-                else send({ type: 'next_round' })
-              }}
-                className="text-sm px-6 py-2 rounded-xl bg-orange-400 text-gray-900 font-bold
-                           hover:bg-orange-300 active:scale-95 transition whitespace-nowrap animate-pulse">
-                下一局 →
-              </button>
-            ) : (
-              <span className="text-xs text-gray-400 whitespace-nowrap">
-                等待 {room?.host}…
-              </span>
-            )}
-          </>}
         />
 
         {gameResult && (
