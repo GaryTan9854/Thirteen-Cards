@@ -304,6 +304,15 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
   // ── Leave confirmation ──
   const [leaveConfirmPending, setLeaveConfirmPending] = useState(false)
 
+  // ESC key → trigger leave confirm (desktop TunaESC)
+  useEffect(() => {
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === 'Escape') setLeaveConfirmPending(true)
+    }
+    document.addEventListener('keydown', onEsc)
+    return () => document.removeEventListener('keydown', onEsc)
+  }, [])
+
   // ── 報到 detection ──
   const isBaodaoHand = !!(info && info.special && info.special.name !== 'normal')
   const [baodaoConfirmPending, setBaodaoConfirmPending] = useState(false)

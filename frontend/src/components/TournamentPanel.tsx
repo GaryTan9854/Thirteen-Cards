@@ -53,7 +53,6 @@ export default function TournamentPanel({
   const lowestPlayer = lowestIdx(totalScores)
   const winnerIdx    = totalScores.indexOf(Math.max(...totalScores))
   const roundCount   = history.length
-  const lastScores   = roundCount > 0 ? history[roundCount - 1] : null
 
   const BTN = "text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold hover:bg-yellow-300 active:scale-95 transition whitespace-nowrap"
 
@@ -202,12 +201,6 @@ export default function TournamentPanel({
         <div className="grid grid-cols-4 gap-3">
           {names.map((name, i) => (
             <div key={name} className="relative flex flex-col items-center gap-1">
-              {/* 本局得分 (desktop only) — top-right corner, bold */}
-              {lastScores && !isEnded && (
-                <span className={`hidden sm:block absolute top-0 right-0 text-[17px] font-bold leading-none ${scoreColor(lastScores[i] ?? 0)}`}>
-                  {fmt(lastScores[i] ?? 0)}
-                </span>
-              )}
               <BeautyAvatar name={name} size={104} idx={i} isMe={myName ? name === myName : false} />
               <span className="text-[15px] text-sky-300 truncate max-w-full">{name}</span>
               {/* 累積分 — double-underline when currently lowest */}

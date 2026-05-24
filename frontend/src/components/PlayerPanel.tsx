@@ -42,7 +42,7 @@ export default function PlayerPanel({ player, finalScore, strategy = 'rule_base_
             </span>
           )}
         </div>
-        <span className={`text-lg font-bold ${finalScore > 0 ? 'text-green-600' : finalScore < 0 ? 'text-red-500' : 'text-gray-500'}`}>
+        <span className={`text-xl font-extrabold tabular-nums ${finalScore > 0 ? 'text-green-600' : finalScore < 0 ? 'text-red-500' : 'text-gray-500'}`}>
           {finalScore > 0 ? '+' : ''}{finalScore}
         </span>
       </div>

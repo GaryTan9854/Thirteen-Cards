@@ -44,7 +44,10 @@ function AppInner() {
         <div className="flex items-center justify-between px-4 py-2.5 sm:px-6">
           {/* Logo — click to go home */}
           <button
-            onClick={() => setTab('online')}
+            onClick={() => {
+              setTab('online')
+              window.dispatchEvent(new CustomEvent('tc-go-home'))
+            }}
             className="flex items-baseline gap-2 hover:opacity-80 transition-opacity active:scale-95"
           >
             <h1 className="text-lg font-bold tracking-wide leading-none font-cinzel">

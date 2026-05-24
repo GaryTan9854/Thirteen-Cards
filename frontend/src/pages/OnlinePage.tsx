@@ -600,6 +600,26 @@ export default function OnlinePage() {
     setVoiceOn(next)
   }
 
+  // ── Leave / ESC navigation ────────────────────────────────────────────────
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+
+  // Reset everything back to lobby (home)
+  function goHome() {
+    setSoloActive(false)
+    soloPhaseRef.current = 'lobby'
+    setSoloPhase('lobby')
+    soloStateRef.current = null
+    setRoom(null)
+    setMyHand(null)
+    setLastResult(null)
+    setAppealInfo(null)
+    setCircleMarks({})
+    setRoundMultipliers([])
+    setNextMultiplier(1)
+    setInRoom(false)
+    setSoloSetupMode(false)
+  }
+
   const processNextGun = useCallback(() => {
     const q = gunQueueRef.current
     if (q.length === 0) { setCurrentGun(null); return }
@@ -1341,6 +1361,47 @@ export default function OnlinePage() {
   const effAppealRounds  = soloActive ? (soloStateRef.current?.roundsAppeal  ?? cfgAppeal)   : (room?.rounds_appeal  ?? cfgAppeal)
 
 
+  // ── ESC / logo-click navigation ────────────────────────────────────────────
+  // Game is "in progress" when a round cycle has started and not yet finished
+  const gameInProgress = !isEnded && !soloSetupMode && (
+    phase === 'playing' || phase === 'round_end' || phase === 'appeal_pending'
+  )
+
+  // Refs so event handlers always see the latest values without re-registering
+  const gameInProgressRef = useRef(false)
+  const alreadyHomeRef    = useRef(false)
+  const manualArrangeOpenRef = useRef(false)
+  const goHomeRef         = useRef(goHome)
+  // Update refs every render (setState setters are stable, so this is safe)
+  gameInProgressRef.current    = gameInProgress
+  alreadyHomeRef.current       = phase === 'lobby' && !soloSetupMode
+  manualArrangeOpenRef.current = !!(myHand && !submitted && phase === 'playing')
+  goHomeRef.current            = goHome
+
+  // ESC key listener (desktop TunaESC)
+  useEffect(() => {
+    function onEsc(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      if (manualArrangeOpenRef.current) return  // ManualArrange handles its own ESC
+      if (alreadyHomeRef.current) return
+      if (gameInProgressRef.current) setShowLeaveConfirm(true)
+      else goHomeRef.current()
+    }
+    document.addEventListener('keydown', onEsc)
+    return () => document.removeEventListener('keydown', onEsc)
+  }, []) // register once; refs carry latest values
+
+  // Logo click listener (dispatched from App.tsx)
+  useEffect(() => {
+    function onLogoClick() {
+      if (alreadyHomeRef.current) return
+      if (gameInProgressRef.current) setShowLeaveConfirm(true)
+      else goHomeRef.current()
+    }
+    window.addEventListener('tc-go-home', onLogoClick)
+    return () => window.removeEventListener('tc-go-home', onLogoClick)
+  }, [])
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   // Compute round header info for ManualArrange overlay (2d)
@@ -1369,6 +1430,31 @@ export default function OnlinePage() {
   return (
     <>
       {arrangePortal}
+
+      {/* ── 離開確認 modal (ESC / logo click when game in progress) ── */}
+      {showLeaveConfirm && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70">
+          <div className="bg-gray-900 border border-gray-600 rounded-2xl p-6 max-w-xs w-full mx-4 text-center shadow-2xl space-y-4">
+            <div className="text-2xl">⚠️</div>
+            <div className="text-base font-bold text-gray-200">確定離開遊戲？</div>
+            <div className="text-sm text-gray-400">
+              目前比賽尚未結束，<br />離開將中斷本場遊戲。
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowLeaveConfirm(false); goHome() }}
+                className="flex-1 py-2.5 rounded-xl bg-orange-500 text-white font-bold hover:bg-orange-400 active:scale-95 transition">
+                確定離開
+              </button>
+              <button
+                onClick={() => setShowLeaveConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl bg-gray-700 text-gray-300 hover:bg-gray-600 transition">
+                繼續遊戲
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── 全壘打 Overlay ── */}
       {grandSlammer && (
