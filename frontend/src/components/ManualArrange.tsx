@@ -75,13 +75,12 @@ function CardTile({ cs, size='md' }: { cs:string; size?:'xs'|'sm'|'md'|'lg' }) {
 
 function RowDisplay({ label, cards, slots }: { label:string; cards:string[]; slots:number }) {
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-gray-700 last:border-0">
-      <span className="w-20 text-sm text-gray-400 shrink-0">{label}</span>
-      {/* overflow-x-auto so cards scroll on narrow mobile screens without squishing */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {cards.map((cs,i) => <CardTile key={i} cs={cs} size="lg" />)}
+    <div className="flex items-center gap-2 py-2 border-b border-gray-700 last:border-0">
+      <span className="w-10 text-xs text-gray-400 shrink-0">{label}</span>
+      <div className="flex gap-2">
+        {cards.map((cs,i) => <CardTile key={i} cs={cs} size="md" />)}
         {Array.from({length: slots - cards.length}).map((_,i) => (
-          <span key={'e'+i} className="w-14 h-20 shrink-0 rounded-lg border-2 border-dashed border-gray-600" />
+          <span key={'e'+i} className="w-11 h-16 shrink-0 rounded-lg border-2 border-dashed border-gray-600" />
         ))}
       </div>
     </div>
@@ -183,28 +182,17 @@ interface ArrangeInfo {
   stats:StatsData; special:SpecialData; groups:Group[]
 }
 
-// Model comparison
-const MODEL_STRATEGIES = ['rulealpha','rulealpha2','ml'] as const
-type ModelStrategy = typeof MODEL_STRATEGIES[number]
-const MODEL_LABEL: Record<ModelStrategy,string> = {
-  rulealpha:  'RuleAlpha',
-  rulealpha2: 'RuleAlpha2',
-  ml:         'ML Alpha',
-}
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 interface Props {
-  hand:                  string[]
-  onConfirm:             (top:string[], mid:string[], bot:string[], isBaodao?: boolean) => void
-  onCancel:              () => void
-  countdown?:            number    // if provided, show timer; auto-submit at 0
-  submittedCount?:       number    // how many players have submitted (online mode)
-  totalPlayers?:         number    // total human players in this round (online mode)
-  defaultModelStrategy?: string    // which AI model to pre-load (default: rule_base_as)
+  hand:            string[]
+  onConfirm:       (top:string[], mid:string[], bot:string[], isBaodao?: boolean) => void
+  countdown?:      number    // if provided, show timer; auto-submit at 0
+  submittedCount?: number    // how many players have submitted (online mode)
+  totalPlayers?:   number    // total human players in this round (online mode)
 }
 
-export default function ManualArrange({ hand, onConfirm, onCancel, countdown, submittedCount, totalPlayers, defaultModelStrategy }: Props) {
+export default function ManualArrange({ hand, onConfirm, countdown, submittedCount, totalPlayers }: Props) {
 
   // ── Sort / animate ──
   const [sorted,   setSorted]   = useState(false)
@@ -234,13 +222,11 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
   function makeShowToCs(h: string[]) {
     return Object.fromEntries(h.map(cs=>[cardShow(cs), cs]))
   }
-  function applyModelData(d: any, h: string[], strategy: ModelStrategy) {
+  function applyModelData(d: any, h: string[]) {
     if(d.top && d.mid && d.bot){
       const stc = makeShowToCs(h)
       const toCs = (cards:string[]) => cards.map((c:string)=>stc[c]??c)
-      const v = { top:toCs(d.top.cards), mid:toCs(d.mid.cards), bot:toCs(d.bot.cards) }
-      setModelArr(prev=>({...prev,[strategy]:v}))
-      return v
+      return { top:toCs(d.top.cards), mid:toCs(d.mid.cards), bot:toCs(d.bot.cards) }
     }
     return null
   }
@@ -257,7 +243,7 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
     .then(([data, rbData]:[ArrangeInfo, any])=>{
       setInfo(data)
       // Apply RuleAlpha as default arrangement (not groups[0])
-      const rbv = rbData ? applyModelData(rbData, hand, 'rulealpha') : null
+      const rbv = rbData ? applyModelData(rbData, hand) : null
       if(rbv){
         setArr({top:rbv.top,mid:rbv.mid,bot:rbv.bot})
         setSelGroup(-1)
@@ -286,37 +272,6 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
     }
   }
 
-  // ── Model comparison ──
-  const [modelIdx,    setModelIdx]    = useState(() => {
-    if (!defaultModelStrategy) return 0
-    const idx = MODEL_STRATEGIES.indexOf(defaultModelStrategy as ModelStrategy)
-    return idx >= 0 ? idx : 0
-  })
-  const [modelArr,    setModelArr]    = useState<Record<ModelStrategy,{top:string[];mid:string[];bot:string[]}>>({} as any)
-  const [modelLoading,setModelLoading]= useState(false)
-
-  async function cycleModel(){
-    const next = MODEL_STRATEGIES[(modelIdx+1) % MODEL_STRATEGIES.length]
-    const nextIdx = (modelIdx+1) % MODEL_STRATEGIES.length
-    setModelIdx(nextIdx)
-
-    if(modelArr[next]){
-      const v=modelArr[next]; setArr({top:v.top,mid:v.mid,bot:v.bot}); setSelGroup(-1)
-      return
-    }
-    setModelLoading(true)
-    try{
-      const r = await fetch('/api/game/arrange',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({hand, strategy: next}),
-      })
-      const d = await r.json()
-      const v = applyModelData(d, hand, next)
-      if(v){ setArr({top:v.top,mid:v.mid,bot:v.bot}); setSelGroup(-1) }
-    } finally { setModelLoading(false) }
-  }
-
   // ── Auto-submit when countdown hits 0 (online mode) ──
   const arrRef = useRef(arr)
   useEffect(() => { arrRef.current = arr }, [arr])
@@ -334,6 +289,9 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
   const [showHand,  setShowHand]  = useState(() => window.innerWidth >= 640)
   const [showStats, setShowStats] = useState(() => window.innerWidth >= 640)
 
+  // ── Leave confirmation ──
+  const [leaveConfirmPending, setLeaveConfirmPending] = useState(false)
+
   // ── 報到 detection ──
   const isBaodaoHand = !!(info && info.special && info.special.name !== 'normal')
   const [baodaoConfirmPending, setBaodaoConfirmPending] = useState(false)
@@ -347,7 +305,6 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
     }
   }
 
-  const currentModel = MODEL_STRATEGIES[modelIdx]
   const curVariant = info && selGroup>=0 ? info.groups[selGroup]?.variants[varIdx] : null
   const canConfirm = arr.top.length===3 && arr.mid.length===5 && arr.bot.length===5
 
@@ -372,33 +329,14 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
         style={{width:'95vw', maxWidth:'1060px', maxHeight:'94dvh', WebkitOverflowScrolling:'touch'}}>
 
         {/* ── Actions (TOP) ── */}
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <button
-            onClick={cycleModel}
-            disabled={modelLoading}
-            className="text-xs px-3 py-1.5 rounded-full bg-gray-700 border border-gray-500 text-gray-200
-                       hover:bg-gray-600 disabled:opacity-50 flex items-center gap-1.5"
-          >
-            <span className="text-gray-400">AI：</span>
-            <span className="font-bold text-blue-300">{MODEL_LABEL[currentModel]}</span>
-            <span className="text-gray-400 ml-1">▷</span>
-            {modelLoading && <span className="ml-1">…</span>}
-          </button>
-
-          <div className="flex gap-2 items-center">
-            <button onClick={onCancel}
+        <div className="flex flex-col gap-2">
+          {/* Row 1: 離開 + 確定送出 */}
+          <div className="flex items-center gap-2">
+            <button onClick={() => setLeaveConfirmPending(true)}
               className="px-4 py-1.5 rounded-lg bg-gray-700 text-gray-300 text-sm hover:bg-gray-600">
-              取消
+              離開
             </button>
-            {isBaodaoHand && (
-              <button
-                onClick={() => onConfirm(arr.top, arr.mid, arr.bot, true)}
-                className="px-4 py-1.5 rounded-lg bg-red-600 text-white font-bold text-sm
-                           hover:bg-red-500 active:scale-95 transition-all animate-pulse"
-              >
-                🀄 報到！
-              </button>
-            )}
+            <div className="flex-1" />
             <button onClick={handleNormalSubmit}
               disabled={!canConfirm}
               className="px-6 py-1.5 rounded-lg bg-orange-500 text-white font-bold text-sm
@@ -406,6 +344,15 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
               確定送出
             </button>
           </div>
+          {/* Row 2: 報到 (only when special hand detected) */}
+          {isBaodaoHand && (
+            <button
+              onClick={() => onConfirm(arr.top, arr.mid, arr.bot, true)}
+              className="w-full py-2 rounded-lg bg-red-600 text-white font-bold text-sm
+                         hover:bg-red-500 active:scale-95 transition-all animate-pulse">
+              🀄 報到！
+            </button>
+          )}
         </div>
 
         {/* ── Toggle buttons: 原始手牌 / 手牌特徵 ── */}
@@ -520,6 +467,36 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
 
       </div>
     </div>
+
+    {/* ── 離開確認 modal ── */}
+    {leaveConfirmPending && (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70">
+        <div className="bg-gray-900 border border-gray-600 rounded-2xl p-6 max-w-xs w-full mx-4 text-center shadow-2xl space-y-4">
+          <div className="text-2xl">⚠️</div>
+          <div className="text-base font-bold text-gray-200">確定離開？</div>
+          <div className="text-sm text-gray-400">
+            目前排法將直接送出，<br/>到比牌畫面後可選擇回到首頁
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                setLeaveConfirmPending(false)
+                if (canConfirm) onConfirm(arr.top, arr.mid, arr.bot, false)
+              }}
+              className="flex-1 py-2.5 rounded-xl bg-orange-500 text-white font-bold
+                         hover:bg-orange-400 active:scale-95 transition">
+              確定離開
+            </button>
+            <button
+              onClick={() => setLeaveConfirmPending(false)}
+              className="flex-1 py-2.5 rounded-xl bg-gray-700 text-gray-300
+                         hover:bg-gray-600 transition">
+              繼續排牌
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* ── 報到 手玩正常比牌確認 modal ── */}
     {baodaoConfirmPending && (

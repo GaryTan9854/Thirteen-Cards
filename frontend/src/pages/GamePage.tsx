@@ -424,12 +424,6 @@ export default function GamePage({ embedded = false }: Props) {
             pendingResolveRef.current?.(top, mid, bot)
             pendingResolveRef.current = null
           }}
-          onCancel={() => {
-            setShowManualUI(false)
-            setLoading(false)
-            pendingResolveRef.current = null
-          }}
-          defaultModelStrategy={(['rulealpha','rulealpha2','ml'] as const).includes(strategies[0] as any) ? strategies[0] : 'rulealpha'}
         />
       )}
 

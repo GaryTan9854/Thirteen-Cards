@@ -296,7 +296,7 @@ function BeautyCarousel({ player }: {
            // availH measured dynamically: fixes iOS address-bar + 2-row mobile header
            // Mobile capped at 62dvh — leaves room for buttons below the carousel
            height: availH > 0 ? `${availH}px` : 'min(calc(100dvh - 80px), 62dvh)',
-           marginTop: '-24px', marginBottom: '-24px',
+           marginTop: '-24px', marginBottom: '0',
            marginLeft: '-16px', marginRight: '-16px',
            cursor: 'grab', touchAction: 'none', userSelect: 'none',
          }}
@@ -1322,7 +1322,7 @@ export default function OnlinePage() {
   const effAppealPlayed  = soloActive ? (soloStateRef.current?.appealPlayed  ?? 0)           : (room?.appeal_played  ?? 0)
   const effAppealGen     = soloActive ? (soloStateRef.current?.appealGeneration ?? 0)        : (room?.appeal_generation ?? 0)
   const effAppealRounds  = soloActive ? (soloStateRef.current?.roundsAppeal  ?? cfgAppeal)   : (room?.rounds_appeal  ?? cfgAppeal)
-  const effAiStrategy    = soloActive ? (soloStateRef.current?.strategies?.[0] ?? cfgStrategies[0]) : cfgStrategies[0]
+
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1331,11 +1331,9 @@ export default function OnlinePage() {
         <ManualArrange
           hand={myHand}
           onConfirm={handleConfirm}
-          onCancel={() => {}}
           countdown={countdown ?? undefined}
           submittedCount={submittedList.length}
           totalPlayers={soloActive ? 1 : (room?.players.length ?? 1)}
-          defaultModelStrategy={(['rulealpha','rulealpha2','ml'] as const).includes(effAiStrategy as any) ? effAiStrategy : 'rulealpha'}
         />,
         document.body
       )
