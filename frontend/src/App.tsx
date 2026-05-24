@@ -71,7 +71,7 @@ function AppInner() {
             ))}
           </div>
 
-          {/* Player chip + logout */}
+          {/* Player chip + logout (portal slot for 成績表 toggle between them) */}
           <div className="flex items-center gap-2">
             <span className={`font-bold px-3 py-1 rounded-full text-sm
               ${isGary
@@ -79,6 +79,8 @@ function AppInner() {
                 : 'bg-slate-600 text-sky-100'}`}>
               {player}
             </span>
+            {/* TournamentPanel renders 成績表 toggle here via portal */}
+            <div id="tournament-header-slot" className="flex items-center" />
             <button
               onClick={logout}
               className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded

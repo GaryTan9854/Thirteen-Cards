@@ -15,6 +15,7 @@
  */
 
 import { useState, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import BeautyAvatar from './BeautyAvatar'
 
 function scoreColor(n: number) {
@@ -168,30 +169,35 @@ export default function TournamentPanel({
     </div>
   )
 
+  // ── 成績表 toggle — portal into App header slot ──────────────────────────
+  const headerSlot = document.getElementById('tournament-header-slot')
+  const historyToggle = (
+    <button
+      onClick={() => setHistoryView(v => ((v + 1) % 3) as 0 | 1 | 2)}
+      className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-slate-700 transition whitespace-nowrap"
+      title="切換成績表">
+      {historyView === 0 ? '▸ 成績表' : historyView === 1 ? '▾ 單場' : '▾ 累計'}
+    </button>
+  )
+
   return (
     <div className="flex flex-col gap-3">
 
-      {/* ── 控制列 ── */}
-      <div className="flex flex-col gap-1.5">
-        {/* Row 1: 動作按鈕（下一局 / 再來一場 / 等待…） */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {actionButtons}
-        </div>
-        {/* Row 2: 局數標籤 + 成績表 toggle + 語音（同一行，省一行） */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold whitespace-nowrap select-none">
-            {roundLabel}
-          </span>
-          <div className="flex-1" />
-          <button onClick={() => setHistoryView(v => ((v + 1) % 3) as 0 | 1 | 2)} className={BTN}>
-            {historyView === 0 ? '▸ 成績表' : historyView === 1 ? '▾ 單場' : '▾ 累計'}
-          </button>
-          <button onClick={onToggleVoice}
-            className={`${BTN} ${!voiceOn ? 'opacity-50' : ''}`}
-            title={voiceOn ? '語音開啟（點擊關閉）' : '語音關閉（點擊開啟）'}>
-            {voiceOn ? '🔊' : '🔇'}
-          </button>
-        </div>
+      {/* Portal: 成績表 toggle → App header slot (between player chip and logout) */}
+      {headerSlot && createPortal(historyToggle, headerSlot)}
+
+      {/* ── 控制列 (single row: roundLabel + actionButtons + 🔊) ── */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold whitespace-nowrap select-none">
+          {roundLabel}
+        </span>
+        <div className="flex-1" />
+        {actionButtons}
+        <button onClick={onToggleVoice}
+          className={`${BTN} ${!voiceOn ? 'opacity-50' : ''}`}
+          title={voiceOn ? '語音開啟（點擊關閉）' : '語音關閉（點擊開啟）'}>
+          {voiceOn ? '🔊' : '🔇'}
+        </button>
       </div>
 
       {/* ── 累積比分 ── */}
@@ -211,7 +217,7 @@ export default function TournamentPanel({
               {/* 累積分 — double-underline when currently lowest */}
               <span className={`text-2xl font-bold font-cinzel ${scoreColor(totalScores[i])} ${
                 roundCount > 0 && i === lowestPlayer && !isEnded
-                  ? 'underline decoration-double decoration-orange-400'
+                  ? 'underline decoration-double decoration-orange-400 underline-offset-4'
                   : ''
               }`}>
                 {fmt(totalScores[i])}

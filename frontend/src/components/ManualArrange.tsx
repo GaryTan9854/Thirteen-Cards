@@ -338,7 +338,7 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
     <>
     <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center">
       <div className="bg-gray-900 rounded-2xl shadow-2xl flex flex-col gap-3 sm:gap-4 p-3 sm:p-5 overflow-y-auto"
-        style={{width:'95vw', maxWidth:'780px', maxHeight:'94dvh', WebkitOverflowScrolling:'touch'}}>
+        style={{width:'95vw', maxWidth:'960px', maxHeight:'94dvh', WebkitOverflowScrolling:'touch'}}>
 
         {/* ── Actions (TOP) ── */}
         <div className="flex flex-col gap-1.5">
@@ -383,107 +383,113 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
           )}
         </div>
 
-        {/* ── Toggle: 原始手牌 ── */}
-        <div className="flex items-center gap-2">
-          <button onClick={() => setShowHand(v => !v)}
-            className={`text-xs px-2.5 py-1 rounded-full border transition-colors
-              ${showHand
-                ? 'bg-sky-800 border-sky-600 text-sky-200'
-                : 'bg-gray-700 border-gray-500 text-gray-300 hover:border-sky-500'}`}>
-            {showHand ? '收起原始手牌' : '展開原始手牌'}
-          </button>
-          {showHand && sorted && (
-            <button
-              onClick={() => setSortIdx(i => (i+1) % SORT_MODES.length)}
-              className="text-xs px-2 py-1 rounded-full bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-500"
-            >
-              {SORT_LABEL[sortMode]}
+        {/* ── Toggle row: [原始手牌] left | [手牌特徵] right — mirrors two-column layout below ── */}
+        <div className="flex gap-4 items-center">
+          {/* Left toggles (mirrors arrangement flex-1) */}
+          <div className="flex-1 min-w-0 flex items-center gap-2">
+            <button onClick={() => setShowHand(v => !v)}
+              className={`text-xs px-2.5 py-1 rounded-full border transition-colors
+                ${showHand
+                  ? 'bg-sky-800 border-sky-600 text-sky-200'
+                  : 'bg-gray-700 border-gray-500 text-gray-300 hover:border-sky-500'}`}>
+              原始手牌 {showHand ? '▲' : '▼'}
             </button>
-          )}
-        </div>
-
-        {/* ── Collapsible Hand ── */}
-        {showHand && (
-          <div className="flex-1 min-w-0">
-            {/* Mobile: xs cards (fit 13 in one row) */}
-            <div className="flex sm:hidden flex-nowrap gap-0.5 transition-opacity duration-200"
-              style={{opacity: fade ? 0 : 1}}>
-              {displayHand.map((cs,i) => <CardTile key={cs+i} cs={cs} size="xs" />)}
-            </div>
-            {/* Desktop: sm cards */}
-            <div className="hidden sm:flex flex-nowrap gap-1 transition-opacity duration-200"
-              style={{opacity: fade ? 0 : 1}}>
-              {displayHand.map((cs,i) => <CardTile key={cs+i+'d'} cs={cs} size="sm" />)}
-            </div>
+            {showHand && sorted && (
+              <button
+                onClick={() => setSortIdx(i => (i+1) % SORT_MODES.length)}
+                className="text-xs px-2 py-1 rounded-full bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-500"
+              >
+                {SORT_LABEL[sortMode]}
+              </button>
+            )}
           </div>
-        )}
-
-        {/* ── 手牌特徵 section (header always visible, content toggles) ── */}
-        <div>
-          <button onClick={() => setShowStats(v => !v)}
-            className={`text-xs px-2.5 py-1 rounded-full border transition-colors
-              ${showStats
-                ? 'bg-sky-800 border-sky-600 text-sky-200'
-                : 'bg-gray-700 border-gray-500 text-gray-300 hover:border-sky-500'}`}>
-            手牌特徵 {showStats ? '▲' : '▼'}
-          </button>
-          {showStats && (
-            <div className="mt-2">
-              <StatsPanel stats={info?.stats} special={info?.special} />
-            </div>
-          )}
+          {/* Right toggle (mirrors right column sm:w-[380px]) */}
+          <div className="shrink-0 sm:w-[380px]">
+            <button onClick={() => setShowStats(v => !v)}
+              className={`text-xs px-2.5 py-1 rounded-full border transition-colors
+                ${showStats
+                  ? 'bg-sky-800 border-sky-600 text-sky-200'
+                  : 'bg-gray-700 border-gray-500 text-gray-300 hover:border-sky-500'}`}>
+              手牌特徵 {showStats ? '▲' : '▼'}
+            </button>
+          </div>
         </div>
 
-        {/* ── Arrangement (left) | Group buttons (right) ── */}
+        {/* ── Two-column: left (hand + arrangement) | right (stats + groups) ── */}
         <div className="flex flex-col sm:flex-row sm:gap-4 gap-3 sm:items-start">
-          {/* Arrangement area */}
-          <div className="flex-1 min-w-0 bg-black/30 rounded-xl px-4 py-2">
-            {curVariant && (
-              <div className="flex gap-4 text-[10px] text-gray-500 mb-2 flex-wrap">
-                <span>頭：{curVariant.top_desc}</span>
-                <span className="mx-1">·</span>
-                <span>中：{curVariant.mid_desc}</span>
-                <span className="mx-1">·</span>
-                <span>尾：{curVariant.bot_desc}</span>
+
+          {/* Left column: hand display + arrangement */}
+          <div className="flex-1 min-w-0 flex flex-col gap-2">
+            {/* Hand (collapsible) */}
+            {showHand && (
+              <div>
+                {/* Mobile: xs cards (fit 13 in one row) */}
+                <div className="flex sm:hidden flex-nowrap gap-0.5 transition-opacity duration-200"
+                  style={{opacity: fade ? 0 : 1}}>
+                  {displayHand.map((cs,i) => <CardTile key={cs+i} cs={cs} size="xs" />)}
+                </div>
+                {/* Desktop: sm cards */}
+                <div className="hidden sm:flex flex-nowrap gap-1 transition-opacity duration-200"
+                  style={{opacity: fade ? 0 : 1}}>
+                  {displayHand.map((cs,i) => <CardTile key={cs+i+'d'} cs={cs} size="sm" />)}
+                </div>
               </div>
             )}
-            <RowDisplay label="頭墩" cards={arr.top} slots={3} size={isDesktop ? 'lg' : 'md'} />
-            <RowDisplay label="中墩" cards={arr.mid} slots={5} size={isDesktop ? 'lg' : 'md'} />
-            <RowDisplay label="尾墩" cards={arr.bot} slots={5} size={isDesktop ? 'lg' : 'md'} />
+            {/* Arrangement */}
+            <div className="bg-black/30 rounded-xl px-4 py-2">
+              {curVariant && (
+                <div className="flex gap-4 text-[10px] text-gray-500 mb-2 flex-wrap">
+                  <span>頭：{curVariant.top_desc}</span>
+                  <span className="mx-1">·</span>
+                  <span>中：{curVariant.mid_desc}</span>
+                  <span className="mx-1">·</span>
+                  <span>尾：{curVariant.bot_desc}</span>
+                </div>
+              )}
+              <RowDisplay label="頭墩" cards={arr.top} slots={3} size={isDesktop ? 'lg' : 'md'} />
+              <RowDisplay label="中墩" cards={arr.mid} slots={5} size={isDesktop ? 'lg' : 'md'} />
+              <RowDisplay label="尾墩" cards={arr.bot} slots={5} size={isDesktop ? 'lg' : 'md'} />
+            </div>
           </div>
 
-          {/* Group buttons panel (right) */}
-          <div className="w-full sm:w-[380px] shrink-0">
-            <div className="text-xs text-gray-500 mb-1.5">牌型排法（點同一按鈕切換此型的不同排法）</div>
-            {apiError
-              ? <div className="text-xs text-red-400">⚠ {apiError}</div>
-              : !info
-                ? <div className="text-xs text-gray-500">分析中…</div>
-                : info.groups.length===0
-                  ? <div className="text-xs text-orange-400">特殊牌型：{info.special.name}</div>
-                  : (
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {info.groups.slice(0,10).map((g,gi)=>{
-                        const active  = gi===selGroup
-                        const matched = gi===matchedGroup && gi!==selGroup
-                        const cnt = g.variants.length
-                        return (
-                          <button key={gi} onClick={()=>pickGroup(gi)}
-                            className={`text-[16px] px-2 py-1.5 rounded-lg border transition-colors text-left
-                              ${active
-                                ?'bg-sky-800 border-sky-500 text-sky-100 font-bold'
-                                : matched
-                                  ?'bg-gray-700 text-gray-200 border-orange-400 font-semibold'
-                                  :'bg-gray-700 border-gray-500 text-gray-300 hover:border-sky-500'}`}>
-                            {g.label}
-                            {active && cnt>1 && <span className="ml-1 opacity-70 text-sm">{varIdx+1}/{cnt}</span>}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )
-            }
+          {/* Right column: stats (when shown) + group buttons */}
+          <div className="w-full sm:w-[380px] shrink-0 flex flex-col gap-2">
+            {/* Stats panel (collapsible via 手牌特徵 toggle) */}
+            {showStats && <StatsPanel stats={info?.stats} special={info?.special} />}
+            {/* Group buttons */}
+            <div>
+              <div className="text-xs text-gray-500 mb-1.5">牌型排法（點同一按鈕切換此型的不同排法）</div>
+              {apiError
+                ? <div className="text-xs text-red-400">⚠ {apiError}</div>
+                : !info
+                  ? <div className="text-xs text-gray-500">分析中…</div>
+                  : info.groups.length===0
+                    ? <div className="text-xs text-orange-400">特殊牌型：{info.special.name}</div>
+                    : (
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {info.groups.slice(0,10).map((g,gi)=>{
+                          const active  = gi===selGroup
+                          const matched = gi===matchedGroup && gi!==selGroup
+                          const cnt = g.variants.length
+                          return (
+                            <button key={gi} onClick={()=>pickGroup(gi)}
+                              className={`text-[16px] px-2 py-1.5 rounded-lg border transition-colors text-left
+                                ${active
+                                  ?'bg-sky-800 border-sky-500 text-sky-100 font-bold'
+                                  : matched
+                                    ?'bg-gray-700 text-gray-200 border-orange-400 font-semibold'
+                                    :'bg-gray-700 border-gray-500 text-gray-300 hover:border-sky-500'}`}>
+                              {g.label}
+                              {active && cnt>1 && <span className="ml-1 opacity-70 text-sm">{varIdx+1}/{cnt}</span>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )
+              }
+            </div>
           </div>
+
         </div>
 
         {/* ── Countdown (online mode) ── */}
