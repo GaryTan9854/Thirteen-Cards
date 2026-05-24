@@ -105,8 +105,10 @@ const BEAUTY_DATA = [
     poem: ['閉月羞花之貌，', '聰慧巧計之心。', '連環計策亂董卓，', '義薄雲天美名揚。'] },
 ]
 
-function BeautyCarousel({ player }: {
+function BeautyCarousel({ player, onEnterRoom, onSolo }: {
   player: string | null
+  onEnterRoom?: () => void
+  onSolo?:      () => void
 }) {
   const N = BEAUTY_DATA.length   // 8
   const COPIES = 3
@@ -373,10 +375,10 @@ function BeautyCarousel({ player }: {
       <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-slate-900 to-transparent pointer-events-none" />
       <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none" />
 
-      {/* ── Title overlay (name only, no buttons) ── */}
+      {/* ── Title + buttons overlay (desktop only — mobile shows buttons below) ── */}
       <div className="absolute inset-0 flex flex-col items-center justify-end pointer-events-none"
-           style={{ zIndex: 10, paddingBottom: '1.5rem' }}>
-        <div className="text-center space-y-1">
+           style={{ zIndex: 10, paddingBottom: 'max(3rem, calc(1.5rem + env(safe-area-inset-bottom, 0px)))' }}>
+        <div className="text-center mb-6 space-y-2">
           <div className="text-4xl font-black tracking-[0.3em]"
                style={{ color: '#fde047', textShadow: '0 0 40px rgba(251,191,36,0.6), 0 2px 8px rgba(0,0,0,0.95)' }}>
             十三支
@@ -386,6 +388,22 @@ function BeautyCarousel({ player }: {
             歡迎，{player}！
           </div>
         </div>
+        {/* Desktop buttons (hidden on mobile) */}
+        {onEnterRoom && onSolo && (
+          <div className="hidden sm:flex gap-4 pointer-events-auto">
+            <button onClick={onEnterRoom}
+              className="px-10 py-3 rounded-2xl bg-yellow-400 text-gray-900 font-bold text-base
+                         hover:bg-yellow-300 active:scale-95 transition-all shadow-2xl border border-yellow-200/40">
+              進入大廳
+            </button>
+            <button onClick={onSolo}
+              className="px-10 py-3 rounded-2xl font-bold text-base text-white
+                         hover:opacity-90 active:scale-95 transition-all shadow-xl border border-sky-400/40"
+              style={{ background: 'rgba(22,101,52,0.75)', backdropFilter: 'blur(6px)' }}>
+              獨自練功
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -1516,17 +1534,21 @@ export default function OnlinePage() {
   function renderEnterLobby() {
     return (
       <div className="flex flex-col">
-        <BeautyCarousel player={player} />
-        {/* Buttons below the carousel */}
-        <div className="flex gap-4 justify-center py-4"
+        <BeautyCarousel
+          player={player}
+          onEnterRoom={() => setInRoom(true)}
+          onSolo={() => setSoloSetupMode(true)}
+        />
+        {/* Mobile-only buttons below the carousel (sm:hidden) */}
+        <div className="flex sm:hidden gap-4 justify-center py-4"
              style={{ paddingBottom: 'max(1rem, calc(0.5rem + env(safe-area-inset-bottom, 0px)))' }}>
           <button onClick={() => setInRoom(true)}
-            className="px-10 py-3 rounded-2xl bg-yellow-400 text-gray-900 font-bold text-base
+            className="flex-1 py-3 rounded-2xl bg-yellow-400 text-gray-900 font-bold text-base
                        hover:bg-yellow-300 active:scale-95 transition-all shadow-2xl border border-yellow-200/40">
             進入大廳
           </button>
           <button onClick={() => setSoloSetupMode(true)}
-            className="px-10 py-3 rounded-2xl font-bold text-base text-white
+            className="flex-1 py-3 rounded-2xl font-bold text-base text-white
                        hover:opacity-90 active:scale-95 transition-all shadow-xl border border-sky-400/40"
             style={{ background: 'rgba(22,101,52,0.85)', backdropFilter: 'blur(6px)' }}>
             獨自練功
