@@ -12,7 +12,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "7.20"
+APP_VERSION = "8.0"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()

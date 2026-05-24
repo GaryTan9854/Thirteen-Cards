@@ -58,8 +58,11 @@ function sortCards(cards: string[], mode: SortMode): string[] {
 
 // ─── CardTile ─────────────────────────────────────────────────────────────────
 
-function CardTile({ cs, size='md' }: { cs:string; size?:'sm'|'md'|'lg' }) {
-  const dim = size==='lg' ? 'w-14 h-20 text-base' : size==='md' ? 'w-11 h-16 text-sm' : 'w-9 h-12 text-xs'
+function CardTile({ cs, size='md' }: { cs:string; size?:'xs'|'sm'|'md'|'lg' }) {
+  const dim = size==='lg' ? 'w-14 h-20 text-base'
+            : size==='md' ? 'w-11 h-16 text-sm'
+            : size==='sm' ? 'w-9 h-12 text-xs'
+            : 'w-6 h-9 text-[10px]'
   return (
     <span className={`inline-flex items-center justify-center rounded-lg border-2 font-bold shadow select-none
       ${dim} ${isRed(cs) ? 'border-red-300 bg-white text-red-600' : 'border-gray-400 bg-white text-gray-900'}`}>
@@ -327,6 +330,10 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
     }
   }, [countdown])
 
+  // ── Hand / Stats visibility (collapsed by default on mobile) ──
+  const [showHand,  setShowHand]  = useState(() => window.innerWidth >= 640)
+  const [showStats, setShowStats] = useState(() => window.innerWidth >= 640)
+
   // ── 報到 detection ──
   const isBaodaoHand = !!(info && info.special && info.special.name !== 'normal')
   const [baodaoConfirmPending, setBaodaoConfirmPending] = useState(false)
@@ -364,32 +371,85 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
       <div className="bg-gray-900 rounded-2xl shadow-2xl flex flex-col gap-3 sm:gap-4 p-3 sm:p-5 overflow-y-auto"
         style={{width:'95vw', maxWidth:'1060px', maxHeight:'94dvh', WebkitOverflowScrolling:'touch'}}>
 
-        {/* ── Row 1: Hand (left) + Right panel: Stats & Groups (right) ── */}
-        <div className="flex flex-col sm:flex-row sm:gap-5 sm:items-start gap-3">
-          {/* Hand */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-sky-400 font-semibold text-xs sm:text-sm">原始手牌</span>
-              {sorted && (
-                <button
-                  onClick={()=>setSortIdx(i=>(i+1)%SORT_MODES.length)}
-                  className="text-xs px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-500"
-                >
-                  {SORT_LABEL[sortMode]}
-                </button>
-              )}
-            </div>
-            <div className="flex flex-nowrap gap-1 overflow-x-auto pb-1 transition-opacity duration-200"
-              style={{opacity: fade ? 0 : 1}}>
-              {displayHand.map((cs,i)=><CardTile key={cs+i} cs={cs} size="sm" />)}
-            </div>
-          </div>
+        {/* ── Actions (TOP) ── */}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <button
+            onClick={cycleModel}
+            disabled={modelLoading}
+            className="text-xs px-3 py-1.5 rounded-full bg-gray-700 border border-gray-500 text-gray-200
+                       hover:bg-gray-600 disabled:opacity-50 flex items-center gap-1.5"
+          >
+            <span className="text-gray-400">AI：</span>
+            <span className="font-bold text-blue-300">{MODEL_LABEL[currentModel]}</span>
+            <span className="text-gray-400 ml-1">▷</span>
+            {modelLoading && <span className="ml-1">…</span>}
+          </button>
 
-          {/* Stats panel (right side of Row 1) */}
-          <StatsPanel stats={info?.stats} special={info?.special} />
+          <div className="flex gap-2 items-center">
+            <button onClick={onCancel}
+              className="px-4 py-1.5 rounded-lg bg-gray-700 text-gray-300 text-sm hover:bg-gray-600">
+              取消
+            </button>
+            {isBaodaoHand && (
+              <button
+                onClick={() => onConfirm(arr.top, arr.mid, arr.bot, true)}
+                className="px-4 py-1.5 rounded-lg bg-red-600 text-white font-bold text-sm
+                           hover:bg-red-500 active:scale-95 transition-all animate-pulse"
+              >
+                🀄 報到！
+              </button>
+            )}
+            <button onClick={handleNormalSubmit}
+              disabled={!canConfirm}
+              className="px-6 py-1.5 rounded-lg bg-orange-500 text-white font-bold text-sm
+                         hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed">
+              確定送出
+            </button>
+          </div>
         </div>
 
-        {/* ── Row 2: Arrangement (left) | Group buttons (right) ── */}
+        {/* ── Toggle buttons: 原始手牌 / 手牌特徵 ── */}
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowHand(v => !v)}
+            className={`text-xs px-2.5 py-1 rounded-full border transition-colors
+              ${showHand
+                ? 'bg-sky-800 border-sky-600 text-sky-200'
+                : 'bg-gray-700 border-gray-500 text-gray-300 hover:border-sky-500'}`}>
+            原始手牌 {showHand ? '▲' : '▼'}
+          </button>
+          <button onClick={() => setShowStats(v => !v)}
+            className={`text-xs px-2.5 py-1 rounded-full border transition-colors
+              ${showStats
+                ? 'bg-sky-800 border-sky-600 text-sky-200'
+                : 'bg-gray-700 border-gray-500 text-gray-300 hover:border-sky-500'}`}>
+            手牌特徵 {showStats ? '▲' : '▼'}
+          </button>
+          {showHand && sorted && (
+            <button
+              onClick={() => setSortIdx(i => (i+1) % SORT_MODES.length)}
+              className="text-xs px-2 py-1 rounded-full bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-500"
+            >
+              {SORT_LABEL[sortMode]}
+            </button>
+          )}
+        </div>
+
+        {/* ── Collapsible Hand + Stats ── */}
+        {(showHand || showStats) && (
+          <div className="flex flex-col sm:flex-row sm:gap-5 sm:items-start gap-2">
+            {showHand && (
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-nowrap gap-0.5 transition-opacity duration-200"
+                  style={{opacity: fade ? 0 : 1}}>
+                  {displayHand.map((cs,i) => <CardTile key={cs+i} cs={cs} size="xs" />)}
+                </div>
+              </div>
+            )}
+            {showStats && <StatsPanel stats={info?.stats} special={info?.special} />}
+          </div>
+        )}
+
+        {/* ── Arrangement (left) | Group buttons (right) ── */}
         <div className="flex flex-col sm:flex-row sm:gap-4 gap-3 sm:items-start">
           {/* Arrangement area */}
           <div className="flex-1 min-w-0 bg-black/30 rounded-xl px-4 py-2">
@@ -402,9 +462,9 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
                 <span>尾：{curVariant.bot_desc}</span>
               </div>
             )}
-            <RowDisplay label="頭墩 (3)" cards={arr.top} slots={3} />
-            <RowDisplay label="中墩 (5)" cards={arr.mid} slots={5} />
-            <RowDisplay label="尾墩 (5)" cards={arr.bot} slots={5} />
+            <RowDisplay label="頭墩" cards={arr.top} slots={3} />
+            <RowDisplay label="中墩" cards={arr.mid} slots={5} />
+            <RowDisplay label="尾墩" cards={arr.bot} slots={5} />
           </div>
 
           {/* Group buttons panel (right) */}
@@ -441,7 +501,7 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
           </div>
         </div>
 
-        {/* ── Row 4: Countdown (online mode) ── */}
+        {/* ── Countdown (online mode) ── */}
         {countdown !== undefined && (
           <div className="flex items-center justify-center gap-4">
             <div className={`text-3xl font-bold tabular-nums
@@ -457,48 +517,6 @@ export default function ManualArrange({ hand, onConfirm, onCancel, countdown, su
             )}
           </div>
         )}
-
-        {/* ── Row 5: Actions ── */}
-        <div className="flex items-center justify-between gap-2 flex-wrap"
-             style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-          {/* Model toggle */}
-          <button
-            onClick={cycleModel}
-            disabled={modelLoading}
-            className="text-xs px-3 py-2 rounded-full bg-gray-700 border border-gray-500 text-gray-200
-                       hover:bg-gray-600 disabled:opacity-50 flex items-center gap-1.5"
-          >
-            <span className="text-gray-400">AI 模型：</span>
-            <span className="font-bold text-blue-300">{MODEL_LABEL[currentModel]}</span>
-            <span className="text-gray-400 ml-1">▷ 切換</span>
-            {modelLoading && <span className="ml-1">…</span>}
-          </button>
-
-          <div className="flex gap-3">
-            <button onClick={onCancel}
-              className="px-4 py-2 rounded-lg bg-gray-700 text-gray-300 text-sm hover:bg-gray-600">
-              取消
-            </button>
-
-            {/* 報到 button — only shown when special hand detected */}
-            {isBaodaoHand && (
-              <button
-                onClick={() => onConfirm(arr.top, arr.mid, arr.bot, true)}
-                className="px-5 py-2 rounded-lg bg-red-600 text-white font-bold text-sm
-                           hover:bg-red-500 active:scale-95 transition-all animate-pulse"
-              >
-                🀄 報到！
-              </button>
-            )}
-
-            <button onClick={handleNormalSubmit}
-              disabled={!canConfirm}
-              className="px-7 py-2 rounded-lg bg-orange-500 text-white font-bold text-sm
-                         hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed">
-              確定送出
-            </button>
-          </div>
-        </div>
 
       </div>
     </div>

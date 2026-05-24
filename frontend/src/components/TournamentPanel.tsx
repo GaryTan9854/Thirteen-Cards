@@ -152,20 +152,26 @@ export default function TournamentPanel({
     <div className="flex flex-col gap-3">
 
       {/* ── 控制列 ── */}
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold whitespace-nowrap select-none">
-          {roundLabel}
-        </span>
-        <div className="flex-1" />
-        <button onClick={onToggleVoice}
-          className={`${BTN} ${!voiceOn ? 'opacity-50' : ''}`}
-          title={voiceOn ? '語音開啟（點擊關閉）' : '語音關閉（點擊開啟）'}>
-          {voiceOn ? '🔊' : '🔇'}
-        </button>
-        <button onClick={() => setHistoryView(v => ((v + 1) % 3) as 0 | 1 | 2)} className={BTN}>
-          {historyView === 0 ? '▸ 成績表' : historyView === 1 ? '▾ 單場' : '▾ 累計'}
-        </button>
-        {actionButtons}
+      <div className="flex flex-col gap-2">
+        {/* Row 1: 局數標籤 + 語音 + 成績表 */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold whitespace-nowrap select-none">
+            {roundLabel}
+          </span>
+          <div className="flex-1" />
+          <button onClick={onToggleVoice}
+            className={`${BTN} ${!voiceOn ? 'opacity-50' : ''}`}
+            title={voiceOn ? '語音開啟（點擊關閉）' : '語音關閉（點擊開啟）'}>
+            {voiceOn ? '🔊' : '🔇'}
+          </button>
+          <button onClick={() => setHistoryView(v => ((v + 1) % 3) as 0 | 1 | 2)} className={BTN}>
+            {historyView === 0 ? '▸ 成績表' : historyView === 1 ? '▾ 單場' : '▾ 累計'}
+          </button>
+        </div>
+        {/* Row 2: 動作按鈕（下一局 / 再來一場 / 等待…） */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {actionButtons}
+        </div>
       </div>
 
       {/* ── 累積比分綠框 ── */}

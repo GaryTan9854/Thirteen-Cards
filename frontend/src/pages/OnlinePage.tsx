@@ -105,8 +105,8 @@ const BEAUTY_DATA = [
     poem: ['閉月羞花之貌，', '聰慧巧計之心。', '連環計策亂董卓，', '義薄雲天美名揚。'] },
 ]
 
-function BeautyCarousel({ player, onEnterRoom, onSolo }: {
-  player: string | null; onEnterRoom: () => void; onSolo: () => void
+function BeautyCarousel({ player }: {
+  player: string | null
 }) {
   const N = BEAUTY_DATA.length   // 8
   const COPIES = 3
@@ -146,14 +146,14 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
       colsRef.current  = newCols
 
       // availH: exact visible space from carousel top to viewport bottom.
-      // On mobile, cap at 55 % of total viewport height so the carousel
-      // doesn't swallow the whole screen. Desktop keeps full available height.
+      // On mobile, cap at 62dvh so the buttons below remain visible without scrolling.
+      // Desktop keeps full available height.
       if (el) {
         const top  = el.getBoundingClientRect().top
         if (top >= 0) {
           const full = window.innerHeight - top
           const capped = w > 0 && w < 640
-            ? Math.min(full, Math.round(window.innerHeight * 0.38))
+            ? Math.min(full, Math.round(window.innerHeight * 0.62))
             : full
           setAvailH(capped)
         }
@@ -294,8 +294,8 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
          className="relative overflow-hidden"
          style={{
            // availH measured dynamically: fixes iOS address-bar + 2-row mobile header
-           // Mobile capped at 38dvh — small enough to see full figure at reduced scale
-           height: availH > 0 ? `${availH}px` : 'min(calc(100dvh - 80px), 38dvh)',
+           // Mobile capped at 62dvh — leaves room for buttons below the carousel
+           height: availH > 0 ? `${availH}px` : 'min(calc(100dvh - 80px), 62dvh)',
            marginTop: '-24px', marginBottom: '-24px',
            marginLeft: '-16px', marginRight: '-16px',
            cursor: 'grab', touchAction: 'none', userSelect: 'none',
@@ -373,10 +373,10 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
       <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-slate-900 to-transparent pointer-events-none" />
       <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none" />
 
-      {/* ── Title + buttons ── */}
+      {/* ── Title overlay (name only, no buttons) ── */}
       <div className="absolute inset-0 flex flex-col items-center justify-end pointer-events-none"
-           style={{ zIndex: 10, paddingBottom: 'max(3rem, calc(1.5rem + env(safe-area-inset-bottom, 0px)))' }}>
-        <div className="text-center mb-8 space-y-2">
+           style={{ zIndex: 10, paddingBottom: '1.5rem' }}>
+        <div className="text-center space-y-1">
           <div className="text-4xl font-black tracking-[0.3em]"
                style={{ color: '#fde047', textShadow: '0 0 40px rgba(251,191,36,0.6), 0 2px 8px rgba(0,0,0,0.95)' }}>
             十三支
@@ -385,19 +385,6 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
                style={{ color: 'rgba(254,240,138,0.72)', textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>
             歡迎，{player}！
           </div>
-        </div>
-        <div className="flex gap-4 pointer-events-auto">
-          <button onClick={onEnterRoom}
-            className="px-10 py-3 rounded-2xl bg-yellow-400 text-gray-900 font-bold text-base
-                       hover:bg-yellow-300 active:scale-95 transition-all shadow-2xl border border-yellow-200/40">
-            進入大廳
-          </button>
-          <button onClick={onSolo}
-            className="px-10 py-3 rounded-2xl font-bold text-base text-white
-                       hover:opacity-90 active:scale-95 transition-all shadow-xl border border-sky-400/40"
-            style={{ background: 'rgba(22,101,52,0.75)', backdropFilter: 'blur(6px)' }}>
-            獨自練功
-          </button>
         </div>
       </div>
     </div>
@@ -1530,11 +1517,24 @@ export default function OnlinePage() {
 
   function renderEnterLobby() {
     return (
-      <BeautyCarousel
-        player={player}
-        onEnterRoom={() => setInRoom(true)}
-        onSolo={() => setSoloSetupMode(true)}
-      />
+      <div className="flex flex-col">
+        <BeautyCarousel player={player} />
+        {/* Buttons below the carousel */}
+        <div className="flex gap-4 justify-center py-4"
+             style={{ paddingBottom: 'max(1rem, calc(0.5rem + env(safe-area-inset-bottom, 0px)))' }}>
+          <button onClick={() => setInRoom(true)}
+            className="px-10 py-3 rounded-2xl bg-yellow-400 text-gray-900 font-bold text-base
+                       hover:bg-yellow-300 active:scale-95 transition-all shadow-2xl border border-yellow-200/40">
+            進入大廳
+          </button>
+          <button onClick={() => setSoloSetupMode(true)}
+            className="px-10 py-3 rounded-2xl font-bold text-base text-white
+                       hover:opacity-90 active:scale-95 transition-all shadow-xl border border-sky-400/40"
+            style={{ background: 'rgba(22,101,52,0.85)', backdropFilter: 'blur(6px)' }}>
+            獨自練功
+          </button>
+        </div>
+      </div>
     )
   }
 
@@ -2104,7 +2104,7 @@ export default function OnlinePage() {
                 if (soloActive) startSoloRound()
                 else send({ type: 'next_round' })
               }}
-                className="text-xs px-3 py-1 rounded-full bg-orange-400 text-gray-900 font-bold
+                className="text-sm px-6 py-2 rounded-xl bg-orange-400 text-gray-900 font-bold
                            hover:bg-orange-300 active:scale-95 transition whitespace-nowrap animate-pulse">
                 下一局 →
               </button>
