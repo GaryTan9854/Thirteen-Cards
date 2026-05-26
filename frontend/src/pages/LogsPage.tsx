@@ -7,6 +7,41 @@ interface LoginEntry {
   timestamp: string
 }
 
+interface LoginSession {
+  username: string
+  login:    LoginEntry | null
+  logout:   LoginEntry | null
+}
+
+function pairSessions(entries: LoginEntry[]): LoginSession[] {
+  const sorted = [...entries].sort((a, b) => a.id - b.id)   // oldest first
+  const result: LoginSession[] = []
+  const pending: Record<string, LoginEntry> = {}
+
+  for (const e of sorted) {
+    if (e.action === 'login') {
+      if (pending[e.username]) result.push({ username: e.username, login: pending[e.username], logout: null })
+      pending[e.username] = e
+    } else {
+      if (pending[e.username]) {
+        result.push({ username: e.username, login: pending[e.username], logout: e })
+        delete pending[e.username]
+      }
+    }
+  }
+  for (const u of Object.keys(pending)) {
+    result.push({ username: u, login: pending[u], logout: null })
+  }
+  return result.reverse()   // newest first for display
+}
+
+function fmtDur(a: string, b: string): string {
+  const ms = new Date(b).getTime() - new Date(a).getTime()
+  if (isNaN(ms) || ms < 0) return ''
+  const m = Math.round(ms / 60000)
+  return m < 60 ? `${m}分` : `${Math.floor(m / 60)}h${m % 60}m`
+}
+
 interface GameRecord {
   game_id: string
   mode: string
@@ -225,25 +260,31 @@ export default function LogsPage() {
             <thead>
               <tr className="text-gray-500 border-b border-gray-700 text-xs">
                 <th className="px-4 py-2 text-left font-normal">玩家</th>
-                <th className="px-4 py-2 text-left font-normal">動作</th>
-                <th className="px-4 py-2 text-left font-normal">時間</th>
+                <th className="px-4 py-2 text-left font-normal">登入</th>
+                <th className="px-4 py-2 text-left font-normal">登出</th>
+                <th className="px-4 py-2 text-left font-normal">時長</th>
               </tr>
             </thead>
             <tbody>
-              {logins.map(l => (
-                <tr key={l.id} className="border-b border-gray-800 hover:bg-gray-800/30">
-                  <td className="px-4 py-2 font-semibold text-sky-300">{l.username}</td>
-                  <td className="px-4 py-2">
-                    <span className={`text-xs px-2 py-0.5 rounded-full
-                      ${l.action === 'login' ? 'bg-slate-800 text-sky-300' : 'bg-gray-700 text-gray-400'}`}>
-                      {l.action === 'login' ? '登入' : '登出'}
-                    </span>
+              {pairSessions(logins).map((s, i) => (
+                <tr key={i} className="border-b border-gray-800 hover:bg-gray-800/30">
+                  <td className="px-4 py-2 font-semibold text-sky-300">{s.username}</td>
+                  <td className="px-4 py-2 text-gray-400 text-xs">
+                    {s.login ? fmtTime(s.login.timestamp) : '—'}
                   </td>
-                  <td className="px-4 py-2 text-gray-400 text-xs">{fmtTime(l.timestamp)}</td>
+                  <td className="px-4 py-2 text-gray-400 text-xs">
+                    {s.logout
+                      ? fmtTime(s.logout.timestamp)
+                      : <span className="text-green-500 text-xs">仍在線</span>
+                    }
+                  </td>
+                  <td className="px-4 py-2 text-gray-500 text-xs">
+                    {s.login && s.logout ? fmtDur(s.login.timestamp, s.logout.timestamp) : ''}
+                  </td>
                 </tr>
               ))}
               {logins.length === 0 && (
-                <tr><td colSpan={3} className="px-4 py-8 text-center text-gray-600">尚無記錄</td></tr>
+                <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-600">尚無記錄</td></tr>
               )}
             </tbody>
           </table>

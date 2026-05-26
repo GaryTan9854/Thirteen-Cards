@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
 interface AuthCtx {
   player: string | null
@@ -21,8 +21,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }).catch(() => {})
   }
 
+  // On page restore (refresh with saved session), log once per browser session
+  useEffect(() => {
+    const p = localStorage.getItem('tc_player')
+    if (p && !sessionStorage.getItem('tc_auth_logged')) {
+      sessionStorage.setItem('tc_auth_logged', '1')
+      _logAuth(p, 'login')
+    }
+  // _logAuth is stable (no deps); empty array is intentional
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   function login(name: string) {
     localStorage.setItem('tc_player', name)
+    sessionStorage.setItem('tc_auth_logged', '1')
     setPlayer(name)
     _logAuth(name, 'login')
   }
@@ -31,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const p = localStorage.getItem('tc_player')
     if (p) _logAuth(p, 'logout')
     localStorage.removeItem('tc_player')
+    sessionStorage.removeItem('tc_auth_logged')
     setPlayer(null)
   }
 

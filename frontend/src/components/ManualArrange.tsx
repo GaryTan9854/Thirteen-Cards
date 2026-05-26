@@ -195,6 +195,7 @@ interface Props {
   roundLabel?:     string    // e.g. "第 3 / 16 局"
   playerNames?:    string[]  // all 4 seat names for cumulative display
   cumScores?:      number[]  // all 4 cumulative scores so far
+  isGary?:         boolean   // enables autopilot toggle
 }
 
 function scoreColor(n: number) {
@@ -202,7 +203,7 @@ function scoreColor(n: number) {
 }
 
 export default function ManualArrange({ hand, onConfirm, countdown, submittedCount, totalPlayers,
-  roundLabel, playerNames, cumScores }: Props) {
+  roundLabel, playerNames, cumScores, isGary }: Props) {
 
   const isDesktop = useMemo(() => window.innerWidth >= 640, [])
 
@@ -291,6 +292,25 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
   // ── Auto-submit when countdown hits 0 (online mode) ──
   const arrRef = useRef(arr)
   useEffect(() => { arrRef.current = arr }, [arr])
+
+  // ── Autopilot (Gary only) — auto-submit top arrangement 1.2s after deal ──
+  const [autopilot, setAutopilot] = useState(
+    () => isGary && localStorage.getItem('tc_autoplay') === 'true'
+  )
+  const autoPlayedRef = useRef(false)
+
+  useEffect(() => {
+    if (!isGary || !autopilot || !info || autoPlayedRef.current) return
+    const { top, mid, bot } = arrRef.current
+    if (top.length !== 3 || mid.length !== 5 || bot.length !== 5) return
+    autoPlayedRef.current = true
+    const isBaodao = !!(info.special && info.special.name !== 'normal')
+    const t = setTimeout(() => {
+      const { top: t2, mid: m2, bot: b2 } = arrRef.current
+      onConfirm(t2, m2, b2, isBaodao)
+    }, 1200)
+    return () => clearTimeout(t)
+  }, [info])   // fires once when arrangement data first arrives
 
   useEffect(() => {
     if (countdown === 0) {
@@ -391,12 +411,27 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
               ))}
             </div>
           )}
-          {/* Row: 離開 + 確定送出 */}
+          {/* Row: 離開 + [autopilot] + 確定送出 */}
           <div className="flex items-center gap-2">
             <button onClick={() => setLeaveConfirmPending(true)}
               className="px-4 py-1.5 rounded-lg bg-gray-700 text-gray-300 text-sm hover:bg-gray-600">
               離開
             </button>
+            {isGary && (
+              <button
+                onClick={() => {
+                  const next = !autopilot
+                  setAutopilot(next)
+                  localStorage.setItem('tc_autoplay', String(next))
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition
+                  ${autopilot
+                    ? 'bg-sky-600 text-white animate-pulse'
+                    : 'bg-gray-700 text-gray-500 hover:text-gray-300'}`}
+                title="自動玩牌（Gary 限定）">
+                🤖 自動
+              </button>
+            )}
             <div className="flex-1" />
             <button ref={confirmBtnRef} onClick={handleNormalSubmit}
               disabled={!canConfirm}

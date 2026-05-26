@@ -20,6 +20,7 @@ import {
   detectGrandSlam, buildGunNotifs, buildSpecialTTS,
   speak, speakSequence,
 } from '../utils/gameEffects'
+import { setScene, isMusicOn, toggleMusic, stopMusic } from '../utils/music'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -584,6 +585,7 @@ export default function OnlinePage() {
   const gunQueueRef  = useRef<GunNotif[]>([])
   const [voiceOn,      setVoiceOn]          = useState(true)
   const voiceRef     = useRef(true)
+  const [musicOn,      setMusicOn]          = useState(() => isMusicOn())
   const ttsGenRef          = useRef(0)
   const soloPhaseRef       = useRef<string>('lobby')
   const soloAppealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1454,6 +1456,19 @@ export default function OnlinePage() {
     }
   }, [soloSetupMode, soloActive])
 
+  // ── Background music: scene-based ──────────────────────────────────────────
+  useEffect(() => {
+    if (isEnded) {
+      setScene('ended')
+    } else if (inRoom || soloActive) {
+      setScene('playing')
+    } else {
+      setScene('lobby')
+    }
+  }, [inRoom, soloActive, isEnded])
+
+  useEffect(() => { return () => stopMusic() }, [])
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   // Compute round header info for ManualArrange overlay (2d)
@@ -1474,6 +1489,7 @@ export default function OnlinePage() {
           roundLabel={arrangeRoundLabel}
           playerNames={arrangeSeats.length > 0 ? arrangeSeats : undefined}
           cumScores={arrangeSeats.length > 0 ? arrangeCumScores : undefined}
+          isGary={isGary}
         />,
         document.body
       )
@@ -1648,6 +1664,12 @@ export default function OnlinePage() {
                         ⚙ 重置
                       </button>
                     )}
+                    <button onClick={() => { const next = toggleMusic(); setMusicOn(next) }}
+                      className={`text-xs px-2 py-1 rounded hover:bg-slate-700 transition
+                        ${musicOn ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-400'}`}
+                      title={musicOn ? '配樂開啟（點擊關閉）' : '配樂關閉（點擊開啟）'}>
+                      🎵
+                    </button>
                     <button onClick={toggleVoice}
                       className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-slate-700 transition"
                       title={voiceOn ? '語音開啟（點擊關閉）' : '語音關閉（點擊開啟）'}>

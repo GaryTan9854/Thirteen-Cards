@@ -203,12 +203,6 @@ export default function LoginPage() {
                 <div className="text-sky-400 text-sm">{bioName}</div>
               </div>
             </button>
-            <button
-              onClick={() => { setBioName(null); localStorage.removeItem(PASSKEY_ID_KEY); localStorage.removeItem(PASSKEY_NAME_KEY) }}
-              className="w-full mt-2 text-xs text-gray-600 hover:text-gray-400 transition text-center"
-            >
-              切換玩家
-            </button>
           </div>
         )}
 
@@ -235,8 +229,8 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* ── Name login (hidden if bio name is set, unless "切換玩家") ── */}
-        {(!bioName || !hasSavedPasskey()) && !showBioOffer && (
+        {/* ── Name login (always visible alongside passkey) ── */}
+        {!showBioOffer && (
           <div className="bg-slate-800 rounded-2xl shadow-2xl p-6 border border-slate-600/60">
             <h2 className="text-base font-semibold text-gray-200 mb-5">玩家登入</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
