@@ -21,6 +21,7 @@ import {
   speak, speakSequence,
 } from '../utils/gameEffects'
 import { setScene, isMusicOn, toggleMusic, stopMusic } from '../utils/music'
+import QuipPanel from '../components/QuipPanel'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -2301,6 +2302,15 @@ export default function OnlinePage() {
       ? `本場結束（共 ${history.length} 局）`
       : `第 ${res.round} / ${effRoundsNormal} 局結果${effInAppeal ? '【申訴】' + appealPlayedStr : ''}`
 
+    // Compute winner/loser for quip selection
+    const cumScores = seatNames.map((_: string, i: number) =>
+      (history as number[][]).reduce((s: number, r: number[]) => s + (r[i] ?? 0), 0)
+    )
+    const maxScore  = Math.max(...cumScores)
+    const minScore  = Math.min(...cumScores)
+    const quipWinner = seatNames[cumScores.indexOf(maxScore)] ?? ''
+    const quipLoser  = seatNames[cumScores.indexOf(minScore)] ?? ''
+
     return (
       <div className="flex flex-col gap-6">
         <TournamentPanel
@@ -2316,6 +2326,10 @@ export default function OnlinePage() {
 
         {gameResult && (
           <GameResultDisplay result={gameResult} strategies={strategies} />
+        )}
+
+        {isEnded && quipWinner && quipLoser && (
+          <QuipPanel loser={quipLoser} winner={quipWinner} names={seatNames} />
         )}
       </div>
     )
