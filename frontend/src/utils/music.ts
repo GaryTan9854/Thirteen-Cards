@@ -11,7 +11,7 @@ const TRACKS: Record<string, string> = {
 
 let audio: HTMLAudioElement | null = null
 let _scene = ''
-let _enabled = localStorage.getItem('tc_music_on') === 'true'   // default OFF
+let _enabled = localStorage.getItem('tc_music_on') !== 'false'   // default ON
 
 function makeAudio(src: string): HTMLAudioElement {
   if (audio) { audio.pause(); audio.src = '' }
