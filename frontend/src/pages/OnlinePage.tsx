@@ -587,6 +587,7 @@ export default function OnlinePage() {
   const [voiceOn,      setVoiceOn]          = useState(true)
   const voiceRef     = useRef(true)
   const [musicOn,      setMusicOn]          = useState(() => isMusicOn())
+  const [quipCtx,      setQuipCtx]          = useState<{ loser: string; winner: string; names: string[] } | null>(null)
   const ttsGenRef          = useRef(0)
   const soloPhaseRef       = useRef<string>('lobby')
   const soloAppealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1496,6 +1497,21 @@ export default function OnlinePage() {
 
   useEffect(() => { return () => stopMusic() }, [])
 
+  // ── Quip panel: set context when game ends, clear when leaving ────────────
+  useEffect(() => {
+    if (!isEnded || !lastResult) { setQuipCtx(null); return }
+    const names   = (lastResult.seat_names ?? []) as string[]
+    const history = (lastResult.history    ?? []) as number[][]
+    if (names.length === 0) return
+    const cum = names.map((_: string, i: number) =>
+      history.reduce((s: number, r: number[]) => s + (r[i] ?? 0), 0)
+    )
+    const winner = names[cum.indexOf(Math.max(...cum))] ?? ''
+    const loser  = names[cum.indexOf(Math.min(...cum))] ?? ''
+    if (winner && loser) setQuipCtx({ winner, loser, names })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEnded, lastResult])
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   // Compute round header info for ManualArrange overlay (2d)
@@ -1761,6 +1777,16 @@ export default function OnlinePage() {
               )}
 
               {renderPhase()}
+
+              {/* ── End-game quip panel ── */}
+              {quipCtx && isEnded && (
+                <QuipPanel
+                  key={`${quipCtx.winner}-${quipCtx.loser}-${quipCtx.names.join(',')}`}
+                  loser={quipCtx.loser}
+                  winner={quipCtx.winner}
+                  names={quipCtx.names}
+                />
+              )}
             </>
         }
       </div>
@@ -2302,15 +2328,6 @@ export default function OnlinePage() {
       ? `本場結束（共 ${history.length} 局）`
       : `第 ${res.round} / ${effRoundsNormal} 局結果${effInAppeal ? '【申訴】' + appealPlayedStr : ''}`
 
-    // Compute winner/loser for quip selection
-    const cumScores = seatNames.map((_: string, i: number) =>
-      (history as number[][]).reduce((s: number, r: number[]) => s + (r[i] ?? 0), 0)
-    )
-    const maxScore  = Math.max(...cumScores)
-    const minScore  = Math.min(...cumScores)
-    const quipWinner = seatNames[cumScores.indexOf(maxScore)] ?? ''
-    const quipLoser  = seatNames[cumScores.indexOf(minScore)] ?? ''
-
     return (
       <div className="flex flex-col gap-6">
         <TournamentPanel
@@ -2326,10 +2343,6 @@ export default function OnlinePage() {
 
         {gameResult && (
           <GameResultDisplay result={gameResult} strategies={strategies} />
-        )}
-
-        {isEnded && quipWinner && quipLoser && (
-          <QuipPanel loser={quipLoser} winner={quipWinner} names={seatNames} />
         )}
       </div>
     )
