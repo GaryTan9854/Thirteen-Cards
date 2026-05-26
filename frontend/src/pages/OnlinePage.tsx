@@ -1785,6 +1785,7 @@ export default function OnlinePage() {
                   loser={quipCtx.loser}
                   winner={quipCtx.winner}
                   names={quipCtx.names}
+                  onDone={() => setQuipCtx(null)}
                 />
               )}
             </>
