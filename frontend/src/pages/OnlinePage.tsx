@@ -1088,8 +1088,22 @@ export default function OnlinePage() {
 
     state.currentRound++
 
-    // Deal hands
-    const { hands } = await fetch('/api/game/deal', { method: 'POST' }).then(r => r.json())
+    // Deal hands (30s timeout + error recovery)
+    let hands: string[][]
+    {
+      const ctrl = new AbortController()
+      const tid  = setTimeout(() => ctrl.abort(), 30000)
+      try {
+        const r  = await fetch('/api/game/deal', { method: 'POST', signal: ctrl.signal })
+        clearTimeout(tid)
+        hands = (await r.json()).hands
+      } catch {
+        clearTimeout(tid)
+        state.currentRound--   // undo increment so round numbering stays correct
+        pushNotice('⚠️ 發牌失敗，請按「下一局」重試')
+        return
+      }
+    }
     state.preDelt = hands
 
     setMyHand(hands[0])   // player is always seat 0
@@ -1111,18 +1125,35 @@ export default function OnlinePage() {
     const state = soloStateRef.current!
     const seatNames = state.seatNames
 
-    // Resolve via HTTP
+    // Resolve via HTTP (30s timeout + error recovery)
     const strategies = seatNames.map((_, i) => i === 0 ? 'manual' : (state.strategies[i] ?? 'rulealpha'))
-    const res = await fetch('/api/game/play', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        player_names: seatNames,
-        strategies,
-        pre_dealt:    state.preDelt,
-        overrides:    [{ player: 0, top, mid, bot, baodao: isBaodao !== false }],
-      }),
-    }).then(r => r.json())
+    let res: any
+    {
+      const ctrl = new AbortController()
+      const tid  = setTimeout(() => ctrl.abort(), 30000)
+      try {
+        const r = await fetch('/api/game/play', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: ctrl.signal,
+          body: JSON.stringify({
+            player_names: seatNames,
+            strategies,
+            pre_dealt:    state.preDelt,
+            overrides:    [{ player: 0, top, mid, bot, baodao: isBaodao !== false }],
+          }),
+        })
+        clearTimeout(tid)
+        res = await r.json()
+      } catch {
+        clearTimeout(tid)
+        // myHand is still set (cleared only after success), so just reset submitted
+        // → ManualArrange portal reappears, player can resubmit
+        setSubmitted(false)
+        pushNotice('⚠️ 計算失敗，請重新送出')
+        return
+      }
+    }
 
     // Apply multiplier & record scores (mirrors room.py resolve_round logic)
     const scoreByName: Record<string, number> = {}
