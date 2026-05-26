@@ -24,11 +24,22 @@ const BEAUTY_CONFIG = [
   { file: '貂蟬',   name: '貂蟬',   label: '閉月' },
 ]
 
-/** Consistent DJB2 hash: same player name always → same beauty, across sessions. */
-export function playerBeautyIndex(name: string): number {
+const MALE_CONFIG = [
+  { file: '秀才', name: '秀才', label: '書生' },
+  { file: '大儒', name: '大儒', label: '鴻儒' },
+  { file: '帝王', name: '帝王', label: '天子' },
+  { file: '將軍', name: '將軍', label: '武將' },
+]
+
+/** Consistent DJB2 hash: same player name always → same index, across sessions. */
+function djb2(name: string, mod: number): number {
   let h = 5381
   for (let i = 0; i < name.length; i++) h = ((h << 5) + h + name.charCodeAt(i)) >>> 0
-  return h % BEAUTY_CONFIG.length
+  return h % mod
+}
+
+export function playerBeautyIndex(name: string): number {
+  return djb2(name, BEAUTY_CONFIG.length)
 }
 
 const STORAGE_KEY = (name: string) => `tc_avatar_${name}`
@@ -93,7 +104,16 @@ export default function BeautyAvatar({ name, size = 80, isMe = false, className 
 
   const bi = idx !== undefined ? idx % BEAUTY_CONFIG.length : playerBeautyIndex(name)
   const b  = BEAUTY_CONFIG[bi]
-  const src = `/assets/beauties/${b.file}.png`
+
+  // Human player's own seat without a custom photo → show a male icon
+  const mi  = djb2(name, MALE_CONFIG.length)
+  const m   = MALE_CONFIG[mi]
+  const src = customSrc
+    ? customSrc
+    : isMe
+      ? `/assets/males/${m.file}.png`
+      : `/assets/beauties/${b.file}.png`
+  const altText  = customSrc ? name : isMe ? `${m.name} ‧ ${m.label}` : `${b.name} ‧ ${b.label}`
 
   const wrapStyle: React.CSSProperties = {
     width:        size,
@@ -117,15 +137,15 @@ export default function BeautyAvatar({ name, size = 80, isMe = false, className 
     <div
       className={className}
       style={wrapStyle}
-      title={customSrc ? name : `${b.name} ‧ ${b.label}`}
+      title={altText}
       onMouseEnter={() => isMe && setHovering(true)}
       onMouseLeave={() => isMe && setHovering(false)}
       onClick={() => isMe && inputRef.current?.click()}
     >
-      {/* Beauty portrait or custom photo */}
+      {/* Portrait: male icon (isMe, no custom) / beauty (AI) / custom photo */}
       <img
-        src={customSrc ?? src}
-        alt={b.name}
+        src={src}
+        alt={altText}
         style={imgStyle}
       />
 
