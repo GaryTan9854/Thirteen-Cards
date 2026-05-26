@@ -36,31 +36,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!player) return
     const TIMEOUT_MS = 15 * 60 * 1000
+    const t = { id: 0 as ReturnType<typeof setTimeout> }
 
-    let timer: ReturnType<typeof setTimeout>
-
-    const reset = () => {
-      clearTimeout(timer)
-      timer = setTimeout(() => {
-        const p = localStorage.getItem('tc_player')
-        if (p) {
-          fetch('/api/log/auth', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ player: p, action: 'auto_logout' }),
-          }).catch(() => {})
-        }
-        localStorage.removeItem('tc_player')
-        sessionStorage.removeItem('tc_auth_logged')
-        setPlayer(null)
-      }, TIMEOUT_MS)
+    const doLogout = () => {
+      const p = localStorage.getItem('tc_player')
+      if (p) fetch('/api/log/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player: p, action: 'auto_logout' }),
+      }).catch(() => {})
+      localStorage.removeItem('tc_player')
+      sessionStorage.removeItem('tc_auth_logged')
+      setPlayer(null)
     }
 
+    const reset = () => { clearTimeout(t.id); t.id = setTimeout(doLogout, TIMEOUT_MS) }
+
     reset()
-    const EVENTS = ['click', 'keydown', 'touchstart', 'scroll'] as const
+    const EVENTS = ['click', 'keydown', 'touchstart'] as const
     EVENTS.forEach(e => document.addEventListener(e, reset, { passive: true }))
     return () => {
-      clearTimeout(timer)
+      clearTimeout(t.id)
       EVENTS.forEach(e => document.removeEventListener(e, reset))
     }
   }, [player])
