@@ -3,13 +3,13 @@ import { useState } from 'react'
 type Tab = 'game' | 'special' | '543' | 'system'
 
 const SPECIAL_HANDS = [
-  { score: 6,   label: '各 -6 分',  hands: ['三同花', '三順子', '六對半', '全黑一張紅', '全紅一張黑', '全大', '全小', '單pair', '單三條'] },
-  { score: 9,   label: '各 -9 分',  hands: ['雙報到'] },
-  { score: 12,  label: '各 -12 分', hands: ['雙pair無花無順', '兩花色'] },
-  { score: 18,  label: '各 -18 分', hands: ['全黑一點紅', '全紅一點黑', '全紅', '全黑', '大全小', '大全大', '六對半帶葫蘆'] },
-  { score: 39,  label: '各 -39 分', hands: ['一條龍'] },
-  { score: 45,  label: '各 -45 分', hands: ['四套三條', '三分天下', '三同花順', '十二皇族'] },
-  { score: 100, label: '各 -100 分', hands: ['清龍'] },
+  { score: 6,   label: '各收6分',   hands: ['三同花', '三順子', '六對半', '全黑一張紅', '全紅一張黑', '全大', '全小', '單pair', '單三條'] },
+  { score: 9,   label: '各收9分',   hands: ['雙報到'] },
+  { score: 12,  label: '各收12分',  hands: ['雙pair無花無順', '兩花色'] },
+  { score: 18,  label: '各收18分',  hands: ['全黑一點紅', '全紅一點黑', '全紅', '全黑', '大全小', '大全大', '六對半帶葫蘆'] },
+  { score: 39,  label: '各收39分',  hands: ['一條龍'] },
+  { score: 45,  label: '各收45分',  hands: ['四套三條', '三分天下', '三同花順', '十二皇族'] },
+  { score: 100, label: '各收100分', hands: ['清龍'] },
 ]
 
 const SPECIAL_DESC: Record<string, string> = {
@@ -87,7 +87,7 @@ export default function RulesPage() {
             <p>
               排牌必須遵循以下強弱順序，否則視為
               <span className="text-red-400 font-bold">「相公」</span>
-              ，違規玩家每人扣 <span className="text-red-400 font-bold">6 分</span>：
+              ，違規玩家各扣 <span className="text-red-400 font-bold">6 分</span>給每一位其他玩家：
             </p>
             <div className="bg-gray-800 rounded-lg px-4 py-3 font-mono text-center text-base">
               尾墩牌力 ≥ 中墩牌力 ≥ 頭墩牌力
@@ -99,8 +99,8 @@ export default function RulesPage() {
             <p>排牌確認後，四人各自進行每一墩的比較：</p>
             <ul className="ml-4 list-disc space-y-1">
               <li>頭對頭、中對中、尾對尾，各自獨立比較</li>
-              <li>每人共與其他三人進行 3 × 3 = 9 場單對單比較</li>
-              <li>每贏一場 <span className="text-sky-400 font-bold">+1 分</span>，每輸一場 <span className="text-red-400 font-bold">−1 分</span></li>
+              <li>每人共與其他三人進行 3 墩比較</li>
+              <li>通常每贏一墩 <span className="text-sky-400 font-bold">+1 分</span>，每輸一墩 <span className="text-red-400 font-bold">−1 分</span></li>
               <li>四人分數為零和（即四人合計為 0）</li>
             </ul>
           </section>
