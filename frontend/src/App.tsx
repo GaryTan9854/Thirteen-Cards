@@ -21,6 +21,11 @@ function AppInner() {
       .catch(() => {})
   }, [])
 
+  // Fire synthetic resize so BeautyCarousel remeasures after tab switch
+  useEffect(() => {
+    if (tab === 'online') window.dispatchEvent(new Event('resize'))
+  }, [tab])
+
   // Require login
   if (!player) return <LoginPage />
 

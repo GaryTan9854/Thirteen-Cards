@@ -85,7 +85,7 @@ export function buildSpecialTTS(players: any[]): { baodao: string[]; monsters: s
 function pickFemaleZh(zh: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
   return (
     // macOS: Meijia (zh-TW), Sinji (zh-HK), Yawen (zh-TW)
-    zh.find(v => /meijia|美嘉|sin[\s-]?ji|sinji|ya[\s-]?wen|雅雯/i.test(v.name)) ||
+    zh.find(v => /mei-?jia|美嘉|sin[\s-]?ji|sinji|ya[\s-]?wen|雅雯/i.test(v.name)) ||
     // macOS: Tingting (zh-CN)
     zh.find(v => /tingting|ting[\s-]?ting/i.test(v.name)) ||
     // Windows / Firefox: Hanhan (zh-TW female), Huihui (zh-CN female)

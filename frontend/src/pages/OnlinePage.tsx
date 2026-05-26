@@ -142,22 +142,17 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
       const w   = el?.clientWidth ?? window.innerWidth
       cwRef.current = w
 
-      // Mobile (<640px) → 1 full-width beauty; desktop → 4 columns
-      const newCols    = w > 0 && w < 640 ? 1 : 4
+      // Mobile (<640px) → 2 columns (shows face+torso); desktop → 4 columns
+      const newCols    = w > 0 && w < 640 ? 2 : 4
       const colsChanged = newCols !== colsRef.current
       colsRef.current  = newCols
 
       // availH: exact visible space from carousel top to viewport bottom.
-      // On mobile, cap at 62dvh so the buttons below remain visible without scrolling.
-      // Desktop keeps full available height.
+      // Buttons are overlaid on the carousel on all screen sizes.
       if (el) {
         const top  = el.getBoundingClientRect().top
         if (top >= 0) {
-          const full = window.innerHeight - top
-          const capped = w > 0 && w < 640
-            ? Math.min(full, Math.round(window.innerHeight * 0.62))
-            : full
-          setAvailH(capped)
+          setAvailH(window.innerHeight - top)
         }
       }
 
@@ -281,8 +276,8 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
     dStart.current = { x, off: offRef.current }
   }
 
-  // pW: full viewport width on mobile (1 beauty = 1 screen), cw/4 on desktop
-  const colsPerView = cw > 0 && cw < 640 ? 1 : 4
+  // pW: cw/2 on mobile (2 beauties visible), cw/4 on desktop
+  const colsPerView = cw > 0 && cw < 640 ? 2 : 4
   const pW  = cw > 0 ? cw / colsPerView : 0
   const cpW = pW * N
 
@@ -296,8 +291,7 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
          className="relative overflow-hidden"
          style={{
            // availH measured dynamically: fixes iOS address-bar + 2-row mobile header
-           // Mobile capped at 62dvh — leaves room for buttons below the carousel
-           height: availH > 0 ? `${availH}px` : 'min(calc(100dvh - 80px), 62dvh)',
+           height: availH > 0 ? `${availH}px` : 'calc(100dvh - 80px)',
            marginTop: '-24px', marginBottom: '0',
            marginLeft: '-16px', marginRight: '-16px',
            cursor: 'grab', touchAction: 'none', userSelect: 'none',
@@ -386,9 +380,9 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
             歡迎，{player}！
           </div>
         </div>
-        {/* Desktop buttons (hidden on mobile) */}
+        {/* Buttons overlaid on carousel (all screen sizes) */}
         {onEnterRoom && onSolo && (
-          <div className="hidden sm:flex gap-4 pointer-events-auto">
+          <div className="flex gap-4 pointer-events-auto">
             <button onClick={onEnterRoom}
               className="px-10 py-3 rounded-2xl bg-yellow-400 text-gray-900 font-bold text-base
                          hover:bg-yellow-300 active:scale-95 transition-all shadow-2xl border border-yellow-200/40">
@@ -1573,6 +1567,7 @@ export default function OnlinePage() {
             {(player === appealInfo.loser_name || soloActive) ? (
               <div className="flex gap-3 justify-center">
                 <button
+                  autoFocus
                   onClick={() => {
                     setAppealInfo(null)
                     if (soloActive) soloAppealDecision(true)
@@ -1750,28 +1745,11 @@ export default function OnlinePage() {
 
   function renderEnterLobby() {
     return (
-      <div className="flex flex-col">
-        <BeautyCarousel
-          player={player}
-          onEnterRoom={() => setInRoom(true)}
-          onSolo={() => setSoloSetupMode(true)}
-        />
-        {/* Mobile-only buttons below the carousel (sm:hidden) */}
-        <div className="flex sm:hidden gap-4 justify-center py-4"
-             style={{ paddingBottom: 'max(1rem, calc(0.5rem + env(safe-area-inset-bottom, 0px)))' }}>
-          <button onClick={() => setInRoom(true)}
-            className="flex-1 py-3 rounded-2xl bg-yellow-400 text-gray-900 font-bold text-base
-                       hover:bg-yellow-300 active:scale-95 transition-all shadow-2xl border border-yellow-200/40">
-            進入大廳
-          </button>
-          <button autoFocus onClick={() => setSoloSetupMode(true)}
-            className="flex-1 py-3 rounded-2xl font-bold text-base text-white
-                       hover:opacity-90 active:scale-95 transition-all shadow-xl border border-sky-400/40"
-            style={{ background: 'rgba(22,101,52,0.85)', backdropFilter: 'blur(6px)' }}>
-            獨自練功
-          </button>
-        </div>
-      </div>
+      <BeautyCarousel
+        player={player}
+        onEnterRoom={() => setInRoom(true)}
+        onSolo={() => setSoloSetupMode(true)}
+      />
     )
   }
 
