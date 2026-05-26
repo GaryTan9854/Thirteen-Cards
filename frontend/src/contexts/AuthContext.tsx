@@ -32,6 +32,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // 15-minute inactivity → auto-logout
+  useEffect(() => {
+    if (!player) return
+    const TIMEOUT_MS = 15 * 60 * 1000
+
+    let timer: ReturnType<typeof setTimeout>
+
+    const reset = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        const p = localStorage.getItem('tc_player')
+        if (p) {
+          fetch('/api/log/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ player: p, action: 'auto_logout' }),
+          }).catch(() => {})
+        }
+        localStorage.removeItem('tc_player')
+        sessionStorage.removeItem('tc_auth_logged')
+        setPlayer(null)
+      }, TIMEOUT_MS)
+    }
+
+    reset()
+    const EVENTS = ['click', 'keydown', 'touchstart', 'scroll'] as const
+    EVENTS.forEach(e => document.addEventListener(e, reset, { passive: true }))
+    return () => {
+      clearTimeout(timer)
+      EVENTS.forEach(e => document.removeEventListener(e, reset))
+    }
+  }, [player])
+
   function login(name: string) {
     localStorage.setItem('tc_player', name)
     sessionStorage.setItem('tc_auth_logged', '1')

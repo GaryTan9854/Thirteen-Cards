@@ -195,7 +195,9 @@ interface Props {
   roundLabel?:     string    // e.g. "第 3 / 16 局"
   playerNames?:    string[]  // all 4 seat names for cumulative display
   cumScores?:      number[]  // all 4 cumulative scores so far
-  isGary?:         boolean   // enables autopilot toggle
+  isGary?:            boolean   // enables autopilot toggle
+  autopilot?:         boolean
+  onAutopilotChange?: (v: boolean) => void
 }
 
 function scoreColor(n: number) {
@@ -203,7 +205,7 @@ function scoreColor(n: number) {
 }
 
 export default function ManualArrange({ hand, onConfirm, countdown, submittedCount, totalPlayers,
-  roundLabel, playerNames, cumScores, isGary }: Props) {
+  roundLabel, playerNames, cumScores, isGary, autopilot = false, onAutopilotChange }: Props) {
 
   const isDesktop = useMemo(() => window.innerWidth >= 640, [])
 
@@ -294,9 +296,6 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
   useEffect(() => { arrRef.current = arr }, [arr])
 
   // ── Autopilot (Gary only) — auto-submit top arrangement 1.2s after deal ──
-  const [autopilot, setAutopilot] = useState(
-    () => isGary && localStorage.getItem('tc_autoplay') === 'true'
-  )
   const autoPlayedRef = useRef(false)
 
   useEffect(() => {
@@ -419,11 +418,7 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
             </button>
             {isGary && (
               <button
-                onClick={() => {
-                  const next = !autopilot
-                  setAutopilot(next)
-                  localStorage.setItem('tc_autoplay', String(next))
-                }}
+                onClick={() => onAutopilotChange?.(!autopilot)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition
                   ${autopilot
                     ? 'bg-sky-600 text-white animate-pulse'

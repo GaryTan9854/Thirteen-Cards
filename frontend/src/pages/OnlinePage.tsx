@@ -586,6 +586,7 @@ export default function OnlinePage() {
   const [voiceOn,      setVoiceOn]          = useState(true)
   const voiceRef     = useRef(true)
   const [musicOn,      setMusicOn]          = useState(() => isMusicOn())
+  const [autopilot,    setAutopilot]        = useState(() => isGary && localStorage.getItem('tc_autoplay') === 'true')
   const ttsGenRef          = useRef(0)
   const soloPhaseRef       = useRef<string>('lobby')
   const soloAppealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1456,6 +1457,30 @@ export default function OnlinePage() {
     }
   }, [soloSetupMode, soloActive])
 
+  // ── Autopilot: auto-advance round after 5s ───────────────────────────────
+  useEffect(() => {
+    if (!autopilot || !isGary || !isHost || isEnded || phase !== 'round_end') return
+    const t = setTimeout(() => {
+      if (soloActive) startSoloRound()
+      else send({ type: 'next_round' })
+    }, 5000)
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, autopilot, isGary, isHost, isEnded, soloActive])
+
+  // ── Autopilot: auto-accept appeal after 2s ───────────────────────────────
+  useEffect(() => {
+    if (!autopilot || !isGary || phase !== 'appeal_pending') return
+    if (!appealInfo || appealInfo.loser_is_ai) return
+    const t = setTimeout(() => {
+      setAppealInfo(null)
+      if (soloActive) soloAppealDecision(true)
+      else send({ type: 'appeal_decision', accept: true })
+    }, 2000)
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, autopilot, isGary, soloActive, appealInfo])
+
   // ── Background music: scene-based ──────────────────────────────────────────
   useEffect(() => {
     if (isEnded) {
@@ -1490,6 +1515,8 @@ export default function OnlinePage() {
           playerNames={arrangeSeats.length > 0 ? arrangeSeats : undefined}
           cumScores={arrangeSeats.length > 0 ? arrangeCumScores : undefined}
           isGary={isGary}
+          autopilot={autopilot}
+          onAutopilotChange={(v) => { setAutopilot(v); localStorage.setItem('tc_autoplay', String(v)) }}
         />,
         document.body
       )
