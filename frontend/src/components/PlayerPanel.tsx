@@ -7,6 +7,7 @@ interface Props {
   finalScore:     number
   strategy?:      string
   revealedHands?: number   // 0=all hidden  1=頭  2=頭+中  3=all (default 3)
+  hideScore?:     boolean  // true = show "?" until all cards revealed
 }
 
 const ROW_LABELS  = ['頭墩 (3)', '中墩 (5)', '尾墩 (5)']
@@ -34,7 +35,7 @@ function CardBack() {
 }
 
 export default function PlayerPanel({
-  player, finalScore, strategy = 'rule_base_as', revealedHands = 3,
+  player, finalScore, strategy = 'rule_base_as', revealedHands = 3, hideScore = false,
 }: Props) {
   const [showHand, setShowHand] = useState(false)
   const isSpecial = player.special_hand !== 'normal'
@@ -62,9 +63,10 @@ export default function PlayerPanel({
           )}
         </div>
         <span className={`text-xl font-extrabold tabular-nums ${
-          finalScore > 0 ? 'text-green-600' : finalScore < 0 ? 'text-red-500' : 'text-gray-500'
+          hideScore ? 'text-gray-300'
+          : finalScore > 0 ? 'text-green-600' : finalScore < 0 ? 'text-red-500' : 'text-gray-500'
         }`}>
-          {finalScore > 0 ? '+' : ''}{finalScore}
+          {hideScore ? '?' : (finalScore > 0 ? '+' : '') + finalScore}
         </span>
       </div>
 

@@ -176,8 +176,8 @@ export default function GameResultDisplay({
       className={`flex flex-col gap-4 ${canAdvance ? 'cursor-pointer select-none' : ''}`}
       onClick={canAdvance ? () => advanceRevealRef.current?.() : undefined}
     >
-      {/* ── 本局比分 strip (mobile only) ── */}
-      <div className="sm:hidden bg-slate-800 rounded-2xl p-4 shadow-inner">
+      {/* ── 本局比分 strip (mobile only, hidden until all cards revealed) ── */}
+      <div className={`sm:hidden bg-slate-800 rounded-2xl p-4 shadow-inner ${stepByStep && globalPhase < 3 ? 'invisible' : ''}`}>
         <div className="text-[15px] text-sky-400 mb-2 font-semibold text-center">本局比分</div>
         <div className="grid grid-cols-4 gap-3">
           {(result.final_scores ?? []).map((fs: any) => (
@@ -215,6 +215,7 @@ export default function GameResultDisplay({
             finalScore={scoreMap[p.name] ?? 0}
             strategy={strategies[i] ?? 'rule_base_as'}
             revealedHands={seatReveal[i] ?? 3}
+            hideScore={stepByStep && globalPhase < 3}
           />
         ))}
       </div>
