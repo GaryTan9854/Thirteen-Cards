@@ -14,7 +14,7 @@ interface LoginSession {
 }
 
 function pairSessions(entries: LoginEntry[]): LoginSession[] {
-  const sorted = [...entries].sort((a, b) => a.id - b.id)   // oldest first
+  const sorted = [...entries].sort((a, b) => a.timestamp.localeCompare(b.timestamp))  // oldest first
   const result: LoginSession[] = []
   const pending: Record<string, LoginEntry> = {}
 

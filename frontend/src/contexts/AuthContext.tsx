@@ -32,6 +32,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Page close / tab close → fire logout via sendBeacon (survives unload)
+  useEffect(() => {
+    if (!player) return
+    const handleUnload = () => {
+      const p = localStorage.getItem('tc_player')
+      if (!p) return
+      const blob = new Blob(
+        [JSON.stringify({ player: p, action: 'logout' })],
+        { type: 'application/json' }
+      )
+      navigator.sendBeacon('/api/log/auth', blob)
+    }
+    window.addEventListener('beforeunload', handleUnload)
+    return () => window.removeEventListener('beforeunload', handleUnload)
+  }, [player])
+
   // 15-minute inactivity → auto-logout
   useEffect(() => {
     if (!player) return
