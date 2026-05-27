@@ -530,6 +530,7 @@ export default function OnlinePage() {
   const [cfgInvitees,     setCfgInvitees]     = useState<string[]>([])
   const [cfgStrategies,   setCfgStrategies]   = useState<string[]>(['rulealpha', 'rulealpha', 'rulealpha', 'rulealpha'])
   const [cfgAiNames,      setCfgAiNames]      = useState<string[]>(() => randomBeauties())
+  const [cfgStepByStep,   setCfgStepByStep]   = useState(false)
   const [cfgRecordGame,   setCfgRecordGame]   = useState(true)
   const [cfgRecordRounds, setCfgRecordRounds] = useState(false)
   const [cfgIsLeague,     setCfgIsLeague]     = useState(false)
@@ -1906,6 +1907,14 @@ export default function OnlinePage() {
           </div>
         </div>
 
+        {/* 顯示設定 */}
+        <div className="space-y-2 border-t border-slate-600/40 pt-4">
+          <div className="text-sm text-gray-400">顯示設定</div>
+          <div className="flex flex-wrap gap-4">
+            <LogToggle label="逐墩比牌" value={cfgStepByStep} onChange={setCfgStepByStep} />
+          </div>
+        </div>
+
         {/* 記錄 & 聯盟賽 */}
         <div className="space-y-2 border-t border-slate-600/40 pt-4">
           <div className="text-sm text-gray-400">記錄設定</div>
@@ -2343,7 +2352,7 @@ export default function OnlinePage() {
         />
 
         {gameResult && (
-          <GameResultDisplay result={gameResult} strategies={strategies} />
+          <GameResultDisplay result={gameResult} strategies={strategies} stepByStep={cfgStepByStep} />
         )}
       </div>
     )

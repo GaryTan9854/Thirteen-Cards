@@ -13,12 +13,13 @@ function scoreColor(n: number) {
 function fmt(n: number) { return (n > 0 ? '+' : '') + n }
 
 interface Props {
-  result:      any        // GameResult from play_one_game
-  strategies:  string[]   // strategy label per seat [0..3]
-  multiplier?: number     // round multiplier for display (default 1)
+  result:       any        // GameResult from play_one_game
+  strategies:   string[]   // strategy label per seat [0..3]
+  multiplier?:  number     // round multiplier for display (default 1)
+  stepByStep?:  boolean    // reveal hands one at a time
 }
 
-export default function GameResultDisplay({ result, strategies, multiplier = 1 }: Props) {
+export default function GameResultDisplay({ result, strategies, multiplier = 1, stepByStep = false }: Props) {
   const scoreMap = Object.fromEntries(
     (result.final_scores ?? []).map((fs: any) => [fs.name, fs.score])
   )
@@ -60,7 +61,7 @@ export default function GameResultDisplay({ result, strategies, multiplier = 1 }
       </div>
 
       {/* ── BattleLog ── */}
-      <BattleLog battles={result.battles ?? []} />
+      <BattleLog battles={result.battles ?? []} stepByStep={stepByStep} />
     </>
   )
 }
