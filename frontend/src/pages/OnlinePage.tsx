@@ -2352,7 +2352,7 @@ export default function OnlinePage() {
         />
 
         {gameResult && (
-          <GameResultDisplay result={gameResult} strategies={strategies} stepByStep={cfgStepByStep} />
+          <GameResultDisplay result={gameResult} strategies={strategies} stepByStep={cfgStepByStep} myName={player ?? ''} />
         )}
       </div>
     )

@@ -16,3 +16,12 @@ body {
 .font-cinzel {
   font-family: 'Cinzel', 'LXGW WenKai Screen', serif;
 }
+
+/* Card flip-in animation — used in step-by-step reveal */
+@keyframes flipIn {
+  from { transform: rotateY(90deg) scaleX(0.5); opacity: 0; }
+  to   { transform: rotateY(0deg)  scaleX(1);   opacity: 1; }
+}
+.card-flip-in {
+  animation: flipIn 0.28s ease-out;
+}
