@@ -1785,10 +1785,17 @@ export default function OnlinePage() {
                       </button>
                     )}
                     <button onClick={() => { const next = toggleMusic(); setMusicOn(next) }}
-                      className={`text-xs px-2 py-1 rounded hover:bg-slate-700 transition
-                        ${musicOn ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-400'}`}
+                      className="text-xs px-2 py-1 rounded hover:bg-slate-700 transition text-gray-400 hover:text-white"
                       title={musicOn ? '配樂開啟（點擊關閉）' : '配樂關閉（點擊開啟）'}>
-                      🎵
+                      <span className="relative inline-block leading-none">
+                        🎵
+                        {!musicOn && (
+                          <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible"
+                               viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+                            <line x1="1" y1="1" x2="15" y2="15" stroke="#ef4444" strokeWidth="2.2" strokeLinecap="round"/>
+                          </svg>
+                        )}
+                      </span>
                     </button>
                     <button onClick={toggleVoice}
                       className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-slate-700 transition"
@@ -1827,14 +1834,9 @@ export default function OnlinePage() {
                         send({ type: 'new_game' })
                       }
                     }}
-                      className="text-xs px-3 py-1 rounded-full bg-orange-400 text-gray-900 font-bold
+                      className="text-sm px-6 py-2 rounded-xl bg-orange-400 text-gray-900 font-bold
                                  hover:bg-orange-300 active:scale-95 transition whitespace-nowrap animate-pulse">
                       再來一場
-                    </button>
-                    <button onClick={goHome}
-                      className="text-xs px-3 py-1 rounded-full bg-gray-600 text-gray-200 font-semibold
-                                 hover:bg-gray-500 active:scale-95 transition whitespace-nowrap">
-                      回到首頁
                     </button>
                   </>) : isHost ? (
                     <button ref={nextRoundBtnRef} onClick={() => {
@@ -2451,6 +2453,10 @@ export default function OnlinePage() {
               pendingRoundEffectRef.current?.()
               pendingRoundEffectRef.current = null
               setFrozenDisplay(null)
+              setTimeout(() => {
+                nextRoundBtnRef.current?.focus()
+                if (!nextRoundBtnRef.current) playAgainBtnRef.current?.focus()
+              }, 80)
             }}
           />
         )}
