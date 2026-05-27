@@ -97,23 +97,14 @@ export default function QuipPanel({ loser, winner, names, onDone }: Props) {
           </span>
         </div>
 
-        {/* Message — 3× bigger text */}
-        <div className="bg-gray-950/97 px-7 py-6" onClick={skip}>
-          <p className="text-4xl text-gray-100 leading-snug font-medium">
+        {/* Message */}
+        <div className="px-7 py-6" style={{ background: 'rgba(3,7,18,0.78)' }} onClick={skip}>
+          <p className="text-3xl text-gray-100 leading-snug font-medium">
             {line.text}
           </p>
 
-          {/* Auto-progress bar */}
-          <div className="mt-6 w-full h-1 bg-gray-800 rounded-full overflow-hidden">
-            <div
-              key={lineIdx}
-              className="h-full rounded-full"
-              style={{ background: color, animation: `quipProgress ${LINE_MS}ms linear` }}
-            />
-          </div>
-
           {/* Dot indicators */}
-          <div className="flex justify-center gap-2 mt-3">
+          <div className="flex justify-center gap-2 mt-5">
             {lines.map((_, i) => (
               <span key={i} className="w-2 h-2 rounded-full transition-colors"
                     style={{ background: i === lineIdx ? color : '#374151' }} />
@@ -126,10 +117,6 @@ export default function QuipPanel({ loser, winner, names, onDone }: Props) {
         @keyframes quipIn {
           from { transform: scale(0.92) translateY(16px); opacity: 0; }
           to   { transform: scale(1)    translateY(0);    opacity: 1; }
-        }
-        @keyframes quipProgress {
-          from { width: 0%; }
-          to   { width: 100%; }
         }
       `}</style>
     </div>
