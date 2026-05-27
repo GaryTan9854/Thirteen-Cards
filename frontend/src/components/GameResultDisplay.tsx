@@ -50,6 +50,7 @@ interface Props {
   stepByStep?:     boolean    // 逐墩比牌 mode
   myName?:         string     // identify which seat is "self" so it flips first
   onAllRevealed?:  () => void // fires once when the last 墩 is flipped (stepByStep only)
+  autoReveal?:     boolean    // autopilot: auto-press Enter every 1s (stepByStep only)
 }
 
 const PHASE_HINT: Record<number, string> = {
@@ -60,7 +61,7 @@ const PHASE_HINT: Record<number, string> = {
 }
 
 export default function GameResultDisplay({
-  result, strategies, multiplier = 1, stepByStep = false, myName = '', onAllRevealed,
+  result, strategies, multiplier = 1, stepByStep = false, myName = '', onAllRevealed, autoReveal = false,
 }: Props) {
   const players: any[] = result.players ?? []
 
@@ -165,6 +166,13 @@ export default function GameResultDisplay({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [stepByStep])
+
+  // Autopilot: auto-advance each 墩 1s apart when autoReveal=true
+  useEffect(() => {
+    if (!autoReveal || !stepByStep || globalPhase >= 3 || animating) return
+    const t = setTimeout(() => { advanceRevealRef.current?.() }, 1000)
+    return () => clearTimeout(t)
+  }, [autoReveal, stepByStep, globalPhase, animating])
 
   // ── derived ────────────────────────────────────────────────────────────────
   const canAdvance   = stepByStep && globalPhase < 3 && !animating

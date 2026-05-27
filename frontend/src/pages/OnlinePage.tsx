@@ -1328,8 +1328,13 @@ export default function OnlinePage() {
     setMyHand(null)
     setCountdown(null)
 
+    // If player (seat 0) has a special hand, no need to step-by-step — outcome is already known
+    const myPlayerResult = (res.players ?? []).find((p: any) => p.name === seatNames[0])
+    const playerHasSpecial = myPlayerResult?.special_hand != null && myPlayerResult.special_hand !== 'normal'
+    const effectiveStepByStep = cfgStepByStep && !playerHasSpecial
+
     // Freeze TournamentPanel at pre-round values until all cards are flipped
-    if (cfgStepByStep) {
+    if (effectiveStepByStep) {
       setFrozenDisplay({
         history:     fakeMsg.history.slice(0, -1),  // exclude current round
         multipliers: roundMultipliers,               // captured before setRoundMultipliers
@@ -1354,7 +1359,7 @@ export default function OnlinePage() {
       setTimeout(() => { if (voiceRef.current) speak('平局！繼續加賽！', 0.9) }, 2000)
     }
 
-    if (cfgStepByStep) {
+    if (effectiveStepByStep) {
       // Bundle ALL post-reveal effects together (guns, end-game voice, appeal popup)
       pendingRoundEffectRef.current = () => {
         fireRoundEffects(res, fakeMsg)
@@ -1524,17 +1529,20 @@ export default function OnlinePage() {
     }
   }, [soloSetupMode, soloActive])
 
-  // ── Autopilot: auto-advance round after 5s ───────────────────────────────
+  // ── Autopilot: auto-advance round ──────────────────────────────────────────
+  // With step-by-step: wait for all cards to flip (frozenDisplay → null) first,
+  // then advance after 2s. Without step-by-step: advance after 5s as before.
   useEffect(() => {
     if (!isGary || !isHost || isEnded || phase !== 'round_end') return
     if (localStorage.getItem('tc_autoplay') !== 'true') return
+    if (cfgStepByStep && frozenDisplay !== null) return  // cards still flipping — wait
     const t = setTimeout(() => {
       if (soloActive) startSoloRound()
       else send({ type: 'next_round' })
-    }, 5000)
+    }, cfgStepByStep ? 2000 : 5000)
     return () => clearTimeout(t)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, isGary, isHost, isEnded, soloActive])
+  }, [phase, isGary, isHost, isEnded, soloActive, frozenDisplay, cfgStepByStep])
 
   // ── Autopilot: auto-accept appeal after 2s ───────────────────────────────
   useEffect(() => {
@@ -2403,6 +2411,13 @@ export default function OnlinePage() {
     // Suppress "本場結束" until all cards are revealed
     const dispIsEnded = isEnded && !frozenDisplay
 
+    // Skip step-by-step if solo player already has a special hand (outcome is obvious)
+    const myPlayerInResult = (gameResult?.players ?? []).find((p: any) => p.name === player)
+    const skipStepByStep = soloActive
+      && myPlayerInResult?.special_hand != null
+      && myPlayerInResult.special_hand !== 'normal'
+    const effectiveStepByStepDisplay = cfgStepByStep && !skipStepByStep
+
     const appealPlayedStr = effInAppeal
       ? ` 申訴 ${effAppealPlayed}/${effAppealGen >= 2 ? 1 : effAppealRounds}`
       : ''
@@ -2429,8 +2444,9 @@ export default function OnlinePage() {
           <GameResultDisplay
             result={gameResult}
             strategies={strategies}
-            stepByStep={cfgStepByStep}
+            stepByStep={effectiveStepByStepDisplay}
             myName={player ?? ''}
+            autoReveal={!!(isGary && effectiveStepByStepDisplay && localStorage.getItem('tc_autoplay') === 'true')}
             onAllRevealed={() => {
               pendingRoundEffectRef.current?.()
               pendingRoundEffectRef.current = null
