@@ -584,7 +584,9 @@ export default function OnlinePage() {
   // ── Effects: 打槍 / 全壘打 / 語音 ──
   const [grandSlammer, setGrandSlammer]     = useState<string | null>(null)
   const [currentGun,   setCurrentGun]       = useState<GunNotif | null>(null)
-  const gunQueueRef  = useRef<GunNotif[]>([])
+  const gunQueueRef           = useRef<GunNotif[]>([])
+  // When 逐墩比牌 is on, gun effects are deferred until all cards are flipped
+  const pendingRoundEffectRef = useRef<(() => void) | null>(null)
   const [voiceOn,      setVoiceOn]          = useState(true)
   const voiceRef     = useRef(true)
   const [musicOn,      setMusicOn]          = useState(() => isMusicOn())
@@ -776,7 +778,11 @@ export default function OnlinePage() {
         } : prev)
         // Update multipliers
         applyRoundMeta(msg)
-        fireRoundEffects(msg.result ?? {}, msg)
+        if (cfgStepByStep) {
+          pendingRoundEffectRef.current = () => fireRoundEffects(msg.result ?? {}, msg)
+        } else {
+          fireRoundEffects(msg.result ?? {}, msg)
+        }
         // Capture round for logging (host only)
         if (cfgRecordRounds && room?.host === player) {
           const scores: Record<string, number> = {}
@@ -804,7 +810,11 @@ export default function OnlinePage() {
         applyRoundMeta(msg)
         setAppealInfo(null)
         if (!msg.from_appeal_decline) {
-          fireRoundEffects(msg.result ?? {}, msg)
+          if (cfgStepByStep) {
+            pendingRoundEffectRef.current = () => fireRoundEffects(msg.result ?? {}, msg)
+          } else {
+            fireRoundEffects(msg.result ?? {}, msg)
+          }
         }
         // End-game voice
         scheduleEndGameVoice(msg)
@@ -1300,7 +1310,11 @@ export default function OnlinePage() {
       setTimeout(() => { if (voiceRef.current) speak('平局！繼續加賽！', 0.9) }, 2000)
     }
 
-    fireRoundEffects(res, fakeMsg)
+    if (cfgStepByStep) {
+      pendingRoundEffectRef.current = () => fireRoundEffects(res, fakeMsg)
+    } else {
+      fireRoundEffects(res, fakeMsg)
+    }
 
     if (newAppealInfo) {
       setAppealInfo(newAppealInfo)
@@ -2352,7 +2366,16 @@ export default function OnlinePage() {
         />
 
         {gameResult && (
-          <GameResultDisplay result={gameResult} strategies={strategies} stepByStep={cfgStepByStep} myName={player ?? ''} />
+          <GameResultDisplay
+            result={gameResult}
+            strategies={strategies}
+            stepByStep={cfgStepByStep}
+            myName={player ?? ''}
+            onAllRevealed={() => {
+              pendingRoundEffectRef.current?.()
+              pendingRoundEffectRef.current = null
+            }}
+          />
         )}
       </div>
     )

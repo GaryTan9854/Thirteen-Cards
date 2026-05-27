@@ -44,11 +44,12 @@ function playFlipSound() {
 // ─── component ────────────────────────────────────────────────────────────────
 
 interface Props {
-  result:       any        // GameResult from play_one_game
-  strategies:   string[]   // strategy label per seat [0..3]
-  multiplier?:  number     // round multiplier for display (default 1)
-  stepByStep?:  boolean    // 逐墩比牌 mode
-  myName?:      string     // identify which seat is "self" so it flips first
+  result:          any        // GameResult from play_one_game
+  strategies:      string[]   // strategy label per seat [0..3]
+  multiplier?:     number     // round multiplier for display (default 1)
+  stepByStep?:     boolean    // 逐墩比牌 mode
+  myName?:         string     // identify which seat is "self" so it flips first
+  onAllRevealed?:  () => void // fires once when the last 墩 is flipped (stepByStep only)
 }
 
 const PHASE_HINT: Record<number, string> = {
@@ -59,7 +60,7 @@ const PHASE_HINT: Record<number, string> = {
 }
 
 export default function GameResultDisplay({
-  result, strategies, multiplier = 1, stepByStep = false, myName = '',
+  result, strategies, multiplier = 1, stepByStep = false, myName = '', onAllRevealed,
 }: Props) {
   const players: any[] = result.players ?? []
 
@@ -76,6 +77,11 @@ export default function GameResultDisplay({
   const [globalPhase, setGlobalPhase] = useState(() => stepByStep ? 0 : 3)
   const [animating,   setAnimating]   = useState(false)
 
+  // Track whether onAllRevealed has fired for the current result
+  const firedRef        = useRef(false)
+  const onAllRevealedRef = useRef(onAllRevealed)
+  useEffect(() => { onAllRevealedRef.current = onAllRevealed }, [onAllRevealed])
+
   // Reset whenever a fresh result arrives or stepByStep toggled
   useEffect(() => {
     if (stepByStep) {
@@ -87,8 +93,17 @@ export default function GameResultDisplay({
       setGlobalPhase(3)
       setAnimating(false)
     }
+    firedRef.current = false
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result, stepByStep])
+
+  // Fire onAllRevealed exactly once when the last 墩 is flipped
+  useEffect(() => {
+    if (stepByStep && globalPhase === 3 && !firedRef.current) {
+      firedRef.current = true
+      onAllRevealedRef.current?.()
+    }
+  }, [globalPhase, stepByStep])
 
   // ── advance-reveal logic (stored in a ref so keyboard handler stays stable) ──
   const stateRef = useRef({ animating, globalPhase, seatReveal, players, myName })
