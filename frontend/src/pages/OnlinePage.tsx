@@ -2380,12 +2380,11 @@ export default function OnlinePage() {
     })
 
     // When 逐墩比牌 cards are still hidden, freeze TournamentPanel at pre-round values
-    const history     = frozenDisplay ? frozenDisplay.history
-                      : (res.history ?? room?.history ?? []) as number[][]
-    const rm          = frozenDisplay ? frozenDisplay.multipliers
-                      : (roundMultipliers.length > 0 ? roundMultipliers : (room?.round_multipliers ?? []))
-    const cm          = frozenDisplay ? frozenDisplay.circleMarks : circleMarks
-    const dispNextMult = frozenDisplay ? frozenDisplay.nextMult : nextMultiplier
+    const history = frozenDisplay ? frozenDisplay.history
+                  : (res.history ?? room?.history ?? []) as number[][]
+    const rm      = frozenDisplay ? frozenDisplay.multipliers
+                  : (roundMultipliers.length > 0 ? roundMultipliers : (room?.round_multipliers ?? []))
+    const cm      = frozenDisplay ? frozenDisplay.circleMarks : circleMarks
 
     const appealPlayedStr = effInAppeal
       ? ` 申訴 ${effAppealPlayed}/${effAppealGen >= 2 ? 1 : effAppealRounds}`
