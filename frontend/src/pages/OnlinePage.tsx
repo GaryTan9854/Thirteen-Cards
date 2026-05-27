@@ -834,15 +834,16 @@ export default function OnlinePage() {
         }
         applyRoundMeta(msg)
         setAppealInfo(null)
-        if (!msg.from_appeal_decline) {
-          if (cfgStepByStep) {
-            pendingRoundEffectRef.current = () => fireRoundEffects(msg.result ?? {}, msg)
-          } else {
-            fireRoundEffects(msg.result ?? {}, msg)
+        if (cfgStepByStep) {
+          // Bundle round effects + end-game voice together
+          pendingRoundEffectRef.current = () => {
+            if (!msg.from_appeal_decline) fireRoundEffects(msg.result ?? {}, msg)
+            scheduleEndGameVoice(msg)
           }
+        } else {
+          if (!msg.from_appeal_decline) fireRoundEffects(msg.result ?? {}, msg)
+          scheduleEndGameVoice(msg)
         }
-        // End-game voice
-        scheduleEndGameVoice(msg)
         // Log game (host only)
         if (room?.host === player) {
           const seatNames: string[] = msg.seat_names ?? []
@@ -1347,9 +1348,14 @@ export default function OnlinePage() {
     }
 
     if (cfgStepByStep) {
-      pendingRoundEffectRef.current = () => fireRoundEffects(res, fakeMsg)
+      // Bundle all end-of-reveal effects together
+      pendingRoundEffectRef.current = () => {
+        fireRoundEffects(res, fakeMsg)
+        if (isEnded) scheduleEndGameVoice(fakeMsg)
+      }
     } else {
       fireRoundEffects(res, fakeMsg)
+      if (isEnded) scheduleEndGameVoice(fakeMsg)
     }
 
     if (newAppealInfo) {
@@ -1358,7 +1364,6 @@ export default function OnlinePage() {
     }
 
     if (isEnded) {
-      scheduleEndGameVoice(fakeMsg)
       submitGameLog({
         seatNames:    seatNames,
         history:      [...state.history],
@@ -1832,8 +1837,8 @@ export default function OnlinePage() {
 
               {renderPhase()}
 
-              {/* ── End-game quip panel ── */}
-              {quipCtx && isEnded && (
+              {/* ── End-game quip panel (hidden until all cards revealed) ── */}
+              {quipCtx && isEnded && !frozenDisplay && (
                 <QuipPanel
                   key={`${quipCtx.winner}-${quipCtx.loser}-${quipCtx.names.join(',')}`}
                   loser={quipCtx.loser}
@@ -2385,11 +2390,13 @@ export default function OnlinePage() {
     const rm      = frozenDisplay ? frozenDisplay.multipliers
                   : (roundMultipliers.length > 0 ? roundMultipliers : (room?.round_multipliers ?? []))
     const cm      = frozenDisplay ? frozenDisplay.circleMarks : circleMarks
+    // Suppress "本場結束" until all cards are revealed
+    const dispIsEnded = isEnded && !frozenDisplay
 
     const appealPlayedStr = effInAppeal
       ? ` 申訴 ${effAppealPlayed}/${effAppealGen >= 2 ? 1 : effAppealRounds}`
       : ''
-    const roundLabel = isEnded
+    const roundLabel = dispIsEnded
       ? `本場結束（共 ${history.length} 局）`
       : `第 ${res.round} / ${effRoundsNormal} 局結果${effInAppeal ? '【申訴】' + appealPlayedStr : ''}`
 
@@ -2401,7 +2408,7 @@ export default function OnlinePage() {
           multipliers={rm}
           circleMarks={cm}
           roundBadges={historyBadges}
-          isEnded={isEnded}
+          isEnded={dispIsEnded}
           myName={player ?? ''}
           roundLabel={roundLabel}
         />
