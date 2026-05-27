@@ -10,8 +10,11 @@ interface LoginEntry {
 interface LoginSession {
   username: string
   login:    LoginEntry | null
-  logout:   LoginEntry | null
+  logout:   LoginEntry | null   // null = truly still online; set = explicit or implicit end
+  implicit: boolean             // true = ended by a new login (page refresh), not explicit logout
 }
+
+const MIN_SESSION_MS = 60_000  // suppress page-refresh sessions shorter than 1 minute
 
 function pairSessions(entries: LoginEntry[]): LoginSession[] {
   const sorted = [...entries].sort((a, b) => a.timestamp.localeCompare(b.timestamp))  // oldest first
@@ -20,17 +23,25 @@ function pairSessions(entries: LoginEntry[]): LoginSession[] {
 
   for (const e of sorted) {
     if (e.action === 'login') {
-      if (pending[e.username]) result.push({ username: e.username, login: pending[e.username], logout: null })
-      pending[e.username] = e
-    } else {
       if (pending[e.username]) {
-        result.push({ username: e.username, login: pending[e.username], logout: e })
+        // New login supersedes previous session → implicit end at this moment
+        const dur = new Date(e.timestamp).getTime() - new Date(pending[e.username].timestamp).getTime()
+        if (dur >= MIN_SESSION_MS) {
+          result.push({ username: e.username, login: pending[e.username], logout: e, implicit: true })
+        }
+        // else: sub-minute refresh, silently drop
+      }
+      pending[e.username] = e
+    } else {  // logout / auto_logout
+      if (pending[e.username]) {
+        result.push({ username: e.username, login: pending[e.username], logout: e, implicit: false })
         delete pending[e.username]
       }
     }
   }
+  // Only the most recent un-closed session per user is truly "仍在線"
   for (const u of Object.keys(pending)) {
-    result.push({ username: u, login: pending[u], logout: null })
+    result.push({ username: u, login: pending[u], logout: null, implicit: false })
   }
   return result.reverse()   // newest first for display
 }
@@ -272,14 +283,18 @@ export default function LogsPage() {
                   <td className="px-4 py-2 text-gray-400 text-xs">
                     {s.login ? fmtTime(s.login.timestamp) : '—'}
                   </td>
-                  <td className="px-4 py-2 text-gray-400 text-xs">
+                  <td className="px-4 py-2 text-xs">
                     {s.logout
-                      ? fmtTime(s.logout.timestamp)
+                      ? <span className={s.implicit ? 'text-gray-600' : 'text-gray-400'}>{fmtTime(s.logout.timestamp)}</span>
                       : <span className="text-green-500 text-xs">仍在線</span>
                     }
                   </td>
-                  <td className="px-4 py-2 text-gray-500 text-xs">
-                    {s.login && s.logout ? fmtDur(s.login.timestamp, s.logout.timestamp) : ''}
+                  <td className="px-4 py-2 text-xs">
+                    {s.login && s.logout && !s.implicit
+                      ? <span className="text-gray-500">{fmtDur(s.login.timestamp, s.logout.timestamp)}</span>
+                      : s.login && s.logout && s.implicit
+                      ? <span className="text-gray-700">{fmtDur(s.login.timestamp, s.logout.timestamp)}</span>
+                      : ''}
                   </td>
                 </tr>
               ))}
