@@ -43,6 +43,7 @@ export function playerBeautyIndex(name: string): number {
 }
 
 const STORAGE_KEY = (name: string) => `tc_avatar_${name}`
+const IMG_VER = 'v2'   // bump when beauty PNG files are replaced
 
 // ── Canvas helper: center-crop + resize to square base64 JPEG ─────────────────
 
@@ -115,8 +116,8 @@ export default function BeautyAvatar({ name, size = 80, isMe = false, className 
   const src = customSrc
     ? customSrc
     : isMe
-      ? `/assets/males/${m.file}.png`
-      : `/assets/beauties/${b.file}.png`
+      ? `/assets/males/${m.file}.png?${IMG_VER}`
+      : `/assets/beauties/${b.file}.png?${IMG_VER}`
   const altText  = customSrc ? name : isMe ? `${m.name} ‧ ${m.label}` : `${b.name} ‧ ${b.label}`
 
   const wrapStyle: React.CSSProperties = {

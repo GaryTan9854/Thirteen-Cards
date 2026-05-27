@@ -10,6 +10,7 @@ import { QuipContext, isBeatuy, subLine, pickScript } from '../data/quips'
 
 const BEAUTY_NAMES = new Set(['妲己','妹喜','褒姒','驪姬','西施','王昭君','楊貴妃','貂蟬'])
 const MALE_FILES   = ['秀才', '大儒', '帝王', '將軍']
+const IMG_VER      = 'v2'   // bump when beauty PNG files are replaced
 
 function djb2mod(name: string, mod: number): number {
   let h = 5381
@@ -18,10 +19,10 @@ function djb2mod(name: string, mod: number): number {
 }
 
 function avatarSrc(speaker: string): string {
-  if (BEAUTY_NAMES.has(speaker)) return `/assets/beauties/${speaker}.png`
+  if (BEAUTY_NAMES.has(speaker)) return `/assets/beauties/${speaker}.png?${IMG_VER}`
   const custom = localStorage.getItem(`tc_avatar_${speaker}`)
   if (custom) return custom
-  return `/assets/males/${MALE_FILES[djb2mod(speaker, MALE_FILES.length)]}.png`
+  return `/assets/males/${MALE_FILES[djb2mod(speaker, MALE_FILES.length)]}.png?${IMG_VER}`
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
