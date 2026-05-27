@@ -102,7 +102,11 @@ export default function BeautyAvatar({ name, size = 80, isMe = false, className 
     e.target.value = ''  // reset so the same file can be re-selected
   }
 
-  const bi = idx !== undefined ? idx % BEAUTY_CONFIG.length : playerBeautyIndex(name)
+  // If name IS a beauty name, use her directly; otherwise fall back to idx or hash
+  const exactIdx = BEAUTY_CONFIG.findIndex(b => b.name === name)
+  const bi = exactIdx >= 0
+    ? exactIdx
+    : (idx !== undefined ? idx % BEAUTY_CONFIG.length : playerBeautyIndex(name))
   const b  = BEAUTY_CONFIG[bi]
 
   // Human player's own seat without a custom photo → show a male icon
