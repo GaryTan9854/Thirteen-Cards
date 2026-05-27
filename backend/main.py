@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
+from datetime import datetime, timedelta
 import os
 
 from game.game import play_one_game
@@ -12,10 +13,14 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "9.18"
+APP_VERSION = "9.19"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
+
+# ── Heartbeat: in-memory last-seen per player (resets on restart, that's fine) ─
+_heartbeats: Dict[str, datetime] = {}
+_HEARTBEAT_TIMEOUT = timedelta(minutes=20)
 
 _ALLOWED_FILE = os.path.join(os.path.dirname(__file__), "allowed_players.txt")
 
@@ -726,6 +731,21 @@ async def ws_endpoint(player_name: str, websocket: WebSocket):
         })
 
 
+# ── Heartbeat ────────────────────────────────────────
+class HeartbeatReq(BaseModel):
+    player: str
+
+@app.post("/api/heartbeat")
+def api_heartbeat(req: HeartbeatReq):
+    _heartbeats[req.player] = datetime.now()
+    return {"ok": True}
+
+@app.get("/api/active_players")
+def api_active_players():
+    cutoff = datetime.now() - _HEARTBEAT_TIMEOUT
+    return {"active": [p for p, t in _heartbeats.items() if t > cutoff]}
+
+
 # ── Log: auth ────────────────────────────────────────
 class AuthLogReq(BaseModel):
     player: str
@@ -733,6 +753,7 @@ class AuthLogReq(BaseModel):
 
 @app.post("/api/log/auth")
 def api_log_auth(req: AuthLogReq):
+    _heartbeats[req.player] = datetime.now()   # login counts as heartbeat too
     gl.log_auth(req.player, req.action)
     return {"ok": True}
 

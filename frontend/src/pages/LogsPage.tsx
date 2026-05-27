@@ -225,18 +225,23 @@ function GameDetailPanel({ game }: { game: GameRecord }) {
 
 export default function LogsPage() {
   const [tab, setTab] = useState<'games' | 'logins'>('games')
-  const [logins,    setLogins]    = useState<LoginEntry[]>([])
-  const [games,     setGames]     = useState<GameRecord[]>([])
-  const [expandId,  setExpandId]  = useState<string | null>(null)
-  const [loading,   setLoading]   = useState(false)
+  const [logins,        setLogins]        = useState<LoginEntry[]>([])
+  const [activePlayers, setActivePlayers] = useState<Set<string>>(new Set())
+  const [games,         setGames]         = useState<GameRecord[]>([])
+  const [expandId,      setExpandId]      = useState<string | null>(null)
+  const [loading,       setLoading]       = useState(false)
 
   useEffect(() => {
     if (tab === 'logins') {
       setLoading(true)
-      fetch('/api/log/logins?limit=200')
-        .then(r => r.json())
-        .then(d => { setLogins(d.logins ?? []); setLoading(false) })
-        .catch(() => setLoading(false))
+      Promise.all([
+        fetch('/api/log/logins?limit=200').then(r => r.json()),
+        fetch('/api/active_players').then(r => r.json()),
+      ]).then(([logData, activeData]) => {
+        setLogins(logData.logins ?? [])
+        setActivePlayers(new Set(activeData.active ?? []))
+        setLoading(false)
+      }).catch(() => setLoading(false))
     } else {
       setLoading(true)
       fetch('/api/log/games?limit=100')
@@ -286,7 +291,9 @@ export default function LogsPage() {
                   <td className="px-4 py-2 text-xs">
                     {s.logout
                       ? <span className={s.implicit ? 'text-gray-600' : 'text-gray-400'}>{fmtTime(s.logout.timestamp)}</span>
-                      : <span className="text-green-500 text-xs">仍在線</span>
+                      : activePlayers.has(s.username)
+                        ? <span className="text-green-500">仍在線</span>
+                        : <span className="text-gray-600">已離線</span>
                     }
                   </td>
                   <td className="px-4 py-2 text-xs">

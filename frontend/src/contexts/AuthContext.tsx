@@ -32,6 +32,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Heartbeat: ping server every 5 minutes so LogsPage can show truly-online status
+  useEffect(() => {
+    if (!player) return
+    const beat = () => fetch('/api/heartbeat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ player }),
+    }).catch(() => {})
+    beat()  // immediate on login / page restore
+    const id = setInterval(beat, 5 * 60_000)
+    return () => clearInterval(id)
+  }, [player])
+
   // Page close / tab close → fire logout via sendBeacon (survives unload)
   useEffect(() => {
     if (!player) return
