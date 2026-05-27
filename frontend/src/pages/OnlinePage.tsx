@@ -581,6 +581,14 @@ export default function OnlinePage() {
   const [appealInfo,       setAppealInfo]       = useState<AppealInfo | null>(null)
   const [nextMultiplier,   setNextMultiplier]   = useState(1)
 
+  // ── 逐墩比牌: frozen display — TournamentPanel shows pre-round values until all cards flipped ──
+  const [frozenDisplay, setFrozenDisplay] = useState<{
+    history:     number[][]
+    multipliers: number[]
+    circleMarks: Record<number, number>
+    nextMult:    number
+  } | null>(null)
+
   // ── Effects: 打槍 / 全壘打 / 語音 ──
   const [grandSlammer, setGrandSlammer]     = useState<string | null>(null)
   const [currentGun,   setCurrentGun]       = useState<GunNotif | null>(null)
@@ -624,6 +632,7 @@ export default function OnlinePage() {
     setNextMultiplier(1)
     setInRoom(false)
     setSoloSetupMode(false)
+    setFrozenDisplay(null)
   }
 
   const processNextGun = useCallback(() => {
@@ -776,7 +785,15 @@ export default function OnlinePage() {
           ...prev, phase: msg.appeal_pending ? 'appeal_pending' : 'round_end',
           current_round: msg.round, history: msg.history
         } : prev)
-        // Update multipliers
+        // Update multipliers (freeze display if stepByStep)
+        if (cfgStepByStep) {
+          setFrozenDisplay({
+            history:     (msg.history ?? []).slice(0, -1),
+            multipliers: roundMultipliers,
+            circleMarks: circleMarks,
+            nextMult:    nextMultiplier,
+          })
+        }
         applyRoundMeta(msg)
         if (cfgStepByStep) {
           pendingRoundEffectRef.current = () => fireRoundEffects(msg.result ?? {}, msg)
@@ -807,6 +824,14 @@ export default function OnlinePage() {
         setLastResult(msg)
         addRoundBadges(msg.round, msg.result)
         setRoom(prev => prev ? { ...prev, phase: 'ended' } : prev)
+        if (cfgStepByStep) {
+          setFrozenDisplay({
+            history:     (msg.history ?? []).slice(0, -1),
+            multipliers: roundMultipliers,
+            circleMarks: circleMarks,
+            nextMult:    nextMultiplier,
+          })
+        }
         applyRoundMeta(msg)
         setAppealInfo(null)
         if (!msg.from_appeal_decline) {
@@ -1294,6 +1319,17 @@ export default function OnlinePage() {
     // Update display states
     setMyHand(null)
     setCountdown(null)
+
+    // Freeze TournamentPanel at pre-round values until all cards are flipped
+    if (cfgStepByStep) {
+      setFrozenDisplay({
+        history:     fakeMsg.history.slice(0, -1),  // exclude current round
+        multipliers: roundMultipliers,               // captured before setRoundMultipliers
+        circleMarks: circleMarks,                   // captured before setCircleMarks
+        nextMult:    nextMultiplier,                 // captured before setNextMultiplier
+      })
+    }
+
     setLastResult(fakeMsg)
     addRoundBadges(state.currentRound, res)
     setRoundMultipliers([...state.roundMultipliers])
@@ -1529,6 +1565,9 @@ export default function OnlinePage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  // In 逐墩比牌 mode, show pre-round nextMultiplier until all cards are flipped
+  const dispNextMult = frozenDisplay ? frozenDisplay.nextMult : nextMultiplier
+
   // Compute round header info for ManualArrange overlay (2d)
   const arrangeSeats   = soloActive ? (soloStateRef.current?.seatNames ?? []) : (room?.seat_names ?? [])
   const arrangeHistory = soloActive ? (soloStateRef.current?.history   ?? []) : (room?.history    ?? [])
@@ -1741,10 +1780,10 @@ export default function OnlinePage() {
               {/* Action bar: 下一局 / 再來一場 — above phase content (round result phases only) */}
               {(phase === 'round_end' || phase === 'ended') && (
                 <div className="flex justify-end items-center gap-2">
-                  {nextMultiplier > 1 && (
+                  {dispNextMult > 1 && (
                     <span className="text-xs px-3 py-1 rounded-full bg-orange-500 text-white font-bold
                                      whitespace-nowrap select-none animate-pulse">
-                      下局 {nextMultiplier}✕
+                      下局 {dispNextMult}✕
                     </span>
                   )}
                   {isEnded ? (<>
@@ -2329,7 +2368,6 @@ export default function OnlinePage() {
 
     const gameResult = res.result
     const seatNames  = (res.seat_names ?? room?.seat_names ?? []) as string[]
-    const history    = (res.history ?? room?.history ?? []) as number[][]
     const soloStrats = soloStateRef.current?.strategies ?? cfgStrategies
     const humanPlayers = new Set(soloActive ? [player!] : (room?.players ?? []))
     const aiStrats = soloActive ? soloStrats : ['rulealpha', ...cfgStrategies.slice(1)]
@@ -2341,9 +2379,13 @@ export default function OnlinePage() {
       return s
     })
 
-    // Multipliers and circle marks: use accumulated state (most up-to-date after reconnect)
-    const rm = roundMultipliers.length > 0 ? roundMultipliers : (room?.round_multipliers ?? [])
-    const cm = circleMarks
+    // When 逐墩比牌 cards are still hidden, freeze TournamentPanel at pre-round values
+    const history     = frozenDisplay ? frozenDisplay.history
+                      : (res.history ?? room?.history ?? []) as number[][]
+    const rm          = frozenDisplay ? frozenDisplay.multipliers
+                      : (roundMultipliers.length > 0 ? roundMultipliers : (room?.round_multipliers ?? []))
+    const cm          = frozenDisplay ? frozenDisplay.circleMarks : circleMarks
+    const dispNextMult = frozenDisplay ? frozenDisplay.nextMult : nextMultiplier
 
     const appealPlayedStr = effInAppeal
       ? ` 申訴 ${effAppealPlayed}/${effAppealGen >= 2 ? 1 : effAppealRounds}`
@@ -2374,6 +2416,7 @@ export default function OnlinePage() {
             onAllRevealed={() => {
               pendingRoundEffectRef.current?.()
               pendingRoundEffectRef.current = null
+              setFrozenDisplay(null)
             }}
           />
         )}
