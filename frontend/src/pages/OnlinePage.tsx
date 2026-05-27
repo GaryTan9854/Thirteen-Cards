@@ -810,8 +810,15 @@ export default function OnlinePage() {
           }
           roundLogRef.current.push({ round_number: msg.round, multiplier: msg.multiplier ?? 1, scores, arrangements: arrs })
         }
-        // If an appeal was triggered, voice the prompt after effects settle
-        if (msg.appeal_pending) {
+        // Appeal popup — defer until all cards revealed (when stepByStep)
+        if (cfgStepByStep && msg.appeal_pending) {
+          const prev = pendingRoundEffectRef.current
+          pendingRoundEffectRef.current = () => {
+            prev?.()
+            setAppealInfo(msg.appeal_pending)
+            scheduleAppealVoice(msg.appeal_pending, false)
+          }
+        } else if (msg.appeal_pending) {
           setAppealInfo(msg.appeal_pending)
           scheduleAppealVoice(msg.appeal_pending, false)
         }
@@ -1348,19 +1355,22 @@ export default function OnlinePage() {
     }
 
     if (cfgStepByStep) {
-      // Bundle all end-of-reveal effects together
+      // Bundle ALL post-reveal effects together (guns, end-game voice, appeal popup)
       pendingRoundEffectRef.current = () => {
         fireRoundEffects(res, fakeMsg)
         if (isEnded) scheduleEndGameVoice(fakeMsg)
+        if (newAppealInfo) {
+          setAppealInfo(newAppealInfo)
+          scheduleAppealVoice(newAppealInfo, false, (accept) => soloAppealDecision(accept))
+        }
       }
     } else {
       fireRoundEffects(res, fakeMsg)
       if (isEnded) scheduleEndGameVoice(fakeMsg)
-    }
-
-    if (newAppealInfo) {
-      setAppealInfo(newAppealInfo)
-      scheduleAppealVoice(newAppealInfo, false, (accept) => soloAppealDecision(accept))
+      if (newAppealInfo) {
+        setAppealInfo(newAppealInfo)
+        scheduleAppealVoice(newAppealInfo, false, (accept) => soloAppealDecision(accept))
+      }
     }
 
     if (isEnded) {
@@ -2396,9 +2406,11 @@ export default function OnlinePage() {
     const appealPlayedStr = effInAppeal
       ? ` 申訴 ${effAppealPlayed}/${effAppealGen >= 2 ? 1 : effAppealRounds}`
       : ''
+    // While cards are still hidden, suppress appeal label too
+    const dispInAppeal = effInAppeal && !frozenDisplay
     const roundLabel = dispIsEnded
       ? `本場結束（共 ${history.length} 局）`
-      : `第 ${res.round} / ${effRoundsNormal} 局結果${effInAppeal ? '【申訴】' + appealPlayedStr : ''}`
+      : `第 ${res.round} / ${effRoundsNormal} 局結果${dispInAppeal ? '【申訴】' + appealPlayedStr : ''}`
 
     return (
       <div className="flex flex-col gap-6">
