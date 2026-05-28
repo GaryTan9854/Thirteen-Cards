@@ -67,6 +67,7 @@ interface AppealInfo {
 // Solo game state (synchronous, in a ref)
 interface SoloState {
   seatNames:       string[]
+  drawnOrder?:     string[]   // drawn seat order for display (may differ from seatNames)
   roundsNormal:    number
   roundsAppeal:    number
   strategies:      string[]   // per-seat [0=self, 1=AI1, 2=AI2, 3=AI3]
@@ -609,12 +610,13 @@ export default function OnlinePage() {
   const soloAppealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Enter-key focus refs ──
-  const nextRoundBtnRef    = useRef<HTMLButtonElement>(null)
-  const playAgainBtnRef    = useRef<HTMLButtonElement>(null)
-  const startSoloBtnRef    = useRef<HTMLButtonElement>(null)
-  const startOnlineBtnRef  = useRef<HTMLButtonElement>(null)
-  const seatingDrawBtnRef  = useRef<HTMLButtonElement>(null)
-  const seatingStartBtnRef = useRef<HTMLButtonElement>(null)
+  const nextRoundBtnRef       = useRef<HTMLButtonElement>(null)
+  const playAgainBtnRef       = useRef<HTMLButtonElement>(null)
+  const startSoloBtnRef       = useRef<HTMLButtonElement>(null)
+  const startOnlineBtnRef     = useRef<HTMLButtonElement>(null)
+  const seatingDrawBtnRef     = useRef<HTMLButtonElement>(null)
+  const seatingStartBtnRef    = useRef<HTMLButtonElement>(null)
+  const leaveConfirmBtnRef    = useRef<HTMLButtonElement>(null)
 
   function toggleVoice() {
     const next = !voiceRef.current
@@ -1089,7 +1091,8 @@ export default function OnlinePage() {
   // ── Solo game ──────────────────────────────────────────────────────────────
 
   function startSoloGame(cfg: {
-    roundsNormal: number; roundsAppeal: number; strategies: string[]; aiNames: string[]
+    roundsNormal: number; roundsAppeal: number; strategies: string[]; aiNames: string[];
+    drawnOrder?: string[]
   }) {
     // Reset server room so it stays clean
     fetch('/api/online/reset', { method: 'POST' }).catch(() => {})
@@ -1097,6 +1100,7 @@ export default function OnlinePage() {
     const seatNames = [player!, ...cfg.aiNames]
     soloStateRef.current = {
       seatNames,
+      drawnOrder: cfg.drawnOrder,
       roundsNormal:    cfg.roundsNormal,
       roundsAppeal:    cfg.roundsAppeal,
       strategies:      cfg.strategies,
@@ -1573,6 +1577,14 @@ export default function OnlinePage() {
     }
   }, [phase, waitingForOnlineSetup])
 
+  // Focus "確定離開" when the game-in-progress leave confirm dialog appears
+  useEffect(() => {
+    if (showLeaveConfirm) {
+      const t = setTimeout(() => leaveConfirmBtnRef.current?.focus(), 50)
+      return () => clearTimeout(t)
+    }
+  }, [showLeaveConfirm])
+
   // ── Autopilot: auto-advance round ──────────────────────────────────────────
   // With step-by-step: wait for all cards to flip (frozenDisplay → null) first,
   // then advance after 2s. Without step-by-step: advance after 5s as before.
@@ -1675,6 +1687,7 @@ export default function OnlinePage() {
             </div>
             <div className="flex gap-3">
               <button
+                ref={leaveConfirmBtnRef}
                 onClick={() => { setShowLeaveConfirm(false); goHome() }}
                 className="flex-1 py-2.5 rounded-xl bg-orange-500 text-white font-bold hover:bg-orange-400 active:scale-95 transition">
                 確定離開
@@ -2137,7 +2150,7 @@ export default function OnlinePage() {
                   setSoloSeatingPending(false)
                   setSoloDrawnSeats([])
                   setPendingSoloConfig(null)
-                  startSoloGame({ roundsNormal: cfg.roundsNormal, roundsAppeal: cfg.roundsAppeal, strategies: newStrategies, aiNames: reorderedAis })
+                  startSoloGame({ roundsNormal: cfg.roundsNormal, roundsAppeal: cfg.roundsAppeal, strategies: newStrategies, aiNames: reorderedAis, drawnOrder: soloDrawnSeats })
                 }}
                 className="px-10 py-3 rounded-xl bg-sky-500 text-white font-bold text-lg
                            hover:bg-sky-400 active:scale-95 transition-all">
@@ -2522,25 +2535,37 @@ export default function OnlinePage() {
     const res = lastResult
     if (!res) return renderLobby()
 
-    const gameResult = res.result
-    const seatNames  = (res.seat_names ?? room?.seat_names ?? []) as string[]
-    const soloStrats = soloStateRef.current?.strategies ?? cfgStrategies
-    const humanPlayers = new Set(soloActive ? [player!] : (room?.players ?? []))
-    const aiStrats = soloActive ? soloStrats : ['rulealpha', ...cfgStrategies.slice(1)]
-    let aiSlot = 0
-    const strategies = seatNames.map((n: string) => {
-      if (humanPlayers.has(n)) return 'manual'
-      const s = aiStrats[aiSlot + 1] ?? 'rulealpha'
-      aiSlot++
-      return s
+    const gameResult    = res.result
+    const gameSeatNames = (res.seat_names ?? room?.seat_names ?? []) as string[]
+    const soloStrats    = soloStateRef.current?.strategies ?? cfgStrategies
+    const humanPlayers  = new Set(soloActive ? [player!] : (room?.players ?? []))
+
+    // Build strategy lookup by name (handles reordering correctly)
+    const stratByName = new Map<string, string>()
+    gameSeatNames.forEach((n, i) => {
+      stratByName.set(n, humanPlayers.has(n) ? 'manual'
+        : soloActive ? (soloStrats[i] ?? 'rulealpha')
+        : (cfgStrategies[i] ?? 'rulealpha'))
     })
 
+    // Apply drawn seat order for display (solo mode with seat draw)
+    const drawnOrder = soloActive ? soloStateRef.current?.drawnOrder : undefined
+    const perm = (drawnOrder && drawnOrder.length === gameSeatNames.length)
+      ? drawnOrder.map(n => gameSeatNames.indexOf(n))
+      : null
+    const seatNames  = drawnOrder ?? gameSeatNames
+    const strategies = seatNames.map(n => stratByName.get(n) ?? 'rulealpha')
+
     // When 逐墩比牌 cards are still hidden, freeze TournamentPanel at pre-round values
-    const history = frozenDisplay ? frozenDisplay.history
-                  : (res.history ?? room?.history ?? []) as number[][]
-    const rm      = frozenDisplay ? frozenDisplay.multipliers
-                  : (roundMultipliers.length > 0 ? roundMultipliers : (room?.round_multipliers ?? []))
-    const cm      = frozenDisplay ? frozenDisplay.circleMarks : circleMarks
+    const rawHistory = frozenDisplay ? frozenDisplay.history
+                     : (res.history ?? room?.history ?? []) as number[][]
+    const history    = perm ? rawHistory.map(row => perm.map(i => row[i] ?? 0)) : rawHistory
+    const rm         = frozenDisplay ? frozenDisplay.multipliers
+                     : (roundMultipliers.length > 0 ? roundMultipliers : (room?.round_multipliers ?? []))
+    const rawCm      = frozenDisplay ? frozenDisplay.circleMarks : circleMarks
+    const cm         = perm
+      ? Object.fromEntries(Object.entries(rawCm).map(([k, v]) => [k, perm.indexOf(v)]))
+      : rawCm
     // Suppress "本場結束" until all cards are revealed
     const dispIsEnded = isEnded && !frozenDisplay
 
