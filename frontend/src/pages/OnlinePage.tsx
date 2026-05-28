@@ -1546,6 +1546,20 @@ export default function OnlinePage() {
     }
   }, [isEnded])
 
+  // Re-focus "下一局" when step-by-step reveal finishes (frozenDisplay clears)
+  const prevFrozenRef = useRef(false)
+  useEffect(() => {
+    const wasFrozen = prevFrozenRef.current
+    prevFrozenRef.current = frozenDisplay !== null
+    if (wasFrozen && frozenDisplay === null) {
+      const t = setTimeout(() => {
+        nextRoundBtnRef.current?.focus()
+        if (!nextRoundBtnRef.current) playAgainBtnRef.current?.focus()
+      }, 120)
+      return () => clearTimeout(t)
+    }
+  }, [frozenDisplay])
+
   useEffect(() => {
     if (soloSetupMode && !soloActive) {
       const t = setTimeout(() => startSoloBtnRef.current?.focus(), 80)
