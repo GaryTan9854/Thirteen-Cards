@@ -154,9 +154,9 @@ export default function GameResultDisplay({
     }, unlockAt)
   }
 
-  // Keyboard: Enter / Space advances
+  // Keyboard: Enter / Space advances — only while cards are still face-down
   useEffect(() => {
-    if (!stepByStep) return
+    if (!stepByStep || globalPhase >= 3) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault()
@@ -165,7 +165,7 @@ export default function GameResultDisplay({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [stepByStep])
+  }, [stepByStep, globalPhase])
 
   // Autopilot: auto-advance each 墩 1s apart when autoReveal=true
   useEffect(() => {

@@ -1552,11 +1552,14 @@ export default function OnlinePage() {
     const wasFrozen = prevFrozenRef.current
     prevFrozenRef.current = frozenDisplay !== null
     if (wasFrozen && frozenDisplay === null) {
-      const t = setTimeout(() => {
-        nextRoundBtnRef.current?.focus()
-        if (!nextRoundBtnRef.current) playAgainBtnRef.current?.focus()
-      }, 120)
-      return () => clearTimeout(t)
+      // Use double-RAF so React has committed the DOM before we call focus()
+      let id1: number, id2: number
+      id1 = requestAnimationFrame(() => {
+        id2 = requestAnimationFrame(() => {
+          ;(nextRoundBtnRef.current ?? playAgainBtnRef.current)?.focus()
+        })
+      })
+      return () => { cancelAnimationFrame(id1); cancelAnimationFrame(id2) }
     }
   }, [frozenDisplay])
 
@@ -2635,10 +2638,11 @@ export default function OnlinePage() {
               pendingRoundEffectRef.current?.()
               pendingRoundEffectRef.current = null
               setFrozenDisplay(null)
-              setTimeout(() => {
-                nextRoundBtnRef.current?.focus()
-                if (!nextRoundBtnRef.current) playAgainBtnRef.current?.focus()
-              }, 80)
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  ;(nextRoundBtnRef.current ?? playAgainBtnRef.current)?.focus()
+                })
+              })
             }}
           />
         )}
