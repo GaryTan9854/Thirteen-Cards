@@ -608,6 +608,9 @@ export default function OnlinePage() {
   const ttsGenRef          = useRef(0)
   const soloPhaseRef       = useRef<string>('lobby')
   const soloAppealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Cache permuted game result to avoid creating a new object on every render
+  // (GameResultDisplay resets reveal state when result ref changes)
+  const permutedResultRef  = useRef<{ input: any; output: any } | null>(null)
 
   // ── Enter-key focus refs ──
   const nextRoundBtnRef       = useRef<HTMLButtonElement>(null)
@@ -2600,9 +2603,16 @@ export default function OnlinePage() {
 
         {gameResult && (
           <GameResultDisplay
-            result={perm && gameResult.players
-              ? { ...gameResult, players: perm.map(i => gameResult.players[i]) }
-              : gameResult}
+            result={(() => {
+              if (!perm || !gameResult.players) { permutedResultRef.current = null; return gameResult }
+              if (permutedResultRef.current?.input !== gameResult) {
+                permutedResultRef.current = {
+                  input:  gameResult,
+                  output: { ...gameResult, players: perm.map(i => gameResult.players[i]) },
+                }
+              }
+              return permutedResultRef.current!.output
+            })()}
             strategies={strategies}
             stepByStep={effectiveStepByStepDisplay}
             myName={player ?? ''}
