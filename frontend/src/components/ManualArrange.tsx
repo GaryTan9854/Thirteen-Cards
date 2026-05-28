@@ -188,6 +188,7 @@ interface ArrangeInfo {
 interface Props {
   hand:            string[]
   onConfirm:       (top:string[], mid:string[], bot:string[], isBaodao?: boolean) => void
+  onLeave?:        () => void  // called when player confirms leaving (ESC → 確定離開)
   countdown?:      number    // if provided, show timer; auto-submit at 0
   submittedCount?: number    // how many players have submitted (online mode)
   totalPlayers?:   number    // total human players in this round (online mode)
@@ -202,7 +203,7 @@ function scoreColor(n: number) {
   return n > 0 ? 'text-yellow-300' : n < 0 ? 'text-red-400' : 'text-gray-400'
 }
 
-export default function ManualArrange({ hand, onConfirm, countdown, submittedCount, totalPlayers,
+export default function ManualArrange({ hand, onConfirm, onLeave, countdown, submittedCount, totalPlayers,
   roundLabel, playerNames, cumScores, isGary }: Props) {
 
   const isDesktop = useMemo(() => window.innerWidth >= 640, [])
@@ -587,13 +588,13 @@ export default function ManualArrange({ hand, onConfirm, countdown, submittedCou
           <div className="text-2xl">⚠️</div>
           <div className="text-base font-bold text-gray-200">確定離開？</div>
           <div className="text-sm text-gray-400">
-            目前排法將直接送出，<br/>到比牌畫面後可選擇回到首頁
+            目前比賽將中止，返回首頁。
           </div>
           <div className="flex gap-3">
             <button
               onClick={() => {
                 setLeaveConfirmPending(false)
-                if (canConfirm) onConfirm(arr.top, arr.mid, arr.bot, false)
+                onLeave?.()
               }}
               className="flex-1 py-2.5 rounded-xl bg-orange-500 text-white font-bold
                          hover:bg-orange-400 active:scale-95 transition">

@@ -32,7 +32,7 @@ function AppInner() {
   const isGary = player === 'Gary'
 
   const TABS = [
-    { id: 'online', label: '🌐', fullLabel: '連線遊戲' },
+    { id: 'online', label: '🌐', fullLabel: '遊戲大廳' },
     { id: 'rules',  label: '📖', fullLabel: '遊戲說明' },
     ...(isGary ? [
       { id: 'duel',   label: '⚔️', fullLabel: '策略對決' },

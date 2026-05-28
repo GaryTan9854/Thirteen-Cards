@@ -388,7 +388,7 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
             <button onClick={onEnterRoom}
               className="px-10 py-3 rounded-2xl bg-yellow-400 text-gray-900 font-bold text-base
                          hover:bg-yellow-300 active:scale-95 transition-all shadow-2xl border border-yellow-200/40">
-              進入大廳
+              連線遊戲
             </button>
             <button autoFocus onClick={onSolo}
               className="px-10 py-3 rounded-2xl font-bold text-base text-white
@@ -508,13 +508,17 @@ export default function OnlinePage() {
   const [inRoom,      setInRoom]      = useState(false)
 
   // ── Solo mode ──
-  const [soloSetupMode, setSoloSetupMode] = useState(false)   // setup screen before solo game
+  const [soloSetupMode,     setSoloSetupMode]     = useState(false)   // setup screen before solo game
+  const [soloSeatingPending, setSoloSeatingPending] = useState(false)  // seat draw step for solo
+  const [pendingSoloConfig,  setPendingSoloConfig]  = useState<{roundsNormal:number,roundsAppeal:number,strategies:string[],aiNames:string[]}|null>(null)
+  const [soloDrawnSeats,     setSoloDrawnSeats]     = useState<string[]>([])
   const [soloActive,  setSoloActive]  = useState(false)
   const [soloPhase,   setSoloPhase]   = useState<string>('lobby')
   const soloStateRef = useRef<SoloState | null>(null)
 
   // ── WebSocket ──
-  const wsRef    = useRef<WebSocket | null>(null)
+  const wsRef          = useRef<WebSocket | null>(null)
+  const autoNewGameRef = useRef(false)   // true when entering via "連線遊戲" direct button
   const [connected, setConnected] = useState(false)
 
   // ── Lobby / room state ──
@@ -632,6 +636,9 @@ export default function OnlinePage() {
     setNextMultiplier(1)
     setInRoom(false)
     setSoloSetupMode(false)
+    setSoloSeatingPending(false)
+    setPendingSoloConfig(null)
+    setSoloDrawnSeats([])
     setFrozenDisplay(null)
   }
 
@@ -718,6 +725,11 @@ export default function OnlinePage() {
         if (msg.room?.ai_names?.length === 3) setCfgAiNames(msg.room.ai_names)
         // Restore display state from room snapshot
         if (msg.room) restoreFromSnapshot(msg.room)
+        // Auto-start new game if user came via "連線遊戲" direct button
+        if (autoNewGameRef.current && (msg.room?.phase ?? 'lobby') === 'lobby') {
+          autoNewGameRef.current = false
+          send({ type: 'new_game' })
+        }
         break
 
       case 'online_update':
@@ -1479,7 +1491,7 @@ export default function OnlinePage() {
   const goHomeRef         = useRef(goHome)
   // Update refs every render (setState setters are stable, so this is safe)
   gameInProgressRef.current    = gameInProgress
-  alreadyHomeRef.current       = phase === 'lobby' && !soloSetupMode
+  alreadyHomeRef.current       = phase === 'lobby' && !soloSetupMode && !soloSeatingPending
   manualArrangeOpenRef.current = !!(myHand && !submitted && phase === 'playing')
   goHomeRef.current            = goHome
 
@@ -1603,6 +1615,7 @@ export default function OnlinePage() {
         <ManualArrange
           hand={myHand}
           onConfirm={handleConfirm}
+          onLeave={goHome}
           countdown={countdown ?? undefined}
           submittedCount={submittedList.length}
           totalPlayers={soloActive ? 1 : (room?.players.length ?? 1)}
@@ -1735,10 +1748,12 @@ export default function OnlinePage() {
 
       <div className="space-y-4">
         {/* Pre-lobby entry screen */}
-        {!inRoom && !soloActive && !soloSetupMode
+        {!inRoom && !soloActive && !soloSetupMode && !soloSeatingPending
           ? renderEnterLobby()
           : soloSetupMode && !soloActive
           ? renderSoloSetup()
+          : soloSeatingPending && !soloActive
+          ? renderSoloSeating()
           : <>
               {inRoom && <OnlineBar players={onlinePlayers} self={player} onLeave={() => {
                 setSoloActive(false)
@@ -1902,7 +1917,7 @@ export default function OnlinePage() {
     return (
       <BeautyCarousel
         player={player}
-        onEnterRoom={() => setInRoom(true)}
+        onEnterRoom={() => { autoNewGameRef.current = true; setInRoom(true) }}
         onSolo={() => setSoloSetupMode(true)}
       />
     )
@@ -2009,17 +2024,94 @@ export default function OnlinePage() {
         <button ref={startSoloBtnRef}
           onClick={() => {
             setSoloSetupMode(false)
-            startSoloGame({
-              roundsNormal: cfgNormal,
-              roundsAppeal: cfgAppeal,
-              strategies:   cfgStrategies,
-              aiNames:      cfgAiNames,
-            })
+            setPendingSoloConfig({ roundsNormal: cfgNormal, roundsAppeal: cfgAppeal, strategies: cfgStrategies, aiNames: cfgAiNames })
+            setSoloDrawnSeats([])
+            setSoloSeatingPending(true)
           }}
           className="w-full py-3 rounded-xl bg-sky-500 text-white font-bold text-lg
                      hover:bg-sky-400 active:scale-95 transition-all shadow-lg">
           🥋 開始練功
         </button>
+      </div>
+    )
+  }
+
+  // ── Solo seating (seat draw step before game start) ──────────────────────────
+
+  function renderSoloSeating() {
+    const cfg = pendingSoloConfig
+    if (!cfg) return null
+    const allNames = [player!, ...cfg.aiNames]
+    const hasDrawn = soloDrawnSeats.length === 4
+
+    return (
+      <div className="relative bg-slate-800/30 rounded-xl p-6 space-y-5 text-center">
+        <button
+          onClick={() => { setSoloSeatingPending(false); setSoloSetupMode(true) }}
+          className="absolute left-4 top-4 text-sm text-gray-400 hover:text-white transition">
+          ← 返回
+        </button>
+        <div className="text-xl font-bold text-sky-300">🎲 抽座位</div>
+        <div className="text-sm text-gray-400">
+          玩家：{allNames.join('、')}
+        </div>
+
+        {!hasDrawn && (
+          <button
+            onClick={() => {
+              const shuffled = [...allNames].sort(() => Math.random() - 0.5)
+              setSoloDrawnSeats(shuffled)
+            }}
+            className="px-8 py-3 rounded-xl bg-yellow-400 text-gray-900 font-bold
+                       hover:bg-yellow-300 active:scale-95 transition-all">
+            🎲 抽座位
+          </button>
+        )}
+
+        {hasDrawn && (
+          <>
+            <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto text-left">
+              {soloDrawnSeats.map((name, i) => (
+                <div key={i} className={`rounded-xl p-3 text-center
+                  ${name === player
+                    ? 'bg-yellow-400 text-gray-900 ring-2 ring-yellow-300'
+                    : 'bg-gray-700 text-gray-400'}`}>
+                  <div className="text-[10px] opacity-60 mb-0.5">座位 {i + 1}</div>
+                  <div className="font-bold">{name}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-col items-center gap-3 pt-1">
+              <button
+                onClick={() => {
+                  const reshuffled = [...allNames].sort(() => Math.random() - 0.5)
+                  setSoloDrawnSeats(reshuffled)
+                }}
+                className="text-xs text-gray-400 hover:text-white transition underline">
+                重新抽
+              </button>
+              <button
+                onClick={() => {
+                  const playerIdx    = soloDrawnSeats.indexOf(player!)
+                  const reorderedAis = [
+                    ...soloDrawnSeats.slice(playerIdx + 1),
+                    ...soloDrawnSeats.slice(0, playerIdx),
+                  ].filter(n => n !== player!)
+                  const aiStratMap    = new Map(cfg.aiNames.map((n, i) => [n, cfg.strategies[i + 1]]))
+                  const newStrategies = [cfg.strategies[0], ...reorderedAis.map(n => aiStratMap.get(n) ?? 'rulealpha')]
+                  setSoloSeatingPending(false)
+                  setSoloDrawnSeats([])
+                  setPendingSoloConfig(null)
+                  startSoloGame({ roundsNormal: cfg.roundsNormal, roundsAppeal: cfg.roundsAppeal, strategies: newStrategies, aiNames: reorderedAis })
+                }}
+                className="px-10 py-3 rounded-xl bg-sky-500 text-white font-bold text-lg
+                           hover:bg-sky-400 active:scale-95 transition-all">
+                ⚔️ 開始戰鬥！
+              </button>
+            </div>
+          </>
+        )}
       </div>
     )
   }
@@ -2234,6 +2326,13 @@ export default function OnlinePage() {
           )}
         </div>
 
+        {/* 顯示設定 */}
+        <div className="space-y-2 border-t border-slate-600/40 pt-3">
+          <div className="flex flex-wrap gap-4">
+            <LogToggle label="逐墩比牌" value={cfgStepByStep} onChange={setCfgStepByStep} />
+          </div>
+        </div>
+
         {/* 記錄 & 聯盟賽 */}
         <div className="space-y-2 border-t border-slate-600/40 pt-3">
           <div className="flex flex-wrap gap-4">
@@ -2249,13 +2348,10 @@ export default function OnlinePage() {
         <button
           onClick={() => {
             if (cfgInvitees.length === 0) {
-              // Solo mode — run locally, no WS game session
-              startSoloGame({
-                roundsNormal: cfgNormal,
-                roundsAppeal: cfgAppeal,
-                strategies:   cfgStrategies,
-                aiNames:      cfgAiNames,
-              })
+              // AI-only — go to seating step first, then start solo game
+              setPendingSoloConfig({ roundsNormal: cfgNormal, roundsAppeal: cfgAppeal, strategies: cfgStrategies, aiNames: cfgAiNames })
+              setSoloDrawnSeats([])
+              setSoloSeatingPending(true)
             } else {
               gameIdRef.current        = crypto.randomUUID()
               gameStartTimeRef.current = new Date().toISOString()
@@ -2271,10 +2367,10 @@ export default function OnlinePage() {
               })
             }
           }}
-          className="px-6 py-3 rounded-xl bg-yellow-400 text-gray-900 font-bold
+          className="w-full py-3 rounded-xl bg-yellow-400 text-gray-900 font-bold
                      hover:bg-yellow-300 active:scale-95 transition-all"
         >
-          {cfgInvitees.length > 0 ? `發出邀請（${cfgInvitees.join('、')}）` : '直接開始（AI 陪練）'}
+          {cfgInvitees.length > 0 ? `發出邀請（${cfgInvitees.join('、')}）` : '開始連線遊戲'}
         </button>
       </div>
     )
