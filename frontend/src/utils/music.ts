@@ -1,12 +1,19 @@
 /**
  * Scene-based background music — singleton, browser-safe.
  * Handles autoplay policy by deferring play to first user gesture.
+ * Each scene has vocal + instrumental variants; one is chosen at random on each play.
  */
 
-const TRACKS: Record<string, string> = {
-  lobby:   '/assets/music/lobby.mp3',
-  playing: '/assets/music/playing.mp3',
-  ended:   '/assets/music/ended.mp3',
+const TRACKS: Record<string, [string, string]> = {
+  lobby:   ['/assets/music/lobby.mp3',   '/assets/music/lobby_i.mp3'],
+  playing: ['/assets/music/playing.mp3', '/assets/music/playing_i.mp3'],
+  ended:   ['/assets/music/ended.mp3',   '/assets/music/ended_i.mp3'],
+}
+
+function pickTrack(scene: string): string | null {
+  const variants = TRACKS[scene]
+  if (!variants) return null
+  return variants[Math.random() < 0.5 ? 0 : 1]
 }
 
 let audio: HTMLAudioElement | null = null
@@ -35,7 +42,7 @@ export function setScene(scene: string) {
   if (scene === _scene) return
   _scene = scene
   if (!_enabled) return
-  const src = TRACKS[scene]
+  const src = pickTrack(scene)
   if (!src) { audio?.pause(); return }
   tryPlay(makeAudio(src))
 }
@@ -46,7 +53,7 @@ export function toggleMusic(): boolean {
   _enabled = !_enabled
   localStorage.setItem('tc_music_on', String(_enabled))
   if (_enabled) {
-    const src = TRACKS[_scene]
+    const src = pickTrack(_scene)
     if (src) tryPlay(makeAudio(src))
   } else {
     audio?.pause()

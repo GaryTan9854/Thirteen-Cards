@@ -2600,7 +2600,9 @@ export default function OnlinePage() {
 
         {gameResult && (
           <GameResultDisplay
-            result={gameResult}
+            result={perm && gameResult.players
+              ? { ...gameResult, players: perm.map(i => gameResult.players[i]) }
+              : gameResult}
             strategies={strategies}
             stepByStep={effectiveStepByStepDisplay}
             myName={player ?? ''}
