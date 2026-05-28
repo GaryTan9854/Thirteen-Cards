@@ -459,7 +459,7 @@ function OnlineBar({ players, self: self_, onLeave }: {
         onClick={onLeave}
         className="text-xs text-gray-500 hover:text-red-400 px-2 py-0.5 rounded
                    hover:bg-gray-800/60 transition whitespace-nowrap">
-        ← 離開大廳
+        ← 離開遊戲
       </button>
     </div>
   )
@@ -517,8 +517,9 @@ export default function OnlinePage() {
   const soloStateRef = useRef<SoloState | null>(null)
 
   // ── WebSocket ──
-  const wsRef          = useRef<WebSocket | null>(null)
-  const autoNewGameRef = useRef(false)   // true when entering via "連線遊戲" direct button
+  const wsRef               = useRef<WebSocket | null>(null)
+  const autoNewGameRef      = useRef(false)   // true when entering via "連線遊戲" direct button
+  const [waitingForOnlineSetup, setWaitingForOnlineSetup] = useState(false)  // suppress lobby flash
   const [connected, setConnected] = useState(false)
 
   // ── Lobby / room state ──
@@ -608,9 +609,12 @@ export default function OnlinePage() {
   const soloAppealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Enter-key focus refs ──
-  const nextRoundBtnRef = useRef<HTMLButtonElement>(null)
-  const playAgainBtnRef = useRef<HTMLButtonElement>(null)
-  const startSoloBtnRef = useRef<HTMLButtonElement>(null)
+  const nextRoundBtnRef    = useRef<HTMLButtonElement>(null)
+  const playAgainBtnRef    = useRef<HTMLButtonElement>(null)
+  const startSoloBtnRef    = useRef<HTMLButtonElement>(null)
+  const startOnlineBtnRef  = useRef<HTMLButtonElement>(null)
+  const seatingDrawBtnRef  = useRef<HTMLButtonElement>(null)
+  const seatingStartBtnRef = useRef<HTMLButtonElement>(null)
 
   function toggleVoice() {
     const next = !voiceRef.current
@@ -639,6 +643,7 @@ export default function OnlinePage() {
     setSoloSeatingPending(false)
     setPendingSoloConfig(null)
     setSoloDrawnSeats([])
+    setWaitingForOnlineSetup(false)
     setFrozenDisplay(null)
   }
 
@@ -1541,6 +1546,33 @@ export default function OnlinePage() {
     }
   }, [soloSetupMode, soloActive])
 
+  // Focus "開始連線遊戲" when online setup screen appears
+  useEffect(() => {
+    if (!soloActive && !soloSetupMode && !soloSeatingPending && inRoom && phase === 'setup') {
+      const t = setTimeout(() => startOnlineBtnRef.current?.focus(), 80)
+      return () => clearTimeout(t)
+    }
+  }, [soloActive, soloSetupMode, soloSeatingPending, inRoom, phase])
+
+  // Focus seating buttons as state changes
+  useEffect(() => {
+    if (!soloSeatingPending || soloActive) return
+    if (soloDrawnSeats.length === 0) {
+      const t = setTimeout(() => seatingDrawBtnRef.current?.focus(), 80)
+      return () => clearTimeout(t)
+    } else {
+      const t = setTimeout(() => seatingStartBtnRef.current?.focus(), 80)
+      return () => clearTimeout(t)
+    }
+  }, [soloSeatingPending, soloActive, soloDrawnSeats.length])
+
+  // Clear "waiting for setup" loading state once phase leaves lobby
+  useEffect(() => {
+    if (waitingForOnlineSetup && phase !== 'lobby') {
+      setWaitingForOnlineSetup(false)
+    }
+  }, [phase, waitingForOnlineSetup])
+
   // ── Autopilot: auto-advance round ──────────────────────────────────────────
   // With step-by-step: wait for all cards to flip (frozenDisplay → null) first,
   // then advance after 2s. Without step-by-step: advance after 5s as before.
@@ -1917,7 +1949,7 @@ export default function OnlinePage() {
     return (
       <BeautyCarousel
         player={player}
-        onEnterRoom={() => { autoNewGameRef.current = true; setInRoom(true) }}
+        onEnterRoom={() => { autoNewGameRef.current = true; setWaitingForOnlineSetup(true); setInRoom(true) }}
         onSolo={() => setSoloSetupMode(true)}
       />
     )
@@ -2058,6 +2090,7 @@ export default function OnlinePage() {
 
         {!hasDrawn && (
           <button
+            ref={seatingDrawBtnRef}
             onClick={() => {
               const shuffled = [...allNames].sort(() => Math.random() - 0.5)
               setSoloDrawnSeats(shuffled)
@@ -2092,6 +2125,7 @@ export default function OnlinePage() {
                 重新抽
               </button>
               <button
+                ref={seatingStartBtnRef}
                 onClick={() => {
                   const playerIdx    = soloDrawnSeats.indexOf(player!)
                   const reorderedAis = [
@@ -2142,7 +2176,7 @@ export default function OnlinePage() {
     }
 
     switch (phase) {
-      case 'lobby':          return renderLobby()
+      case 'lobby':          return waitingForOnlineSetup ? renderWait('進入設定畫面…') : renderLobby()
       case 'setup':          return isHost ? renderSetup() : renderWait(`等待 ${room?.host} 設定比賽…`)
       case 'inviting':       return renderInviting()
       case 'seating':        return renderSeating()
@@ -2367,6 +2401,7 @@ export default function OnlinePage() {
               })
             }
           }}
+          ref={startOnlineBtnRef}
           className="w-full py-3 rounded-xl bg-yellow-400 text-gray-900 font-bold
                      hover:bg-yellow-300 active:scale-95 transition-all"
         >

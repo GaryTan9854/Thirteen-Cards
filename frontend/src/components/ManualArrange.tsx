@@ -338,6 +338,7 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
 
   // ── Leave confirmation ──
   const [leaveConfirmPending, setLeaveConfirmPending] = useState(false)
+  const leaveConfirmBtnRef = useRef<HTMLButtonElement>(null)
 
   // ESC key → trigger leave confirm (desktop TunaESC)
   useEffect(() => {
@@ -347,6 +348,14 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
     document.addEventListener('keydown', onEsc)
     return () => document.removeEventListener('keydown', onEsc)
   }, [])
+
+  // Auto-focus "確定離開" when leave confirm dialog appears
+  useEffect(() => {
+    if (leaveConfirmPending) {
+      const t = setTimeout(() => leaveConfirmBtnRef.current?.focus(), 50)
+      return () => clearTimeout(t)
+    }
+  }, [leaveConfirmPending])
 
   // ── 報到 detection ──
   const isBaodaoHand = !!(info && info.special && info.special.name !== 'normal')
@@ -592,6 +601,7 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
           </div>
           <div className="flex gap-3">
             <button
+              ref={leaveConfirmBtnRef}
               onClick={() => {
                 setLeaveConfirmPending(false)
                 onLeave?.()
