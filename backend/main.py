@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "10.17"
+APP_VERSION = "10.18"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -330,16 +330,25 @@ def manual_arrange_info(req: ManualInfoRequest):
     # variants each = max 4.  "Pair-rank structure" = which pair ranks appear in
     # each row (top/mid/bot); variants sharing the same structure differ only in
     # which single/kicker card occupies which slot — visually near-identical.
-    _WEAK = {'亂', '對', '兩對'}
+    # Domain type sets for variant-limiting rules
+    _WEAK   = {'亂', '對', '兩對'}           # no strong hands
+    _NO_SF  = {'亂', '對', '兩對', '三條', '葫蘆'}  # no straight / flush
     groups = []
     for label, variants in grouped.items():
         variants.sort(key=lambda t: score_defensive(*t), reverse=True)
 
-        # Determine if all three rows are weak types
+        # Determine row types from the best variant
         top_t = _row_label(variants[0][0].handtype_val)
         mid_t = _row_label(variants[0][1].handtype_val)
         bot_t = _row_label(variants[0][2].handtype_val)
-        is_weak_group = top_t in _WEAK and mid_t in _WEAK and bot_t in _WEAK
+        is_weak_group  = top_t in _WEAK   and mid_t in _WEAK   and bot_t in _WEAK
+        is_no_sf_group = top_t in _NO_SF  and mid_t in _NO_SF  and bot_t in _NO_SF
+
+        # Rule: groups with 葫蘆 (and no S/F) → show 1 variant only.
+        # TR always pairs with the weakest P to form H; stronger pairs go upward.
+        # The top-scored variant (already sorted best-first) IS this canonical choice.
+        if is_no_sf_group and '葫蘆' in {top_t, mid_t, bot_t}:
+            variants = variants[:1]
 
         if is_weak_group and len(variants) > 4:
             # Deduplicate by pair-rank structure, keep best 2 structures × max 2 variants
