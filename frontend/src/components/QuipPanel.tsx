@@ -27,7 +27,7 @@ function avatarSrc(speaker: string): string {
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-const LINE_MS = 4000   // ms before auto-advancing to next line
+const LINE_MS = 2500   // ms before auto-advancing to next line
 
 interface Props {
   loser:  string
@@ -104,13 +104,6 @@ export default function QuipPanel({ loser, winner, names, onDone }: Props) {
             {line.text}
           </p>
 
-          {/* Dot indicators */}
-          <div className="flex justify-center gap-2 mt-5">
-            {lines.map((_, i) => (
-              <span key={i} className="w-2 h-2 rounded-full transition-colors"
-                    style={{ background: i === lineIdx ? color : '#374151' }} />
-            ))}
-          </div>
         </div>
       </div>
 

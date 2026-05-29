@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "10.11"
+APP_VERSION = "10.12"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -297,11 +297,6 @@ def manual_arrange_info(req: ManualInfoRequest):
     # Always enumerate groups even for special hands — user may choose not to 報到
     candidates = enumerate_arrangements(handstrs)
 
-    def _row_label(ht: int) -> str:
-        labels = {0:"亂",1:"對",2:"兩對",3:"三條",4:"順",5:"同花",
-                  6:"葫蘆",7:"鐵支",8:"同花順",9:"同花次大順",10:"同花大順"}
-        return labels.get(ht, str(ht))
-
     def _arr_to_dict(h3, hm, hb):
         return {
             "top":      [c.cardstr() for c in h3.display_order()],
@@ -345,6 +340,124 @@ def manual_arrange_info(req: ManualInfoRequest):
         "special": {"name": sp_name, "score": sp_score, "baodao_list": baodao_list},
         "groups":  groups,
     }
+
+
+# ── Row scoring / validation ──────────────────────────────────────────────────
+
+def _row_label(ht: int) -> str:
+    labels = {0:"亂",1:"對",2:"兩對",3:"三條",4:"順",5:"同花",
+              6:"葫蘆",7:"鐵支",8:"同花順",9:"同花次大順",10:"同花大順"}
+    return labels.get(ht, str(ht))
+
+
+class ScoreRowsRequest(BaseModel):
+    top: list
+    mid: list
+    bot: list
+
+
+@app.post("/api/manual/score_rows")
+def score_rows(req: ScoreRowsRequest):
+    """Score three rows and report validity (尾 ≥ 中 ≥ 頭)."""
+    from game.hands import Hand3, Hand5
+    h3 = Hand3(req.top);  h3.score_hand()
+    hm = Hand5(req.mid);  hm.score_hand()
+    hb = Hand5(req.bot);  hb.score_hand()
+    return {
+        "top_score":  h3.score,
+        "mid_score":  hm.score,
+        "bot_score":  hb.score,
+        "top_type":   _row_label(h3.handtype_val),
+        "mid_type":   _row_label(hm.handtype_val),
+        "bot_type":   _row_label(hb.handtype_val),
+        "valid":      h3.score <= hm.score <= hb.score,
+        "top_mid_ok": h3.score <= hm.score,
+        "mid_bot_ok": hm.score <= hb.score,
+    }
+
+
+# ── Top↔mid row swap options ──────────────────────────────────────────────────
+
+class SwapTopMidRequest(BaseModel):
+    top_cards: list
+    mid_cards: list
+    bot_cards: list
+
+
+@app.post("/api/manual/swap_top_mid")
+def swap_top_mid(req: SwapTopMidRequest):
+    """
+    Given the current top (3 cards) and mid (5 cards), enumerate all valid
+    (top3, mid5) re-splits of the 8-card pool that match the "other side" of the
+    swap rule.  The rules (and their reverses) are:
+
+        [亂, 對]  ↔  [亂, 亂]
+        [對, 對]  ↔  [亂, 兩對]
+        [對, 兩對]   →  cycle all [對, 兩對] combos (rotate pair assignments)
+
+    Returns { options: [{top, mid, top_type, mid_type}, ...] } sorted best-first.
+    If the current combo is not in any rule, returns { options: [] }.
+    """
+    from game.hands import Hand3, Hand5
+    from game.arrange import score_arrangement
+    from itertools import combinations as _comb
+
+    h3_curr = Hand3(req.top_cards);  h3_curr.score_hand()
+    hm_curr = Hand5(req.mid_cards);  hm_curr.score_hand()
+    hb      = Hand5(req.bot_cards);  hb.score_hand()
+
+    curr_tt = h3_curr.handtype_val  # 0=亂,1=對,3=三條…
+    curr_mt = hm_curr.handtype_val
+
+    # What target (top_type, mid_type) are we swapping TO?
+    target_pairs: list[tuple[int,int]] = []
+    if   curr_tt == 0 and curr_mt == 1: target_pairs = [(0, 0)]       # [亂,對]  → [亂,亂]
+    elif curr_tt == 0 and curr_mt == 0: target_pairs = [(0, 1)]       # [亂,亂]  → [亂,對]
+    elif curr_tt == 1 and curr_mt == 1: target_pairs = [(0, 2)]       # [對,對]  → [亂,兩對]
+    elif curr_tt == 0 and curr_mt == 2: target_pairs = [(1, 1)]       # [亂,兩對]→ [對,對]
+    elif curr_tt == 1 and curr_mt == 2: target_pairs = [(1, 2)]       # [對,兩對]→ cycle
+    else:
+        return {"options": []}
+
+    target_set = set(target_pairs)
+    pool = req.top_cards + req.mid_cards  # 8 cards
+    curr_key = (tuple(sorted(req.top_cards)), tuple(sorted(req.mid_cards)))
+
+    results: list = []
+    seen:    set  = set()
+
+    for top3 in _comb(pool, 3):
+        top_set = set(top3)
+        mid5    = [c for c in pool if c not in top_set]
+        if len(mid5) != 5:
+            continue
+
+        h3 = Hand3(list(top3)); h3.score_hand()
+        hm = Hand5(mid5);       hm.score_hand()
+
+        if (h3.handtype_val, hm.handtype_val) not in target_set:
+            continue
+        if not (h3.score <= hm.score <= hb.score):
+            continue
+
+        key = (tuple(sorted(top3)), tuple(sorted(mid5)))
+        if key in seen or key == curr_key:
+            continue
+        seen.add(key)
+
+        results.append({
+            "top":      list(top3),
+            "mid":      mid5,
+            "top_type": _row_label(h3.handtype_val),
+            "mid_type": _row_label(hm.handtype_val),
+            "_score":   score_arrangement(h3, hm, hb),
+        })
+
+    results.sort(key=lambda x: x["_score"], reverse=True)
+    for r in results:
+        del r["_score"]
+
+    return {"options": results}
 
 
 # ── Duel: compare two strategies ─────────────────────

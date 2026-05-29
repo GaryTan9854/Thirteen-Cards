@@ -71,19 +71,97 @@ function CardTile({ cs, size='md' }: { cs:string; size?:'xs'|'sm'|'md'|'lg' }) {
   )
 }
 
-// ─── RowDisplay ───────────────────────────────────────────────────────────────
+// ─── InteractiveRow ───────────────────────────────────────────────────────────
 
-function RowDisplay({ label, cards, slots, size='md' }: { label:string; cards:string[]; slots:number; size?:'md'|'lg' }) {
+type RowId = 'top' | 'mid' | 'bot'
+
+interface SelCard { row: RowId; idx: number }
+
+function InteractiveRow({
+  rowId, label, cards, slots, size = 'md',
+  selCard, dragFrom, dragOver,
+  onCardClick, onDragStart, onDragOver, onDrop, onDragEnd,
+  violation,
+}: {
+  rowId:       RowId
+  label:       string
+  cards:       string[]
+  slots:       number
+  size?:       'md' | 'lg'
+  selCard?:    SelCard | null
+  dragFrom?:   SelCard | null
+  dragOver?:   SelCard | null
+  onCardClick: (row: RowId, idx: number) => void
+  onDragStart: (row: RowId, idx: number) => void
+  onDragOver:  (row: RowId, idx: number) => void
+  onDrop:      (row: RowId, idx: number) => void
+  onDragEnd:   () => void
+  violation?:  boolean
+}) {
   const emptyDim = size === 'lg' ? 'w-14 h-20' : 'w-11 h-16'
+  const hasDragSrc = !!(dragFrom?.row === rowId)
+
   return (
-    <div className="flex items-center gap-2 py-2 border-b border-gray-700 last:border-0">
+    <div className={`flex items-center gap-2 py-2 border-b border-gray-700 last:border-0
+                     rounded-lg px-1 transition-colors duration-150
+                     ${violation ? 'bg-red-900/40' : hasDragSrc ? 'bg-sky-900/20' : ''}`}>
       <span className="w-10 text-xs text-gray-400 shrink-0">{label}</span>
-      <div className="flex gap-2">
-        {cards.map((cs,i) => <CardTile key={i} cs={cs} size={size} />)}
-        {Array.from({length: slots - cards.length}).map((_,i) => (
-          <span key={'e'+i} className={`${emptyDim} shrink-0 rounded-lg border-2 border-dashed border-gray-600`} />
+      <div className="flex gap-1.5 sm:gap-2 flex-wrap">
+        {cards.map((cs, i) => {
+          const isSel      = selCard?.row === rowId && selCard.idx === i
+          const isDragSrc  = dragFrom?.row === rowId && dragFrom.idx === i
+          const isDragOver = dragOver?.row === rowId && dragOver.idx === i
+          return (
+            <span
+              key={cs + i}
+              draggable
+              onDragStart={e => { e.stopPropagation(); onDragStart(rowId, i) }}
+              onDragOver={e  => { e.preventDefault(); e.stopPropagation(); onDragOver(rowId, i) }}
+              onDrop={e      => { e.preventDefault(); e.stopPropagation(); onDrop(rowId, i) }}
+              onDragEnd={onDragEnd}
+              onClick={() => onCardClick(rowId, i)}
+              className={`cursor-pointer rounded-lg transition-all duration-100 select-none
+                ${isSel     ? 'ring-2 ring-yellow-400 scale-110 z-10' : ''}
+                ${isDragSrc ? 'opacity-40' : ''}
+                ${isDragOver && !isDragSrc ? 'ring-2 ring-sky-400 scale-105' : ''}`}
+            >
+              <CardTile cs={cs} size={size} />
+            </span>
+          )
+        })}
+        {Array.from({ length: slots - cards.length }).map((_, i) => (
+          <span key={'e' + i} className={`${emptyDim} shrink-0 rounded-lg border-2 border-dashed border-gray-600`} />
         ))}
       </div>
+    </div>
+  )
+}
+
+// ─── Swap-divider ─────────────────────────────────────────────────────────────
+
+function SwapDivider({
+  onClick, available, label, cycleInfo,
+}: {
+  onClick:   () => void
+  available: boolean
+  label:     string
+  cycleInfo?: string   // e.g. "1/3"
+}) {
+  return (
+    <div className="flex items-center gap-2 my-0.5">
+      <div className="flex-1 border-t border-gray-700" />
+      {available ? (
+        <button
+          onClick={onClick}
+          className="text-[11px] px-2 py-0.5 rounded-full bg-sky-900/60 text-sky-300
+                     border border-sky-700 hover:bg-sky-800 transition whitespace-nowrap"
+          title={label}>
+          ↕ {label}{cycleInfo ? ` ${cycleInfo}` : ''}
+        </button>
+      ) : (
+        <span className="text-[10px] text-gray-700 px-1">—</span>
+      )}
+      <div className="flex-1 border-t border-gray-700" />
     </div>
   )
 }
@@ -273,6 +351,8 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
 
   function pickGroup(gi:number){
     if(!info) return
+    resetSwapTM()
+    setSelCard(null)
     if(gi===selGroup){
       const g=info.groups[gi]
       const next=(varIdx+1)%g.variants.length
@@ -286,6 +366,126 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
     }
   }
 
+  // ── Card drag / click-to-swap ──
+  const [selCard,  setSelCard]  = useState<SelCard|null>(null)
+  const [dragFrom, setDragFrom] = useState<SelCard|null>(null)
+  const [dragOver, setDragOver] = useState<SelCard|null>(null)
+  // Whether the last pointer event was a drag (suppresses the click handler)
+  const didDragRef = useRef(false)
+
+  // ── Row violation state ──
+  const [topMidOk, setTopMidOk] = useState(true)
+  const [midBotOk, setMidBotOk] = useState(true)
+  const [rowTypes, setRowTypes] = useState<{top:string;mid:string;bot:string}|null>(null)
+  const hasViolation = !topMidOk || !midBotOk
+
+  // Scores a complete arrangement and updates violation state
+  const scoreRowsRef = useRef<(a:{top:string[];mid:string[];bot:string[]})=>void>()
+  scoreRowsRef.current = (a) => {
+    if (a.top.length!==3 || a.mid.length!==5 || a.bot.length!==5) return
+    fetch('/api/manual/score_rows', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({top:a.top, mid:a.mid, bot:a.bot}),
+    }).then(r=>r.json()).then(d=>{
+      setTopMidOk(d.top_mid_ok)
+      setMidBotOk(d.mid_bot_ok)
+      setRowTypes({top:d.top_type, mid:d.mid_type, bot:d.bot_type})
+    }).catch(()=>{})
+  }
+
+  // Re-score whenever arr changes (but debounce via ref to avoid stale closures)
+  useEffect(() => {
+    if (arr.top.length===3 && arr.mid.length===5 && arr.bot.length===5) {
+      scoreRowsRef.current!(arr)
+    } else {
+      setTopMidOk(true); setMidBotOk(true); setRowTypes(null)
+    }
+  }, [arr])
+
+  function doSwapCards(
+    a: {top:string[];mid:string[];bot:string[]},
+    from: SelCard, to: SelCard
+  ) {
+    const rows: Record<string, string[]> = {top:[...a.top], mid:[...a.mid], bot:[...a.bot]}
+    const tmp = rows[from.row][from.idx]
+    rows[from.row][from.idx] = rows[to.row][to.idx]
+    rows[to.row][to.idx] = tmp
+    return {top:rows.top, mid:rows.mid, bot:rows.bot}
+  }
+
+  function handleCardClick(row: RowId, idx: number) {
+    if (didDragRef.current) { didDragRef.current = false; return }
+    if (!selCard) { setSelCard({row, idx}); return }
+    if (selCard.row === row && selCard.idx === idx) { setSelCard(null); return }
+    const newArr = doSwapCards(arr, selCard, {row, idx})
+    setArr(newArr)
+    setSelCard(null)
+    setSelGroup(-1)  // custom arrangement no longer matches a preset group
+  }
+  function handleDragStart(row: RowId, idx: number) {
+    setDragFrom({row, idx})
+    setSelCard(null)
+    didDragRef.current = false
+  }
+  function handleDragOver(row: RowId, idx: number) {
+    setDragOver({row, idx})
+  }
+  function handleDrop(row: RowId, idx: number) {
+    if (dragFrom && !(dragFrom.row===row && dragFrom.idx===idx)) {
+      const newArr = doSwapCards(arr, dragFrom, {row, idx})
+      setArr(newArr)
+      setSelGroup(-1)
+    }
+    setDragFrom(null); setDragOver(null)
+    didDragRef.current = true
+  }
+  function handleDragEnd() {
+    setDragFrom(null); setDragOver(null)
+  }
+
+  // ── Row-swap (mid↔bot) ──
+  function swapMidBot() {
+    const newArr = {top:arr.top, mid:arr.bot, bot:arr.mid}
+    setArr(newArr)
+    setSelGroup(-1)
+  }
+
+  // ── Row-swap (top↔mid, limited rules via backend) ──
+  const [swapTMOpts, setSwapTMOpts] = useState<{top:string[];mid:string[]}[]>([])
+  const [swapTMIdx,  setSwapTMIdx]  = useState(0)
+
+  // Which top↔mid swap type is available for the current row types?
+  const swapTMAvail = useMemo(() => {
+    if (!rowTypes) return false
+    const tt = rowTypes.top, mt = rowTypes.mid
+    return (tt==='亂'&&mt==='對') || (tt==='亂'&&mt==='亂') ||
+           (tt==='對'&&mt==='對') || (tt==='亂'&&mt==='兩對') ||
+           (tt==='對'&&mt==='兩對')
+  }, [rowTypes])
+
+  // Reset cycle when user makes a non-swap change
+  function resetSwapTM() { setSwapTMOpts([]); setSwapTMIdx(0) }
+
+  async function swapTopMidCycle() {
+    let opts = swapTMOpts
+    let idx  = swapTMIdx
+    if (opts.length === 0) {
+      const r = await fetch('/api/manual/swap_top_mid', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({top_cards:arr.top, mid_cards:arr.mid, bot_cards:arr.bot}),
+      }).then(r=>r.json()).catch(()=>({options:[]}))
+      opts = r.options ?? []
+      setSwapTMOpts(opts)
+      idx = 0
+    }
+    if (opts.length === 0) return
+    const opt = opts[idx % opts.length]
+    setSwapTMIdx(idx + 1)
+    const newArr = {top:opt.top, mid:opt.mid, bot:arr.bot}
+    setArr(newArr)
+    setSelGroup(-1)
+  }
+
   // ── Button refs for Enter-key navigation ──
   const confirmBtnRef = useRef<HTMLButtonElement>(null)
   const baodaoBtnRef  = useRef<HTMLButtonElement>(null)
@@ -293,6 +493,9 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
   // ── Auto-submit when countdown hits 0 (online mode) ──
   const arrRef = useRef(arr)
   useEffect(() => { arrRef.current = arr }, [arr])
+  const hasViolationRef = useRef(hasViolation)
+  useEffect(() => { hasViolationRef.current = hasViolation }, [hasViolation])
+  const defaultArrRef = useRef<{top:string[];mid:string[];bot:string[]}|null>(null)
 
   // ── Autopilot (Gary only) — auto-submit top arrangement 1.2s after deal ──
   const [autopilot, setAutopilot] = useState(
@@ -313,11 +516,25 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
     return () => clearTimeout(t)
   }, [info])   // fires once when arrangement data first arrives
 
+  // Store the model's default arrangement so we can fall back to it on countdown
+  useEffect(() => {
+    if (arr.top.length === 3 && arr.mid.length === 5 && arr.bot.length === 5
+        && !defaultArrRef.current) {
+      defaultArrRef.current = arr
+    }
+  }, [arr])
+
   useEffect(() => {
     if (countdown === 0) {
       const a = arrRef.current
       if (a.top.length === 3 && a.mid.length === 5 && a.bot.length === 5) {
-        onConfirm(a.top, a.mid, a.bot, true)   // auto-submit as 報到 if applicable
+        if (hasViolationRef.current && defaultArrRef.current) {
+          // Current arrangement violates rules — fall back to model's default
+          const d = defaultArrRef.current
+          onConfirm(d.top, d.mid, d.bot, true)
+        } else {
+          onConfirm(a.top, a.mid, a.bot, true)
+        }
       }
     }
   }, [countdown])
@@ -371,10 +588,13 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
     return () => clearTimeout(t)
   }, [info, isBaodaoHand])
 
+  const [violationAlert, setViolationAlert] = useState(false)
+
   function handleNormalSubmit() {
     if (!canConfirm) return
+    if (hasViolation) { setViolationAlert(true); return }
     if (isBaodaoHand) {
-      setBaodaoConfirmPending(true)   // show confirmation dialog
+      setBaodaoConfirmPending(true)
     } else {
       onConfirm(arr.top, arr.mid, arr.bot, false)
     }
@@ -513,20 +733,68 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
                 </div>
               </div>
             )}
-            {/* Arrangement */}
+            {/* Arrangement (interactive drag/click-to-swap) */}
             <div className="bg-black/30 rounded-xl px-4 py-2">
-              {curVariant && (
-                <div className="flex gap-4 text-[10px] text-gray-500 mb-2 flex-wrap">
-                  <span>頭：{curVariant.top_desc}</span>
-                  <span className="mx-1">·</span>
-                  <span>中：{curVariant.mid_desc}</span>
-                  <span className="mx-1">·</span>
+              {/* Violation banner */}
+              {hasViolation && (
+                <div className="text-xs text-red-400 bg-red-900/30 rounded-lg px-3 py-1 mb-2 text-center font-semibold">
+                  ⚠ 倒水！{!topMidOk ? '頭墩 > 中墩' : '中墩 > 尾墩'} — 請調整牌的位置
+                </div>
+              )}
+              {/* Row type hint (when custom arrangement) */}
+              {rowTypes && selGroup===-1 && (
+                <div className="flex gap-3 text-[10px] text-gray-500 mb-1 flex-wrap">
+                  <span>頭：{rowTypes.top}</span>·
+                  <span>中：{rowTypes.mid}</span>·
+                  <span>尾：{rowTypes.bot}</span>
+                </div>
+              )}
+              {curVariant && selGroup>=0 && (
+                <div className="flex gap-4 text-[10px] text-gray-500 mb-1 flex-wrap">
+                  <span>頭：{curVariant.top_desc}</span>·
+                  <span>中：{curVariant.mid_desc}</span>·
                   <span>尾：{curVariant.bot_desc}</span>
                 </div>
               )}
-              <RowDisplay label="頭墩" cards={arr.top} slots={3} size={isDesktop ? 'lg' : 'md'} />
-              <RowDisplay label="中墩" cards={arr.mid} slots={5} size={isDesktop ? 'lg' : 'md'} />
-              <RowDisplay label="尾墩" cards={arr.bot} slots={5} size={isDesktop ? 'lg' : 'md'} />
+              {/* Instruction hint */}
+              <div className="text-[10px] text-gray-600 mb-1">
+                {selCard ? '點另一張牌互換，再點同張取消' : '點牌選取後點另一張互換；或直接拖曳'}
+              </div>
+              <InteractiveRow
+                rowId="top" label="頭墩" cards={arr.top} slots={3}
+                size={isDesktop ? 'lg' : 'md'}
+                selCard={selCard} dragFrom={dragFrom} dragOver={dragOver}
+                onCardClick={handleCardClick} onDragStart={handleDragStart}
+                onDragOver={handleDragOver} onDrop={handleDrop} onDragEnd={handleDragEnd}
+                violation={!topMidOk}
+              />
+              <SwapDivider
+                onClick={swapTopMidCycle}
+                available={swapTMAvail}
+                label="頭中換"
+                cycleInfo={swapTMOpts.length > 1 ? `${(swapTMIdx % swapTMOpts.length) + 1}/${swapTMOpts.length}` : undefined}
+              />
+              <InteractiveRow
+                rowId="mid" label="中墩" cards={arr.mid} slots={5}
+                size={isDesktop ? 'lg' : 'md'}
+                selCard={selCard} dragFrom={dragFrom} dragOver={dragOver}
+                onCardClick={handleCardClick} onDragStart={handleDragStart}
+                onDragOver={handleDragOver} onDrop={handleDrop} onDragEnd={handleDragEnd}
+                violation={!topMidOk || !midBotOk}
+              />
+              <SwapDivider
+                onClick={swapMidBot}
+                available={true}
+                label="中尾換"
+              />
+              <InteractiveRow
+                rowId="bot" label="尾墩" cards={arr.bot} slots={5}
+                size={isDesktop ? 'lg' : 'md'}
+                selCard={selCard} dragFrom={dragFrom} dragOver={dragOver}
+                onCardClick={handleCardClick} onDragStart={handleDragStart}
+                onDragOver={handleDragOver} onDrop={handleDrop} onDragEnd={handleDragEnd}
+                violation={!midBotOk}
+              />
             </div>
           </div>
 
@@ -589,6 +857,26 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
 
       </div>
     </div>
+
+    {/* ── 倒水提示 modal ── */}
+    {violationAlert && (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70">
+        <div className="bg-gray-900 border border-red-500 rounded-2xl p-6 max-w-xs w-full mx-4 text-center shadow-2xl space-y-4">
+          <div className="text-3xl">🚫</div>
+          <div className="text-base font-bold text-red-400">此排法不符合規則</div>
+          <div className="text-sm text-gray-300">
+            {!topMidOk ? '頭墩強過中墩（倒水）' : '中墩強過尾墩（倒水）'}
+            <br/>請拖移牌調整後再送出。
+          </div>
+          <button
+            autoFocus
+            onClick={() => setViolationAlert(false)}
+            className="w-full py-2.5 rounded-xl bg-gray-700 text-gray-200 font-bold hover:bg-gray-600 transition">
+            知道了，繼續調整
+          </button>
+        </div>
+      </div>
+    )}
 
     {/* ── 離開確認 modal ── */}
     {leaveConfirmPending && (

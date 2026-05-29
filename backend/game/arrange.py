@@ -138,14 +138,15 @@ def generate_5card_options(available: list) -> list:
                                   key=lambda x: -int(x[:2])))
 
     # ── 鐵支 QD ──────────────────────────────────────────────────────────
-    # Kicker = LOWEST remaining card; this frees the highest card (e.g. K) for
-    # the top row per the "散牌最大的往最上" domain rule.
+    # Enumerate ALL possible kickers so that every (top_type, mid_type, bot_type)
+    # combo involving 鐵支 is reachable.  Using only the lowest kicker caused
+    # valid arrangements like 亂·兩對·鐵支 to be missed when the lowest card
+    # was part of a pair needed in the middle row.
     for r, c in cnt.items():
         if c >= 4:
-            non_quad = sorted([cs for cs in available if int(cs[:2]) != r],
-                              key=lambda cs: int(cs[:2]))
-            if non_quad:
-                options.append(by_rank[r][:4] + [non_quad[0]])
+            non_quad = [cs for cs in available if int(cs[:2]) != r]
+            for kicker in non_quad:
+                options.append(by_rank[r][:4] + [kicker])
 
     # ── 同花 F ───────────────────────────────────────────────────────────
     # For 5-card suits: one candidate (best5).
