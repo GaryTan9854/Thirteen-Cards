@@ -370,6 +370,8 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
   const [selCard,  setSelCard]  = useState<SelCard|null>(null)
   const [dragFrom, setDragFrom] = useState<SelCard|null>(null)
   const [dragOver, setDragOver] = useState<SelCard|null>(null)
+  // Ref mirror of dragFrom — read synchronously inside drop handler (React state is async)
+  const dragFromRef = useRef<SelCard|null>(null)
   // Whether the last pointer event was a drag (suppresses the click handler)
   const didDragRef = useRef(false)
 
@@ -423,7 +425,9 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
     setSelGroup(-1)  // custom arrangement no longer matches a preset group
   }
   function handleDragStart(row: RowId, idx: number) {
-    setDragFrom({row, idx})
+    const src = {row, idx}
+    dragFromRef.current = src
+    setDragFrom(src)
     setSelCard(null)
     didDragRef.current = false
   }
@@ -431,15 +435,19 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
     setDragOver({row, idx})
   }
   function handleDrop(row: RowId, idx: number) {
-    if (dragFrom && !(dragFrom.row===row && dragFrom.idx===idx)) {
-      const newArr = doSwapCards(arr, dragFrom, {row, idx})
+    // Use ref (not state) for reliable synchronous read of drag source
+    const src = dragFromRef.current
+    if (src && !(src.row===row && src.idx===idx)) {
+      const newArr = doSwapCards(arr, src, {row, idx})
       setArr(newArr)
       setSelGroup(-1)
     }
+    dragFromRef.current = null
     setDragFrom(null); setDragOver(null)
     didDragRef.current = true
   }
   function handleDragEnd() {
+    dragFromRef.current = null
     setDragFrom(null); setDragOver(null)
   }
 

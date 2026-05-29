@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "10.13"
+APP_VERSION = "10.14"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -326,12 +326,18 @@ def manual_arrange_info(req: ManualInfoRequest):
             "variants": [_arr_to_dict(h3, hm, hb) for h3, hm, hb in variants],
         })
 
-    # Sort groups: stronger bot type first, then by best defensive score
+    # Sort groups by (bot_cat, mid_cat, top_cat) descending — matches 102-type taxonomy order
+    _CAT = {"亂":0,"對":1,"兩對":2,"三條":3,"順":4,"同花":5,
+            "葫蘆":6,"鐵支":7,"同花順":8,"同花次大順":8,"同花大順":8}
+    _TOP_CAT = {"亂":0,"對":1,"三條":3}
+
     def _group_sort_key(g):
-        first = g["variants"][0]
-        bot_ht = {"亂":0,"對":1,"兩對":2,"三條":3,"順":4,"同花":5,
-                  "葫蘆":6,"鐵支":7,"同花順":8,"同花次大順":9,"同花大順":10}
-        return bot_ht.get(first["bot_type"], 0)
+        v = g["variants"][0]
+        return (
+            _CAT.get(v["bot_type"], 0),
+            _CAT.get(v["mid_type"], 0),
+            _TOP_CAT.get(v["top_type"], 0),
+        )
 
     groups.sort(key=_group_sort_key, reverse=True)
 

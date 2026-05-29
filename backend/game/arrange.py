@@ -979,13 +979,35 @@ def _generate_3card_tops(handstrs: list) -> list:
 
 # ─── Main enumeration ─────────────────────────────────────────────────────────
 
+# ─── 102-type hand-type taxonomy ─────────────────────────────────────────────
+# 3-card top:  0=亂  1=對  3=三條
+# 5-card mid/bot: 0=亂 1=對 2=兩對 3=三條 4=順 5=同花 6=葫蘆 7=鐵支 8=同花順(any SF)
+#
+# Cross-comparison rule (can 5-card mid score ≥ 3-card top score?):
+#   top=亂(0):  any mid OK        (5-card anything ≥ 3-card scatter)
+#   top=對(1):  mid ≥ 對(1)       (5-card scatter max ~14 < 3-card pair base 15)
+#   top=三條(3): mid ≥ 三條(3)    (5-card 兩對 max ~43 < 3-card trip base 45)
+
+_VALID_MID_FOR_TOP: dict[int, frozenset[int]] = {
+    0: frozenset(range(9)),       # top=亂: any mid
+    1: frozenset(range(1, 9)),    # top=對: mid ≥ 1
+    3: frozenset(range(3, 9)),    # top=三條: mid ≥ 3
+}
+
+def _norm_cat(ht: int) -> int:
+    """Normalize SF variants (同花次大順=9, 同花大順=10) → 8 for taxonomy checks."""
+    return min(ht, 8)
+
+
 def enumerate_arrangements(handstrs: list) -> list:
     """
-    Enumerate meaningful arrangements for a 13-card hand.
+    102-type taxonomy-driven arrangement enumeration.
 
-    Dual-approach: BOTH bottom-first (bot→mid→top) AND top-first (top→bot→mid)
-    paths run independently; results are merged with deduplication.
-    Bottom-first misses trip-in-top (三條 原子頭); top-first captures it directly.
+    Dual-approach (bottom-first + top-first) with taxonomy validity checks:
+      • _norm_cat normalises SF variants (9/10 → 8) so groups are keyed correctly
+      • _VALID_MID_FOR_TOP enforces the cross-scale constraint (e.g. 散牌 mid
+        cannot dominate a 對 top because 5-card scatter < 3-card pair by score)
+      • Bottom-first handles most type combos; top-first catches 三條 原子頭
 
     Returns list of (Hand3_top, Hand5_mid, Hand5_bot), each already scored,
     satisfying top.score ≤ mid.score ≤ bot.score.
@@ -997,8 +1019,15 @@ def enumerate_arrangements(handstrs: list) -> list:
     for bot_cards in generate_5card_options(handstrs):
         bot_set   = set(bot_cards)
         remaining = [cs for cs in handstrs if cs not in bot_set]
+        hb_tmp    = Hand5(bot_cards); hb_tmp.score_hand()
+        bot_cat   = _norm_cat(hb_tmp.handtype_val)
 
         for mid_cards in generate_5card_options(remaining):
+            hm_tmp  = Hand5(mid_cards); hm_tmp.score_hand()
+            mid_cat = _norm_cat(hm_tmp.handtype_val)
+            if mid_cat > bot_cat:
+                continue  # taxonomy: mid must not outrank bot
+
             mid_set = set(mid_cards)
             top3 = [cs for cs in remaining if cs not in mid_set]
             if len(top3) != 3:
@@ -1016,18 +1045,32 @@ def enumerate_arrangements(handstrs: list) -> list:
                 hm = Hand5(mid_v);      hm.score_hand()
                 hb = Hand5(bot_cards);  hb.score_hand()
 
+                # Taxonomy cross-scale check: mid_cat must be valid for top cat
+                if mid_cat not in _VALID_MID_FOR_TOP.get(h3.handtype_val, frozenset()):
+                    continue
+
                 if h3.score <= hm.score <= hb.score:
                     results.append((h3, hm, hb))
 
-    # ── Top-first: top → bot → mid ────────────────────────────────────────────
+    # ── Top-first: top → bot → mid (catches 三條 原子頭) ─────────────────────
     for top_cards in _generate_3card_tops(handstrs):
         top_set      = set(top_cards)
         remaining_10 = [cs for cs in handstrs if cs not in top_set]
+        h3_tmp       = Hand3(top_cards); h3_tmp.score_hand()
+        top_cat      = h3_tmp.handtype_val
+        valid_mids   = _VALID_MID_FOR_TOP.get(top_cat, frozenset())
 
         for bot_cards in generate_5card_options(remaining_10):
+            hb_tmp  = Hand5(bot_cards); hb_tmp.score_hand()
+            bot_cat = _norm_cat(hb_tmp.handtype_val)
             bot_set = set(bot_cards)
             mid5    = [cs for cs in remaining_10 if cs not in bot_set]
             if len(mid5) != 5:
+                continue
+
+            hm_tmp  = Hand5(mid5); hm_tmp.score_hand()
+            mid_cat = _norm_cat(hm_tmp.handtype_val)
+            if mid_cat > bot_cat or mid_cat not in valid_mids:
                 continue
 
             for top_v, mid_v in spare_variants(top_cards, mid5):
