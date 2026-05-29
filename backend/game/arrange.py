@@ -1121,24 +1121,23 @@ def enumerate_arrangements(handstrs: list) -> list:
             if len(top3) != 3:
                 continue
 
-            for top_v, mid_v in spare_variants(top3, mid_cards):
-                key = (tuple(sorted(top_v)),
-                       tuple(sorted(mid_v)),
-                       tuple(sorted(bot_cards)))
-                if key in seen:
-                    continue
-                seen.add(key)
+            key = (tuple(sorted(top3)),
+                   tuple(sorted(mid_cards)),
+                   tuple(sorted(bot_cards)))
+            if key in seen:
+                continue
+            seen.add(key)
 
-                h3 = Hand3(top_v);      h3.score_hand()
-                hm = Hand5(mid_v);      hm.score_hand()
-                hb = Hand5(bot_cards);  hb.score_hand()
+            h3 = Hand3(top3);       h3.score_hand()
+            hm = Hand5(mid_cards);  hm.score_hand()
+            hb = Hand5(bot_cards);  hb.score_hand()
 
-                # Taxonomy cross-scale check: mid_cat must be valid for top cat
-                if mid_cat not in _VALID_MID_FOR_TOP.get(h3.handtype_val, frozenset()):
-                    continue
+            # Taxonomy cross-scale check: mid_cat must be valid for top cat
+            if mid_cat not in _VALID_MID_FOR_TOP.get(h3.handtype_val, frozenset()):
+                continue
 
-                if h3.score <= hm.score <= hb.score:
-                    results.append((h3, hm, hb))
+            if h3.score <= hm.score <= hb.score:
+                results.append((h3, hm, hb))
 
     # ── Top-first: top → bot → mid (catches 三條 原子頭) ─────────────────────
     for top_cards in _generate_3card_tops(handstrs):
@@ -1161,19 +1160,18 @@ def enumerate_arrangements(handstrs: list) -> list:
             if mid_cat > bot_cat or mid_cat not in valid_mids:
                 continue
 
-            for top_v, mid_v in spare_variants(top_cards, mid5):
-                key = (tuple(sorted(top_v)),
-                       tuple(sorted(mid_v)),
-                       tuple(sorted(bot_cards)))
-                if key in seen:
-                    continue
-                seen.add(key)
+            key = (tuple(sorted(top_cards)),
+                   tuple(sorted(mid5)),
+                   tuple(sorted(bot_cards)))
+            if key in seen:
+                continue
+            seen.add(key)
 
-                h3 = Hand3(top_v);      h3.score_hand()
-                hm = Hand5(mid_v);      hm.score_hand()
-                hb = Hand5(bot_cards);  hb.score_hand()
+            h3 = Hand3(top_cards);  h3.score_hand()
+            hm = Hand5(mid5);       hm.score_hand()
+            hb = Hand5(bot_cards);  hb.score_hand()
 
-                if h3.score <= hm.score <= hb.score:
-                    results.append((h3, hm, hb))
+            if h3.score <= hm.score <= hb.score:
+                results.append((h3, hm, hb))
 
     return results
