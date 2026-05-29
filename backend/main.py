@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "10.18"
+APP_VERSION = "10.19"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -344,11 +344,56 @@ def manual_arrange_info(req: ManualInfoRequest):
         is_weak_group  = top_t in _WEAK   and mid_t in _WEAK   and bot_t in _WEAK
         is_no_sf_group = top_t in _NO_SF  and mid_t in _NO_SF  and bot_t in _NO_SF
 
-        # Rule: groups with 葫蘆 (and no S/F) → show 1 variant only.
-        # TR always pairs with the weakest P to form H; stronger pairs go upward.
-        # The top-scored variant (already sorted best-first) IS this canonical choice.
+        # Rule: groups with 葫蘆 (no S/F) → 1 canonical variant per distinct trip rank.
+        # Logic: TR always pairs with the weakest AVAILABLE pair, but must NOT use a
+        # pair derived from another trip rank (e.g. if 444 is a trip in the hand,
+        # don't use 44 as the FH kicker — it would break the 444 trip; use the next
+        # weakest non-trip pair instead).
+        # Variants rotate through the available trips (largest first).
         if is_no_sf_group and '葫蘆' in {top_t, mid_t, bot_t}:
-            variants = variants[:1]
+            from collections import Counter as _Counter
+
+            # All trip ranks present in this 13-card hand
+            hand_trip_ranks: set = {
+                int(cs[:2])
+                for cs in handstrs
+                if sum(1 for x in handstrs if int(x[:2]) == int(cs[:2])) >= 3
+            }
+
+            def _fh_trip_and_pair(h_obj):
+                """Return (trip_rank, pair_rank) from a Hand5 full-house object."""
+                cards = [c.cardstr() for c in h_obj.display_order()]
+                by_r  = _Counter(int(cs[:2]) for cs in cards)
+                tr    = next((r for r, c in by_r.items() if c >= 3), None)
+                pr    = next((r for r, c in by_r.items() if c == 2), None)
+                return tr, pr
+
+            fh_in_bot = (bot_t == '葫蘆')
+
+            # Build: trip_rank → best valid variant (pair rank ∉ other trips)
+            canonical: dict = {}
+            fallback:  dict = {}   # if no non-trip pair exists for a trip
+            for h3, hm, hb in variants:
+                fh_hand    = hb if fh_in_bot else hm
+                tr, pr     = _fh_trip_and_pair(fh_hand)
+                if tr is None:
+                    continue
+                other_trips = hand_trip_ranks - {tr}
+                if pr in other_trips:
+                    # pair is from another trip — record as fallback only
+                    if tr not in fallback:
+                        fallback[tr] = (h3, hm, hb)
+                else:
+                    # Preferred: pair is from a natural (non-trip) pair rank
+                    if tr not in canonical:
+                        canonical[tr] = (h3, hm, hb)
+
+            # Merge: prefer canonical; fall back if no canonical for a trip
+            merged = {**fallback, **canonical}  # canonical wins over fallback
+
+            # Sort by trip rank descending (largest trip → first variant)
+            if merged:
+                variants = [v for _, v in sorted(merged.items(), reverse=True)]
 
         if is_weak_group and len(variants) > 4:
             # Deduplicate by pair-rank structure, keep best 2 structures × max 2 variants
