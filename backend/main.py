@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "10.20"
+APP_VERSION = "11.0"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -344,12 +344,55 @@ def manual_arrange_info(req: ManualInfoRequest):
         is_weak_group  = top_t in _WEAK   and mid_t in _WEAK   and bot_t in _WEAK
         is_no_sf_group = top_t in _NO_SF  and mid_t in _NO_SF  and bot_t in _NO_SF
 
-        # Rule: groups with 同花/順/鐵支/同花順 → 1 variant only.
-        # These types have a single canonical form; kicker / flush-subset differences
-        # are meaningless to display — the player adjusts via drag-swap.
-        _STRONG_1 = {'同花', '順', '鐵支', '同花順', '同花次大順', '同花大順'}
-        if any(t in _STRONG_1 for t in (top_t, mid_t, bot_t)):
-            variants = variants[:1]
+        # Rule: groups with 亂 AND at least one "strong" row (三條/順/同花/葫蘆/鐵支/SF).
+        # 亂 is a "supporting role" — given the strong rows, the scatter cards are
+        # fully determined (remaining cards sorted high-to-low).  So two variants
+        # that share the same strong-row identity but differ only in which kicker
+        # card fills the scatter row are effectively the same arrangement.
+        #
+        # Dedup key for each row:
+        #   亂        → None  (not a choice; ignored in key)
+        #   對/兩對   → frozenset of pair ranks  (kicker choice is irrelevant)
+        #   三條       → trip rank
+        #   葫蘆       → (trip_rank, pair_rank)
+        #   鐵支       → quad rank
+        #   同花/順/SF → frozenset of actual card strings (each subset IS distinct)
+        _STRONG_TYPES = {'三條', '順', '同花', '葫蘆', '鐵支',
+                         '同花順', '同花次大順', '同花大順'}
+        has_scatter = '亂' in {top_t, mid_t, bot_t}
+        has_strong  = bool({top_t, mid_t, bot_t} & _STRONG_TYPES)
+
+        if has_scatter and has_strong:
+            from collections import Counter as _Counter
+
+            def _row_key(h_obj, h_type):
+                cards  = [c.cardstr() for c in h_obj.display_order()]
+                by_r   = _Counter(int(cs[:2]) for cs in cards)
+                if h_type == '亂':
+                    return None
+                elif h_type == '對':
+                    return ('P', max(r for r, c in by_r.items() if c >= 2))
+                elif h_type == '兩對':
+                    return ('2P', frozenset(r for r, c in by_r.items() if c >= 2))
+                elif h_type == '三條':
+                    return ('TR', max(r for r, c in by_r.items() if c >= 3))
+                elif h_type == '葫蘆':
+                    return ('H',
+                            max(r for r, c in by_r.items() if c >= 3),
+                            max(r for r, c in by_r.items() if c == 2))
+                elif h_type == '鐵支':
+                    return ('QD', max(r for r, c in by_r.items() if c >= 4))
+                else:  # 同花/順/SF variants — actual card set matters
+                    return frozenset(cards)
+
+            seen_skeys: set  = set()
+            deduped_s: list  = []
+            for h3, hm, hb in variants:
+                sk = (_row_key(h3, top_t), _row_key(hm, mid_t), _row_key(hb, bot_t))
+                if sk not in seen_skeys:
+                    seen_skeys.add(sk)
+                    deduped_s.append((h3, hm, hb))
+            variants = deduped_s
 
         # Rule: groups with 葫蘆 (no S/F) → 1 canonical variant per distinct trip rank.
         # Logic: TR always pairs with the weakest AVAILABLE pair, but must NOT use a
