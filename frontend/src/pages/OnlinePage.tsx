@@ -704,7 +704,9 @@ export default function OnlinePage() {
       }
       ws.onerror = () => setConnected(false)
       ws.onmessage = e => {
-        try { handleMsg(JSON.parse(e.data)) } catch {}
+        // Always call the LATEST handleMsg via ref — avoids stale-closure issues
+        // (e.g. cfgStepByStep toggled after WS was opened would be invisible otherwise)
+        try { handleMsgRef.current(JSON.parse(e.data)) } catch {}
       }
     }
 
@@ -910,6 +912,11 @@ export default function OnlinePage() {
         break
     }
   }
+
+  // Keep a ref to the latest handleMsg so the WS onmessage handler always dispatches
+  // to the current render's closure (captures latest cfgStepByStep, roundMultipliers, etc.)
+  const handleMsgRef = useRef(handleMsg)
+  handleMsgRef.current = handleMsg
 
   // Restore circleMarks + roundMultipliers from a snapshot (e.g. after reconnect)
   function restoreFromSnapshot(snap: RoomSnapshot) {

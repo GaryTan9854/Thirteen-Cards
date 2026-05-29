@@ -81,19 +81,25 @@ export function buildSpecialTTS(players: any[]): { baodao: string[]; monsters: s
 
 // ── 女聲 TTS（Web Speech API，優先 zh-TW）────────────────────────────────────
 
-/** Pick best female zh voice across browsers/OS */
+/** Pick best Mandarin (華語) female voice, avoiding Cantonese (zh-HK / Sinji). */
 function pickFemaleZh(zh: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
+  // Exclude Cantonese voices (zh-HK, Sinji, etc.)
+  const mandarin = zh.filter(v => v.lang !== 'zh-HK' && !/sin[\s-]?ji|sinji/i.test(v.name))
+  const pool = mandarin.length > 0 ? mandarin : zh  // fallback to all zh if nothing left
+
   return (
-    // macOS: Meijia (zh-TW), Sinji (zh-HK), Yawen (zh-TW)
-    zh.find(v => /mei-?jia|美嘉|sin[\s-]?ji|sinji|ya[\s-]?wen|雅雯/i.test(v.name)) ||
-    // macOS: Tingting (zh-CN)
-    zh.find(v => /tingting|ting[\s-]?ting/i.test(v.name)) ||
+    // macOS: Meijia (zh-TW Mandarin) — preferred; Yawen (zh-TW)
+    pool.find(v => /mei-?jia|美嘉|ya[\s-]?wen|雅雯/i.test(v.name)) ||
+    // macOS: Tingting (zh-CN Mandarin)
+    pool.find(v => /tingting|ting[\s-]?ting/i.test(v.name)) ||
     // Windows / Firefox: Hanhan (zh-TW female), Huihui (zh-CN female)
-    zh.find(v => /hanhan|han[\s-]?han|huihui|hui[\s-]?hui/i.test(v.name)) ||
-    // Google voices (Android / ChromeOS): 普通話 / 國語
-    zh.find(v => /google/i.test(v.name) && v.lang.startsWith('zh')) ||
-    // Fallback: any zh-TW, then any zh
-    zh.find(v => v.lang === 'zh-TW') || zh[0]
+    pool.find(v => /hanhan|han[\s-]?han|huihui|hui[\s-]?hui/i.test(v.name)) ||
+    // Google voices (Android / ChromeOS): any zh (Google TTS is Mandarin by default)
+    pool.find(v => /google/i.test(v.name) && v.lang.startsWith('zh')) ||
+    // Fallback: any zh-TW, then any zh-CN, then any zh
+    pool.find(v => v.lang === 'zh-TW') ||
+    pool.find(v => v.lang === 'zh-CN') ||
+    pool[0]
   )
 }
 

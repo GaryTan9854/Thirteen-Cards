@@ -458,41 +458,9 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
     setSelGroup(-1)
   }
 
-  // ── Row-swap (top↔mid, limited rules via backend) ──
-  const [swapTMOpts, setSwapTMOpts] = useState<{top:string[];mid:string[]}[]>([])
-  const [swapTMIdx,  setSwapTMIdx]  = useState(0)
-
-  // Which top↔mid swap type is available for the current row types?
-  const swapTMAvail = useMemo(() => {
-    if (!rowTypes) return false
-    const tt = rowTypes.top, mt = rowTypes.mid
-    return (tt==='亂'&&mt==='對') || (tt==='亂'&&mt==='亂') ||
-           (tt==='對'&&mt==='對') || (tt==='亂'&&mt==='兩對') ||
-           (tt==='對'&&mt==='兩對')
-  }, [rowTypes])
-
-  // Reset cycle when user makes a non-swap change
-  function resetSwapTM() { setSwapTMOpts([]); setSwapTMIdx(0) }
-
-  async function swapTopMidCycle() {
-    let opts = swapTMOpts
-    let idx  = swapTMIdx
-    if (opts.length === 0) {
-      const r = await fetch('/api/manual/swap_top_mid', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({top_cards:arr.top, mid_cards:arr.mid, bot_cards:arr.bot}),
-      }).then(r=>r.json()).catch(()=>({options:[]}))
-      opts = r.options ?? []
-      setSwapTMOpts(opts)
-      idx = 0
-    }
-    if (opts.length === 0) return
-    const opt = opts[idx % opts.length]
-    setSwapTMIdx(idx + 1)
-    const newArr = {top:opt.top, mid:opt.mid, bot:arr.bot}
-    setArr(newArr)
-    setSelGroup(-1)
-  }
+  // (top↔mid smart swap deferred — removed for now, visual divider remains)
+  // Reset helper: called when user selects a preset group
+  function resetSwapTM() { /* no-op, kept for pickGroup call-site */ }
 
   // ── Button refs for Enter-key navigation ──
   const confirmBtnRef = useRef<HTMLButtonElement>(null)
@@ -776,12 +744,8 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
                 onDragOver={handleDragOver} onDrop={handleDrop} onDragEnd={handleDragEnd}
                 violation={!topMidOk}
               />
-              <SwapDivider
-                onClick={swapTopMidCycle}
-                available={swapTMAvail}
-                label="頭中換"
-                cycleInfo={swapTMOpts.length > 1 ? `${(swapTMIdx % swapTMOpts.length) + 1}/${swapTMOpts.length}` : undefined}
-              />
+              {/* top↔mid smart swap deferred — divider is just a visual separator */}
+              <div className="border-t border-gray-700/60 my-0.5" />
               <InteractiveRow
                 rowId="mid" label="中墩" cards={arr.mid} slots={5}
                 size={isDesktop ? 'lg' : 'md'}

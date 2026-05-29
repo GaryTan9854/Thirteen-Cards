@@ -977,6 +977,94 @@ def _generate_3card_tops(handstrs: list) -> list:
     return unique
 
 
+# ─── Pure-pair canonical enumeration ─────────────────────────────────────────
+
+def _is_pure_pairs(handstrs: list) -> bool:
+    """Return True if hand has only pairs + singles (no trips, quads, straight, flush)."""
+    from collections import Counter, defaultdict
+    by_rank = Counter(int(cs[:2]) for cs in handstrs)
+    if any(c >= 3 for c in by_rank.values()):
+        return False
+    ranks = set(by_rank.keys())
+    for hi in range(14, 5, -1):
+        if set(range(hi - 4, hi + 1)).issubset(ranks):
+            return False
+    by_suit: dict = defaultdict(int)
+    for cs in handstrs:
+        by_suit[cs[2]] += 1
+    if any(c >= 5 for c in by_suit.values()):
+        return False
+    return True
+
+
+def enumerate_pure_pair_arrangements(handstrs: list) -> list:
+    """
+    Domain-rule enumeration for pure-pair hands (no trips/quads/straight/flush).
+
+    Uses the B-procedure canonical layouts (2P→2, 3P→2, 4P→2, 5P→1), then applies
+    spare_variants for scatter-placement variants.  Returns at most ~4 arrangements
+    covering the 2–3 meaningful type groups.  Returns [] if hand is not pure pairs.
+    """
+    if not _is_pure_pairs(handstrs):
+        return []
+
+    by_rank: dict = defaultdict(list)
+    for cs in handstrs:
+        by_rank[int(cs[:2])].append(cs)
+    pr_desc   = sorted([r for r, css in by_rank.items() if len(css) >= 2], reverse=True)
+    single_cs = sorted(
+        [cs for r, css in by_rank.items() if len(css) == 1 for cs in css],
+        key=lambda cs: -int(cs[:2]))
+    n_pairs   = len(pr_desc)
+
+    if n_pairs < 2:
+        return []
+
+    results: list = []
+    seen:    set  = set()
+
+    def _add(top_v, mid_v, bot_v):
+        h3 = Hand3(top_v); h3.score_hand()
+        hm = Hand5(mid_v); hm.score_hand()
+        hb = Hand5(bot_v); hb.score_hand()
+        if not (h3.score <= hm.score <= hb.score):
+            return
+        for tv, mv in spare_variants(top_v, mid_v):
+            key = (tuple(sorted(tv)), tuple(sorted(mv)), tuple(sorted(bot_v)))
+            if key in seen:
+                continue
+            seen.add(key)
+            h3v = Hand3(tv); h3v.score_hand()
+            hmv = Hand5(mv); hmv.score_hand()
+            if h3v.score <= hmv.score <= hb.score:
+                results.append((h3v, hmv, hb))
+
+    sc = single_cs
+
+    if n_pairs >= 5:
+        p = [by_rank[r] for r in pr_desc[:5]]
+        _add(p[0][:2] + sc[:1],
+             p[2][:2] + p[3][:2] + sc[1:2],
+             p[1][:2] + p[4][:2] + sc[2:3])
+
+    elif n_pairs == 4:
+        p = [by_rank[r] for r in pr_desc[:4]]
+        _add(p[1][:2] + sc[:1],     p[0][:2] + sc[1:4],  p[2][:2] + p[3][:2] + sc[4:5])
+        _add(sc[:3],                 p[1][:2] + p[2][:2] + sc[3:4], p[0][:2] + p[3][:2] + sc[4:5])
+
+    elif n_pairs == 3:
+        p = [by_rank[r] for r in pr_desc[:3]]
+        _add(p[2][:2] + sc[:1],      p[1][:2] + sc[1:4],  p[0][:2] + sc[4:7])
+        _add(sc[:3],                  p[0][:2] + sc[3:6],  p[1][:2] + p[2][:2] + sc[6:7])
+
+    elif n_pairs == 2:
+        p = [by_rank[r] for r in pr_desc[:2]]
+        _add(sc[6:9],  sc[1:6],               p[0][:2] + p[1][:2] + sc[:1])
+        _add(sc[:3],   p[1][:2] + sc[3:6],    p[0][:2] + sc[6:9])
+
+    return results
+
+
 # ─── Main enumeration ─────────────────────────────────────────────────────────
 
 # ─── 102-type hand-type taxonomy ─────────────────────────────────────────────

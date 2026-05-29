@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import LoginPage  from './pages/LoginPage'
-import DuelPage   from './pages/DuelPage'
-import OnlinePage from './pages/OnlinePage'
-import LogsPage   from './pages/LogsPage'
-import LeaguePage from './pages/LeaguePage'
-import RulesPage  from './pages/RulesPage'
+import LoginPage      from './pages/LoginPage'
+import DuelPage       from './pages/DuelPage'
+import OnlinePage     from './pages/OnlinePage'
+import LogsPage       from './pages/LogsPage'
+import LeaguePage     from './pages/LeaguePage'
+import RulesPage      from './pages/RulesPage'
+import ErrorBoundary  from './components/ErrorBoundary'
 
 // ─── Inner app (needs AuthProvider above) ─────────────────────────────────────
 
@@ -141,8 +142,10 @@ function AppInner() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppInner />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppInner />
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }

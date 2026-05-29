@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "10.14"
+APP_VERSION = "10.15"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -295,7 +295,19 @@ def manual_arrange_info(req: ManualInfoRequest):
 
     # ── 排列分組 ────────────────────────────────────────────────────────────
     # Always enumerate groups even for special hands — user may choose not to 報到
-    candidates = enumerate_arrangements(handstrs)
+    #
+    # Pure-pair hands (no trips/quads/straight/flush): use domain-canonical
+    # arrangements instead of full enumeration — avoids the combinatorial
+    # explosion of scatter kicker variants (80-90 groups for 2P-5P hands).
+    from game.arrange import enumerate_pure_pair_arrangements
+    is_pure = (not trips_info and not quads_info
+               and not straights and flush_count == 0
+               and len(pairs_info) >= 2)
+    if is_pure:
+        candidates = enumerate_pure_pair_arrangements(handstrs)
+    if not is_pure or not candidates:
+        from game.arrange import enumerate_arrangements
+        candidates = enumerate_arrangements(handstrs)
 
     def _arr_to_dict(h3, hm, hb):
         return {
