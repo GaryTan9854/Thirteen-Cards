@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "10.15"
+APP_VERSION = "10.16"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -295,19 +295,8 @@ def manual_arrange_info(req: ManualInfoRequest):
 
     # ── 排列分組 ────────────────────────────────────────────────────────────
     # Always enumerate groups even for special hands — user may choose not to 報到
-    #
-    # Pure-pair hands (no trips/quads/straight/flush): use domain-canonical
-    # arrangements instead of full enumeration — avoids the combinatorial
-    # explosion of scatter kicker variants (80-90 groups for 2P-5P hands).
-    from game.arrange import enumerate_pure_pair_arrangements
-    is_pure = (not trips_info and not quads_info
-               and not straights and flush_count == 0
-               and len(pairs_info) >= 2)
-    if is_pure:
-        candidates = enumerate_pure_pair_arrangements(handstrs)
-    if not is_pure or not candidates:
-        from game.arrange import enumerate_arrangements
-        candidates = enumerate_arrangements(handstrs)
+    from game.arrange import enumerate_arrangements, score_defensive
+    candidates = enumerate_arrangements(handstrs)
 
     def _arr_to_dict(h3, hm, hb):
         return {
@@ -322,17 +311,65 @@ def manual_arrange_info(req: ManualInfoRequest):
             "bot_desc": hb.hand_dscp(),
         }
 
+    # Helper: pair ranks present in a card set
+    def _pair_ranks(card_objs):
+        from collections import Counter
+        by_r = Counter(int(c.cardstr()[:2]) for c in card_objs)
+        return tuple(sorted([r for r, cnt in by_r.items() if cnt >= 2], reverse=True))
+
     # Group by (top_type, mid_type, bot_type) label
-    from game.arrange import score_arrangement, score_defensive
     grouped: dict = defaultdict(list)
     for h3, hm, hb in candidates:
         label = f"{_row_label(h3.handtype_val)}·{_row_label(hm.handtype_val)}·{_row_label(hb.handtype_val)}"
         grouped[label].append((h3, hm, hb))
 
-    # Sort variants within each group by score_defensive (best first)
+    # Sort variants within each group by score_defensive (best first).
+    # For groups whose every row is 亂/對/兩對 (no strong hand), the full enumeration
+    # can yield dozens of variants that differ only in kicker selection.
+    # Domain rule: limit to at most 2 distinct pair-rank structures × 2 scatter
+    # variants each = max 4.  "Pair-rank structure" = which pair ranks appear in
+    # each row (top/mid/bot); variants sharing the same structure differ only in
+    # which single/kicker card occupies which slot — visually near-identical.
+    _WEAK = {'亂', '對', '兩對'}
     groups = []
     for label, variants in grouped.items():
         variants.sort(key=lambda t: score_defensive(*t), reverse=True)
+
+        # Determine if all three rows are weak types
+        top_t = _row_label(variants[0][0].handtype_val)
+        mid_t = _row_label(variants[0][1].handtype_val)
+        bot_t = _row_label(variants[0][2].handtype_val)
+        is_weak_group = top_t in _WEAK and mid_t in _WEAK and bot_t in _WEAK
+
+        if is_weak_group and len(variants) > 4:
+            # Deduplicate by pair-rank structure, keep best 2 structures × max 2 variants
+            struct_map: dict = {}
+            for h3, hm, hb in variants:
+                sk = (_pair_ranks(h3.display_order()),
+                      _pair_ranks(hm.display_order()),
+                      _pair_ranks(hb.display_order()))
+                if sk not in struct_map:
+                    struct_map[sk] = []
+                if len(struct_map[sk]) < 2:
+                    struct_map[sk].append((h3, hm, hb))
+
+            # Sort structures by their best variant's score (already sorted above)
+            final_variants: list = []
+            seen_structs = 0
+            seen_keys: set = set()
+            for h3, hm, hb in variants:
+                sk = (_pair_ranks(h3.display_order()),
+                      _pair_ranks(hm.display_order()),
+                      _pair_ranks(hb.display_order()))
+                if sk not in seen_keys:
+                    seen_keys.add(sk)
+                    seen_structs += 1
+                if seen_structs > 2:
+                    break
+                if struct_map.get(sk) and (h3, hm, hb) in struct_map[sk]:
+                    final_variants.append((h3, hm, hb))
+            variants = final_variants
+
         groups.append({
             "label": label,
             "variants": [_arr_to_dict(h3, hm, hb) for h3, hm, hb in variants],
