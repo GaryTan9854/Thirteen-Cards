@@ -2586,6 +2586,10 @@ export default function OnlinePage() {
     const cm         = perm
       ? Object.fromEntries(Object.entries(rawCm).map(([k, v]) => [k, perm.indexOf(v)]))
       : rawCm
+    // Permute badges so purple text follows the correct player column
+    const badges     = perm
+      ? historyBadges.map(row => row.length > 0 ? perm.map(i => row[i] ?? []) : row)
+      : historyBadges
     // Suppress "本場結束" until all cards are revealed
     const dispIsEnded = isEnded && !frozenDisplay
 
@@ -2612,7 +2616,7 @@ export default function OnlinePage() {
           history={history}
           multipliers={rm}
           circleMarks={cm}
-          roundBadges={historyBadges}
+          roundBadges={badges}
           isEnded={dispIsEnded}
           myName={player ?? ''}
           roundLabel={roundLabel}
