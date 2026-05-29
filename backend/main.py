@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "10.19"
+APP_VERSION = "10.20"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -343,6 +343,13 @@ def manual_arrange_info(req: ManualInfoRequest):
         bot_t = _row_label(variants[0][2].handtype_val)
         is_weak_group  = top_t in _WEAK   and mid_t in _WEAK   and bot_t in _WEAK
         is_no_sf_group = top_t in _NO_SF  and mid_t in _NO_SF  and bot_t in _NO_SF
+
+        # Rule: groups with 同花/順/鐵支/同花順 → 1 variant only.
+        # These types have a single canonical form; kicker / flush-subset differences
+        # are meaningless to display — the player adjusts via drag-swap.
+        _STRONG_1 = {'同花', '順', '鐵支', '同花順', '同花次大順', '同花大順'}
+        if any(t in _STRONG_1 for t in (top_t, mid_t, bot_t)):
+            variants = variants[:1]
 
         # Rule: groups with 葫蘆 (no S/F) → 1 canonical variant per distinct trip rank.
         # Logic: TR always pairs with the weakest AVAILABLE pair, but must NOT use a
