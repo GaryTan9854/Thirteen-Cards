@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "11.3"
+APP_VERSION = "11.4"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -295,8 +295,27 @@ def manual_arrange_info(req: ManualInfoRequest):
 
     # ── 排列分組 ────────────────────────────────────────────────────────────
     # Always enumerate groups even for special hands — user may choose not to 報到
+    #
+    # Pure-pair hands (2P–5P, no trips/straights/flushes/quads):
+    # Use B-procedure canonical arrangements instead of full enumeration.
+    # B-procedure gives exactly the 1–2 meaningful arrangements for each
+    # pair count; types like [R·P·2P] that cannot be proved dominated by
+    # Pareto but are excluded by domain knowledge are simply never generated.
+    from collections import Counter as _rc
+    _rank_cnt  = _rc(int(cs[:2]) for cs in handstrs)
+    _is_pure_pairs = (
+        not trips_info and not quads_info and
+        not straights and flush_count == 0 and
+        len(pairs_info) >= 2
+    )
     from game.arrange import enumerate_arrangements, score_defensive
-    candidates = enumerate_arrangements(handstrs)
+    if _is_pure_pairs:
+        from game.arrange import enumerate_pure_pair_arrangements
+        candidates = enumerate_pure_pair_arrangements(handstrs)
+        if not candidates:          # safety fallback
+            candidates = enumerate_arrangements(handstrs)
+    else:
+        candidates = enumerate_arrangements(handstrs)
 
     def _sorted_cards(card_objs, handtype_val):
         """Return cardstrs sorted rank-desc for scatter rows (配角), original order otherwise."""
