@@ -11,7 +11,6 @@ interface PlayerStat {
   games:   number
   wins:    number
   losses:  number
-  ties:    number
 }
 
 interface StatsResponse {
@@ -160,7 +159,6 @@ export default function StatsPage() {
                 <th className="text-right py-2 px-2">場</th>
                 <th className="text-right py-2 px-2 text-yellow-300">勝</th>
                 <th className="text-right py-2 px-2 text-red-400">負</th>
-                <th className="text-right py-2 px-2">平</th>
                 <th className="text-right py-2 pl-2">勝率 / 淨</th>
               </tr>
             </thead>
@@ -181,7 +179,6 @@ export default function StatsPage() {
                     <td className="py-2 px-2 text-right text-gray-300 tabular-nums">{r.games}</td>
                     <td className="py-2 px-2 text-right text-yellow-300 font-bold tabular-nums">{r.wins}</td>
                     <td className="py-2 px-2 text-right text-red-400 tabular-nums">{r.losses}</td>
-                    <td className="py-2 px-2 text-right text-gray-400 tabular-nums">{r.ties}</td>
                     <td className="py-2 pl-2 text-right tabular-nums">
                       <span className={net > 0 ? 'text-yellow-300 font-semibold'
                                                : net < 0 ? 'text-red-400' : 'text-gray-400'}>

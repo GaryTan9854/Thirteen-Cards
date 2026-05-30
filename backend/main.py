@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "11.15"
+APP_VERSION = "11.16"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -1265,23 +1265,37 @@ def api_stats(scope: str = "all", period: str = "all", player: str = ""):
             fs = g.get("final_scores")
             if not fs or not isinstance(fs, dict):
                 continue
+
+            # Parse all scores for this game
+            game_scores: dict[str, int] = {}
             for pname, score_val in fs.items():
                 if isinstance(score_val, dict):
-                    score = int(score_val.get("score", 0) or 0)
+                    s = int(score_val.get("score", 0) or 0)
                 else:
                     try:
-                        score = int(score_val)
+                        s = int(score_val)
                     except (TypeError, ValueError):
                         continue
+                game_scores[pname] = s
+
+            if not game_scores:
+                continue
+
+            # Identify sole winner (highest) and sole loser (lowest)
+            max_score = max(game_scores.values())
+            min_score = min(game_scores.values())
+
+            # Count per player: games played, wins (1st only), losses (last only)
+            for pname, s in game_scores.items():
                 if pname not in stats:
-                    stats[pname] = {"player": pname, "wins": 0, "losses": 0, "ties": 0, "games": 0}
+                    stats[pname] = {"player": pname, "wins": 0, "losses": 0, "games": 0}
                 stats[pname]["games"] += 1
-                if score > 0:
+                if s == max_score and max_score != min_score:
+                    # Sole-winner rule: only award win if not a four-way tie
                     stats[pname]["wins"] += 1
-                elif score < 0:
+                elif s == min_score and max_score != min_score:
                     stats[pname]["losses"] += 1
-                else:
-                    stats[pname]["ties"] += 1
+                # 2nd/3rd place: no win, no loss
 
         rows_out = sorted(stats.values(),
                           key=lambda s: (s["wins"] - s["losses"], s["wins"]),
