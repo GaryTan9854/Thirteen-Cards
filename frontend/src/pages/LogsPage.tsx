@@ -228,12 +228,18 @@ export default function LogsPage() {
   const { player } = useAuth()
   const isGary = player === 'Gary'
 
-  const [tab, setTab] = useState<'games' | 'logins'>('games')
+  const [tab,    setTab]    = useState<'games' | 'logins'>('games')
+  const [period, setPeriod] = useState<'month' | 'all'>('month')   // default: 本月
+
   const [logins,        setLogins]        = useState<LoginEntry[]>([])
   const [activePlayers, setActivePlayers] = useState<Set<string>>(new Set())
   const [games,         setGames]         = useState<GameRecord[]>([])
+  const [allGames,      setAllGames]      = useState<GameRecord[]>([])
   const [expandId,      setExpandId]      = useState<string | null>(null)
   const [loading,       setLoading]       = useState(false)
+
+  // UTC month prefix (same format as start_time from frontend)
+  const utcMonth = new Date().toISOString().slice(0, 7)   // "YYYY-MM"
 
   useEffect(() => {
     if (tab === 'logins' && isGary) {
@@ -248,7 +254,7 @@ export default function LogsPage() {
       }).catch(() => setLoading(false))
     } else {
       setLoading(true)
-      fetch('/api/log/games?limit=100')
+      fetch('/api/log/games?limit=500')
         .then(r => r.json())
         .then(d => {
           let list: GameRecord[] = d.games ?? []
@@ -256,17 +262,43 @@ export default function LogsPage() {
           if (!isGary && player) {
             list = list.filter(g => g.participants?.includes(player))
           }
-          setGames(list)
+          setAllGames(list)
           setLoading(false)
         })
         .catch(() => setLoading(false))
     }
   }, [tab, isGary, player])
 
+  // Apply period filter locally
+  useEffect(() => {
+    if (period === 'month') {
+      setGames(allGames.filter(g => (g.start_time ?? '').startsWith(utcMonth)))
+    } else {
+      setGames(allGames)
+    }
+  }, [allGames, period, utcMonth])
+
+  // Filter login entries by period
+  const displayLogins = period === 'month'
+    ? logins.filter(l => (l.timestamp ?? '').startsWith(utcMonth))
+    : logins
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <div className="text-xl font-bold text-sky-300">📋 遊戲紀錄</div>
+
+        {/* Period filter — default: 本月 */}
+        <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
+          {(['month', 'all'] as const).map(p => (
+            <button key={p} onClick={() => setPeriod(p)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition
+                ${period === p ? 'bg-orange-500 text-white shadow' : 'text-gray-400 hover:text-white'}`}>
+              {p === 'month' ? `本月 (${utcMonth})` : '全期'}
+            </button>
+          ))}
+        </div>
+
         {/* Login tab: Gary only */}
         {isGary && (
           <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
@@ -297,7 +329,7 @@ export default function LogsPage() {
               </tr>
             </thead>
             <tbody>
-              {pairSessions(logins).map((s, i) => (
+              {pairSessions(displayLogins).map((s, i) => (
                 <tr key={i} className="border-b border-gray-800 hover:bg-gray-800/30">
                   <td className="px-4 py-2 font-semibold text-sky-300">{s.username}</td>
                   <td className="px-4 py-2 text-gray-400 text-xs">
@@ -320,7 +352,7 @@ export default function LogsPage() {
                   </td>
                 </tr>
               ))}
-              {logins.length === 0 && (
+              {displayLogins.length === 0 && (
                 <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-600">尚無記錄</td></tr>
               )}
             </tbody>

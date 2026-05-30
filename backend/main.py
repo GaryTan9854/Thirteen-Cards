@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "11.14"
+APP_VERSION = "11.15"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -1193,14 +1193,15 @@ def api_get_game(game_id: str):
     return g if g else {"error": "not_found"}
 
 @app.get("/api/log/stats")
-def api_stats(scope: str = "all", period: str = "all"):
+def api_stats(scope: str = "all", period: str = "all", player: str = ""):
     """
-    Aggregate win/loss statistics for all players from game logs.
+    Aggregate win/loss statistics.
 
     scope:  "all" | "league" | "normal"
-    period: "all" | "month"   (month = current calendar month only)
+    period: "all" | "month"
+    player: if provided, only count games where this player participated.
 
-    Games are counted only from the LATEST reset point onward.
+    Games counted from the LATEST reset point onward.
     Win = final score > 0.  Loss = final score < 0.  Tie = 0.
     """
     try:
@@ -1253,16 +1254,18 @@ def api_stats(scope: str = "all", period: str = "all"):
                 return gdt is not None and gdt >= era_dt
             rows = [r for r in rows if _after_era(r)]
         if period == "month":
-            # Use UTC month prefix for consistency with start_time
             utc_month = _dt.now(_tz.utc).strftime("%Y-%m")
             rows = [r for r in rows if (r.get("start_time") or "").startswith(utc_month)]
+        # Filter to games where the requesting player participated
+        if player:
+            rows = [r for r in rows if player in (r.get("participants") or [])]
 
         stats: dict = {}
         for g in rows:
             fs = g.get("final_scores")
             if not fs or not isinstance(fs, dict):
                 continue
-            for player, score_val in fs.items():
+            for pname, score_val in fs.items():
                 if isinstance(score_val, dict):
                     score = int(score_val.get("score", 0) or 0)
                 else:
@@ -1270,15 +1273,15 @@ def api_stats(scope: str = "all", period: str = "all"):
                         score = int(score_val)
                     except (TypeError, ValueError):
                         continue
-                if player not in stats:
-                    stats[player] = {"player": player, "wins": 0, "losses": 0, "ties": 0, "games": 0}
-                stats[player]["games"] += 1
+                if pname not in stats:
+                    stats[pname] = {"player": pname, "wins": 0, "losses": 0, "ties": 0, "games": 0}
+                stats[pname]["games"] += 1
                 if score > 0:
-                    stats[player]["wins"] += 1
+                    stats[pname]["wins"] += 1
                 elif score < 0:
-                    stats[player]["losses"] += 1
+                    stats[pname]["losses"] += 1
                 else:
-                    stats[player]["ties"] += 1
+                    stats[pname]["ties"] += 1
 
         rows_out = sorted(stats.values(),
                           key=lambda s: (s["wins"] - s["losses"], s["wins"]),

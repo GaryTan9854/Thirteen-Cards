@@ -57,7 +57,9 @@ export default function StatsPage() {
   const load = useCallback(() => {
     setLoading(true)
     setError(null)
-    fetch(`/api/log/stats?scope=${scope}&period=${period}`)
+    // Always pass the current player so only their games are counted
+    const playerParam = player ? `&player=${encodeURIComponent(player)}` : ''
+    fetch(`/api/log/stats?scope=${scope}&period=${period}${playerParam}`)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
@@ -65,7 +67,7 @@ export default function StatsPage() {
       .then(d => setData(d))
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false))
-  }, [scope, period])
+  }, [scope, period, player])
 
   useEffect(() => { load() }, [load])
 
