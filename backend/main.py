@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "11.7"
+APP_VERSION = "11.8"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -455,8 +455,11 @@ def manual_arrange_info(req: ManualInfoRequest):
                         max(r for r, c in by_r.items() if c == 2))
             elif h_type == '鐵支':
                 return ('QD', max(r for r, c in by_r.items() if c >= 4))
-            else:  # 同花/順/同花順 — exact card identity
-                return frozenset(cards)
+            else:
+                # 同花/順/同花順: suit never affects hand value in 13支.
+                # Two straights or flushes with identical ranks (different suits)
+                # are worth exactly the same → deduplicate by RANK set only.
+                return frozenset(int(cs[:2]) for cs in cards)
 
         seen_struct: set  = set()
         deduped:     list = []
