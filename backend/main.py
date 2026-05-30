@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "11.5"
+APP_VERSION = "11.6"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -467,37 +467,40 @@ def manual_arrange_info(req: ManualInfoRequest):
                 deduped.append((h3, hm, hb))
         variants = deduped
 
-        # ── B-procedure canonical ordering for pair-dominant groups ────────────
-        # After structure dedup, pair-only groups may still have multiple variants
-        # differing in which pair rank goes to which row.  Domain rule:
-        #   [P,P,P]    → bot_pair > mid_pair > top_pair
-        #   [P,P,*]    → mid_pair > top_pair  (larger pair in 5-card mid)
-        #   [R,2P,2P]  → B-procedure "spread": bot has both max AND min pair
-        #                 (max(bot)>max(mid) AND min(bot)<min(mid))
-        if len(variants) > 1 and top_t in ('亂','對') and mid_t in ('對','兩對') and bot_t in ('對','兩對'):
-            def _max_pr(h_obj):
+        # ── B-procedure canonical ordering: [P,P,2P] and [P,P,P] ──────────────
+        # For [P,P,2P]: C(4,2)=6 different bot-pair assignments survive structure
+        # dedup, but B-procedure says only ONE is canonical:
+        #   bot gets the two WEAKEST pairs (p3,p4),
+        #   mid gets the STRONGEST pair (p1),
+        #   top gets the 2nd strongest (p2).
+        # Selection: mid_pair > top_pair  AND  max(bot_pairs) < min(top_pair, mid_pair)
+        #
+        # For [P,P,P]: bot_pair > mid_pair > top_pair (descending order)
+        if len(variants) > 1 and top_t == '對' and mid_t == '對':
+            def _pr(h_obj):   # single pair rank from a 對 row
+                cs  = [c.cardstr() for c in h_obj.display_order()]
+                by  = _Counter(int(x[:2]) for x in cs)
+                prs = [r for r, c in by.items() if c >= 2]
+                return prs[0] if prs else 0
+            def _max_pr(h_obj):  # max pair rank (for 兩對 bot)
                 cs  = [c.cardstr() for c in h_obj.display_order()]
                 by  = _Counter(int(x[:2]) for x in cs)
                 prs = [r for r, c in by.items() if c >= 2]
                 return max(prs) if prs else 0
-            def _min_pr(h_obj):
-                cs  = [c.cardstr() for c in h_obj.display_order()]
-                by  = _Counter(int(x[:2]) for x in cs)
-                prs = [r for r, c in by.items() if c >= 2]
-                return min(prs) if prs else 9999
 
-            if top_t == '對' and mid_t == '對' and bot_t == '對':
+            if bot_t == '對':
+                # [P,P,P]: canonical = bot > mid > top
                 canon = [(h3,hm,hb) for h3,hm,hb in variants
-                         if _max_pr(hb) > _max_pr(hm) > _max_pr(h3)]
-            elif top_t == '對' and mid_t == '對':
+                         if _pr(hb) > _pr(hm) > _pr(h3)]
+            elif bot_t == '兩對':
+                # [P,P,2P]: canonical = mid>top AND max(bot_pairs)<min(top,mid)
                 canon = [(h3,hm,hb) for h3,hm,hb in variants
-                         if _max_pr(hm) > _max_pr(h3)]
-            elif top_t == '亂' and mid_t == '兩對' and bot_t == '兩對':
-                # Spread: bot holds both extremes (best pair + worst pair)
-                canon = [(h3,hm,hb) for h3,hm,hb in variants
-                         if _max_pr(hb) > _max_pr(hm) and _min_pr(hb) < _min_pr(hm)]
+                         if _pr(hm) > _pr(h3)
+                         and _max_pr(hb) < min(_pr(h3), _pr(hm))]
             else:
-                canon = []
+                # [P,P,S] / [P,P,F] / [P,P,H] …: canonical = mid pair > top pair
+                canon = [(h3,hm,hb) for h3,hm,hb in variants
+                         if _pr(hm) > _pr(h3)]
             if canon:
                 variants = canon
 
