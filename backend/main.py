@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "11.1"
+APP_VERSION = "11.2"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -298,17 +298,28 @@ def manual_arrange_info(req: ManualInfoRequest):
     from game.arrange import enumerate_arrangements, score_defensive
     candidates = enumerate_arrangements(handstrs)
 
+    def _sorted_cards(card_objs, handtype_val):
+        """Return cardstrs sorted rank-desc for scatter rows (配角), original order otherwise."""
+        cs = [c.cardstr() for c in card_objs]
+        if handtype_val == 0:  # 亂 — scatter fills high→low
+            cs.sort(key=lambda x: -int(x[:2]))
+        return cs
+
     def _arr_to_dict(h3, hm, hb):
         return {
-            "top":      [c.cardstr() for c in h3.display_order()],
-            "mid":      [c.cardstr() for c in hm.display_order()],
-            "bot":      [c.cardstr() for c in hb.display_order()],
-            "top_type": _row_label(h3.handtype_val),
-            "mid_type": _row_label(hm.handtype_val),
-            "bot_type": _row_label(hb.handtype_val),
-            "top_desc": h3.hand_dscp(),
-            "mid_desc": hm.hand_dscp(),
-            "bot_desc": hb.hand_dscp(),
+            "top":       _sorted_cards(h3.display_order(), h3.handtype_val),
+            "mid":       _sorted_cards(hm.display_order(), hm.handtype_val),
+            "bot":       _sorted_cards(hb.display_order(), hb.handtype_val),
+            "top_type":  _row_label(h3.handtype_val),
+            "mid_type":  _row_label(hm.handtype_val),
+            "bot_type":  _row_label(hb.handtype_val),
+            "top_desc":  h3.hand_dscp(),
+            "mid_desc":  hm.hand_dscp(),
+            "bot_desc":  hb.hand_dscp(),
+            # Scores for cross-group domination check in frontend
+            "top_score": h3.score,
+            "mid_score": hm.score,
+            "bot_score": hb.score,
         }
 
     # Helper: pair ranks present in a card set
@@ -456,6 +467,34 @@ def manual_arrange_info(req: ManualInfoRequest):
         )
 
     groups.sort(key=_group_sort_key, reverse=True)
+
+    # Cross-group domination: group A is dominated if every one of its variants
+    # is weakly dominated (all 3 scores ≤) by some other group's best variant,
+    # with at least one strict inequality.  Dominated groups are shown disabled
+    # in the UI with strikethrough — still visible but not selectable.
+    all_best = []  # (top_score, mid_score, bot_score) for first variant of each group
+    for g in groups:
+        if g["variants"]:
+            v = g["variants"][0]
+            all_best.append((v["top_score"], v["mid_score"], v["bot_score"]))
+        else:
+            all_best.append(None)
+
+    for i, gi in enumerate(groups):
+        if all_best[i] is None:
+            gi["dominated"] = True
+            continue
+        ts_i, ms_i, bs_i = all_best[i]
+        dominated = False
+        for j, scores_j in enumerate(all_best):
+            if i == j or scores_j is None:
+                continue
+            ts_j, ms_j, bs_j = scores_j
+            if ts_j >= ts_i and ms_j >= ms_i and bs_j >= bs_i:
+                if ts_j > ts_i or ms_j > ms_i or bs_j > bs_i:
+                    dominated = True
+                    break
+        gi["dominated"] = dominated
 
     return {
         "stats":   stats,

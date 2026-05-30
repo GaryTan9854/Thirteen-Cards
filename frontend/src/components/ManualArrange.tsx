@@ -255,8 +255,9 @@ interface Variant {
   top:string[]; mid:string[]; bot:string[]
   top_type:string; mid_type:string; bot_type:string
   top_desc:string; mid_desc:string; bot_desc:string
+  top_score?:number; mid_score?:number; bot_score?:number
 }
-interface Group { label:string; variants:Variant[] }
+interface Group { label:string; variants:Variant[]; dominated?:boolean }
 interface ArrangeInfo {
   stats:StatsData; special:SpecialData; groups:Group[]
 }
@@ -786,19 +787,25 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
                     : (
                       <div className="grid grid-cols-2 gap-1.5">
                         {info.groups.slice(0,10).map((g,gi)=>{
-                          const active  = gi===selGroup
-                          const matched = gi===matchedGroup && gi!==selGroup
-                          const cnt = g.variants.length
+                          const active     = gi===selGroup
+                          const matched    = gi===matchedGroup && gi!==selGroup
+                          const cnt        = g.variants.length
+                          const dominated  = !!g.dominated
                           return (
-                            <button key={gi} onClick={()=>pickGroup(gi)}
+                            <button key={gi}
+                              onClick={dominated ? undefined : ()=>pickGroup(gi)}
+                              disabled={dominated}
+                              title={dominated ? '此排法被其他排法全面壓制' : undefined}
                               className={`text-[16px] px-2 py-1.5 rounded-lg border transition-colors text-left
-                                ${active
-                                  ?'bg-sky-800 border-sky-500 text-sky-100 font-bold'
-                                  : matched
-                                    ?'bg-gray-700 text-gray-200 border-orange-400 font-semibold'
-                                    :'bg-gray-700 border-gray-500 text-gray-300 hover:border-sky-500'}`}>
+                                ${dominated
+                                  ? 'bg-gray-800 border-gray-700 text-gray-600 cursor-not-allowed line-through opacity-60'
+                                  : active
+                                    ? 'bg-sky-800 border-sky-500 text-sky-100 font-bold'
+                                    : matched
+                                      ? 'bg-gray-700 text-gray-200 border-orange-400 font-semibold'
+                                      : 'bg-gray-700 border-gray-500 text-gray-300 hover:border-sky-500'}`}>
                               {g.label}
-                              {active && cnt>1 && <span className="ml-1 opacity-70 text-sm">{varIdx+1}/{cnt}</span>}
+                              {!dominated && active && cnt>1 && <span className="ml-1 opacity-70 text-sm">{varIdx+1}/{cnt}</span>}
                             </button>
                           )
                         })}
