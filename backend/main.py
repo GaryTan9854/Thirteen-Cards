@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "11.4"
+APP_VERSION = "11.5"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -466,6 +466,40 @@ def manual_arrange_info(req: ManualInfoRequest):
                 seen_struct.add(sk)
                 deduped.append((h3, hm, hb))
         variants = deduped
+
+        # ── B-procedure canonical ordering for pair-dominant groups ────────────
+        # After structure dedup, pair-only groups may still have multiple variants
+        # differing in which pair rank goes to which row.  Domain rule:
+        #   [P,P,P]    → bot_pair > mid_pair > top_pair
+        #   [P,P,*]    → mid_pair > top_pair  (larger pair in 5-card mid)
+        #   [R,2P,2P]  → B-procedure "spread": bot has both max AND min pair
+        #                 (max(bot)>max(mid) AND min(bot)<min(mid))
+        if len(variants) > 1 and top_t in ('亂','對') and mid_t in ('對','兩對') and bot_t in ('對','兩對'):
+            def _max_pr(h_obj):
+                cs  = [c.cardstr() for c in h_obj.display_order()]
+                by  = _Counter(int(x[:2]) for x in cs)
+                prs = [r for r, c in by.items() if c >= 2]
+                return max(prs) if prs else 0
+            def _min_pr(h_obj):
+                cs  = [c.cardstr() for c in h_obj.display_order()]
+                by  = _Counter(int(x[:2]) for x in cs)
+                prs = [r for r, c in by.items() if c >= 2]
+                return min(prs) if prs else 9999
+
+            if top_t == '對' and mid_t == '對' and bot_t == '對':
+                canon = [(h3,hm,hb) for h3,hm,hb in variants
+                         if _max_pr(hb) > _max_pr(hm) > _max_pr(h3)]
+            elif top_t == '對' and mid_t == '對':
+                canon = [(h3,hm,hb) for h3,hm,hb in variants
+                         if _max_pr(hm) > _max_pr(h3)]
+            elif top_t == '亂' and mid_t == '兩對' and bot_t == '兩對':
+                # Spread: bot holds both extremes (best pair + worst pair)
+                canon = [(h3,hm,hb) for h3,hm,hb in variants
+                         if _max_pr(hb) > _max_pr(hm) and _min_pr(hb) < _min_pr(hm)]
+            else:
+                canon = []
+            if canon:
+                variants = canon
 
         groups.append({
             "label": label,
