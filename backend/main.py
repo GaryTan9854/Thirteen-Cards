@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "11.8"
+APP_VERSION = "11.9"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -518,11 +518,13 @@ def manual_arrange_info(req: ManualInfoRequest):
     _TOP_CAT = {"亂":0,"對":1,"三條":3}
 
     def _group_sort_key(g):
+        if not g.get("variants"):
+            return (0, 0, 0)
         v = g["variants"][0]
         return (
-            _CAT.get(v["bot_type"], 0),
-            _CAT.get(v["mid_type"], 0),
-            _TOP_CAT.get(v["top_type"], 0),
+            _CAT.get(v.get("bot_type", ""), 0),
+            _CAT.get(v.get("mid_type", ""), 0),
+            _TOP_CAT.get(v.get("top_type", ""), 0),
         )
 
     groups.sort(key=_group_sort_key, reverse=True)
@@ -544,10 +546,14 @@ def manual_arrange_info(req: ManualInfoRequest):
     # dominated become disabled (strikethrough) in the UI.
 
     # Collect every surviving variant with its group/position index
+    # Guard: skip any variant missing score fields (shouldn't happen, but defensive)
     all_scores: list[tuple[float,float,float]] = []
     for g in groups:
         for v in g["variants"]:
-            all_scores.append((v["top_score"], v["mid_score"], v["bot_score"]))
+            try:
+                all_scores.append((v["top_score"], v["mid_score"], v["bot_score"]))
+            except (KeyError, TypeError):
+                all_scores.append((0.0, 0.0, 0.0))
 
     def _dominated_by_any(ts_i, ms_i, bs_i, own_idx):
         for j, (ts_j, ms_j, bs_j) in enumerate(all_scores):
@@ -586,22 +592,23 @@ def manual_arrange_info(req: ManualInfoRequest):
     #   _cat(G_A.mid) >= _cat(G_B.mid)  AND
     #   _cat(G_A.bot) >= _cat(G_B.bot)  AND at least one strict >
     # → G_B is marked dominated (further eliminations beyond score-level Pareto).
-    active_groups = [g for g in groups if not g["dominated"]]
+    active_groups = [g for g in groups
+                     if not g.get("dominated") and g.get("variants")]
     for i, gi in enumerate(active_groups):
-        if gi["dominated"]:
+        if gi.get("dominated"):
             continue
         vi = gi["variants"][0]
-        ci_top = _TOP_CAT.get(vi["top_type"], 0)
-        ci_mid = _CAT.get(vi["mid_type"], 0)
-        ci_bot = min(_CAT.get(vi["bot_type"], 0), 8)  # normalize SF variants
+        ci_top = _TOP_CAT.get(vi.get("top_type", ""), 0)
+        ci_mid = _CAT.get(vi.get("mid_type", ""), 0)
+        ci_bot = min(_CAT.get(vi.get("bot_type", ""), 0), 8)
 
         for j, gj in enumerate(active_groups):
-            if i == j or gj["dominated"]:
+            if i == j or gj.get("dominated") or not gj.get("variants"):
                 continue
             vj = gj["variants"][0]
-            cj_top = _TOP_CAT.get(vj["top_type"], 0)
-            cj_mid = _CAT.get(vj["mid_type"], 0)
-            cj_bot = min(_CAT.get(vj["bot_type"], 0), 8)
+            cj_top = _TOP_CAT.get(vj.get("top_type", ""), 0)
+            cj_mid = _CAT.get(vj.get("mid_type", ""), 0)
+            cj_bot = min(_CAT.get(vj.get("bot_type", ""), 0), 8)
 
             # gj category-dominates gi
             if (cj_top >= ci_top and cj_mid >= ci_mid and cj_bot >= ci_bot and

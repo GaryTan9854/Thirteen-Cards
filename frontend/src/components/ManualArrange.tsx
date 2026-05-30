@@ -789,7 +789,7 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
                         {info.groups.slice(0,10).map((g,gi)=>{
                           const active     = gi===selGroup
                           const matched    = gi===matchedGroup && gi!==selGroup
-                          const cnt        = g.variants.length
+                          const cnt        = g.variants?.length ?? 0
                           const dominated  = !!g.dominated
                           return (
                             <button key={gi}
