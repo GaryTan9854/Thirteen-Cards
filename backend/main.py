@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "11.11"
+APP_VERSION = "11.12"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -1193,51 +1193,78 @@ def api_get_game(game_id: str):
     return g if g else {"error": "not_found"}
 
 @app.get("/api/log/stats")
-def api_stats(filter: str = "all"):
+def api_stats(scope: str = "all", period: str = "all"):
     """
-    Aggregate win/loss statistics for all human players from game logs.
+    Aggregate win/loss statistics for all players from game logs.
 
-    filter: "all" | "league" | "normal"
-    Win  = final score > 0 in that game.
-    Loss = final score < 0.
-    Tie  = final score == 0.
+    scope:  "all" | "league" | "normal"
+    period: "all" | "month"   (month = current calendar month only)
 
-    Returns sorted by (wins - losses) descending.
+    Games are counted only from the LATEST reset point onward.
+    Win = final score > 0.  Loss = final score < 0.  Tie = 0.
     """
-    league_only = (filter == "league")
-    normal_only = (filter == "normal")
-    rows = gl.get_games(limit=9999, league_only=league_only)
-    if normal_only:
-        rows = [r for r in rows if not r.get("is_league")]
+    try:
+        from datetime import datetime as _dt
+        now      = _dt.now()
+        month_pfx = now.strftime("%Y-%m")
 
-    stats: dict = {}
-    for g in rows:
-        fs = g.get("final_scores")
-        if not fs or not isinstance(fs, dict):
-            continue
-        for player, score_val in fs.items():
-            # final_scores may store int or {"score": int} — handle both
-            if isinstance(score_val, dict):
-                score = score_val.get("score", 0) or 0
-            else:
-                try:
-                    score = int(score_val)
-                except (TypeError, ValueError):
-                    continue
-            if player not in stats:
-                stats[player] = {"player": player, "wins": 0, "losses": 0, "ties": 0, "games": 0}
-            stats[player]["games"] += 1
-            if score > 0:
-                stats[player]["wins"] += 1
-            elif score < 0:
-                stats[player]["losses"] += 1
-            else:
-                stats[player]["ties"] += 1
+        # Era filter: only games after the last reset
+        resets  = gl.get_stats_resets()
+        era_since = resets[-1]["reset_at"] if resets else None
 
-    rows_out = sorted(stats.values(),
-                      key=lambda s: (s["wins"] - s["losses"], s["wins"]),
-                      reverse=True)
-    return {"stats": rows_out, "filter": filter}
+        rows = gl.get_games(limit=99999, league_only=(scope == "league"))
+        if scope == "normal":
+            rows = [r for r in rows if not r.get("is_league")]
+        if era_since:
+            rows = [r for r in rows if (r.get("start_time") or "") >= era_since]
+        if period == "month":
+            rows = [r for r in rows if (r.get("start_time") or "").startswith(month_pfx)]
+
+        stats: dict = {}
+        for g in rows:
+            fs = g.get("final_scores")
+            if not fs or not isinstance(fs, dict):
+                continue
+            for player, score_val in fs.items():
+                if isinstance(score_val, dict):
+                    score = int(score_val.get("score", 0) or 0)
+                else:
+                    try:
+                        score = int(score_val)
+                    except (TypeError, ValueError):
+                        continue
+                if player not in stats:
+                    stats[player] = {"player": player, "wins": 0, "losses": 0, "ties": 0, "games": 0}
+                stats[player]["games"] += 1
+                if score > 0:
+                    stats[player]["wins"] += 1
+                elif score < 0:
+                    stats[player]["losses"] += 1
+                else:
+                    stats[player]["ties"] += 1
+
+        rows_out = sorted(stats.values(),
+                          key=lambda s: (s["wins"] - s["losses"], s["wins"]),
+                          reverse=True)
+        return {
+            "stats":     rows_out,
+            "scope":     scope,
+            "period":    period,
+            "era_since": era_since,
+            "month":     month_pfx,
+            "resets":    resets,
+        }
+    except Exception as e:
+        import traceback
+        print(f"[api_stats ERROR] {e}\n{traceback.format_exc()}")
+        raise
+
+
+@app.post("/api/log/stats/reset")
+def api_stats_reset(label: str = ""):
+    """Create a new stats era (Gary only). Old games are archived (still in files)."""
+    record = gl.add_stats_reset(label)
+    return {"ok": True, "reset": record}
 
 
 @app.get("/api/log/logins")

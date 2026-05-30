@@ -173,6 +173,30 @@ def get_game(game_id: str) -> Optional[Dict[str, Any]]:
     return game
 
 
+# ── Stats era / reset ─────────────────────────────────────────────────────────
+
+_RESETS_FILE = LOGS_DIR.parent / "stats_resets.jsonl"   # one JSON obj per line
+
+def get_stats_resets() -> List[Dict[str, Any]]:
+    """Return all reset records, oldest first."""
+    if not _RESETS_FILE.exists():
+        return []
+    try:
+        rows = [json.loads(l) for l in _RESETS_FILE.read_text().splitlines() if l.strip()]
+        rows.sort(key=lambda r: r.get("reset_at", ""))
+        return rows
+    except Exception:
+        return []
+
+
+def add_stats_reset(label: str = "") -> Dict[str, Any]:
+    """Append a new reset point; returns the new record."""
+    record = {"reset_at": datetime.now().isoformat(), "label": label}
+    with _RESETS_FILE.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    return record
+
+
 # ── Leagues (SQLite) ───────────────────────────────────────────────────────────
 
 def create_league(league: Dict[str, Any]) -> str:
