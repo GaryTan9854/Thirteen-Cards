@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "11.6"
+APP_VERSION = "11.7"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -570,6 +570,41 @@ def manual_arrange_info(req: ManualInfoRequest):
         else:
             # All variants eliminated — keep for display (strikethrough) but disable
             g["dominated"] = True
+
+    # ── Type-category Pareto (second pass) ───────────────────────────────────────
+    # After score-level Pareto, run one more pass using HandCat categories instead
+    # of specific card scores.  Non-overlapping HandScor guarantees that a higher
+    # bot TYPE always beats a lower bot TYPE (e.g. F=75+ always beats TR=45-64).
+    # For top/mid rows of the SAME category, treat them as "equal" and ignore the
+    # minor within-category score difference.
+    #
+    # Rule: group G_A category-dominates G_B if
+    #   _cat(G_A.top) >= _cat(G_B.top)  AND
+    #   _cat(G_A.mid) >= _cat(G_B.mid)  AND
+    #   _cat(G_A.bot) >= _cat(G_B.bot)  AND at least one strict >
+    # → G_B is marked dominated (further eliminations beyond score-level Pareto).
+    active_groups = [g for g in groups if not g["dominated"]]
+    for i, gi in enumerate(active_groups):
+        if gi["dominated"]:
+            continue
+        vi = gi["variants"][0]
+        ci_top = _TOP_CAT.get(vi["top_type"], 0)
+        ci_mid = _CAT.get(vi["mid_type"], 0)
+        ci_bot = min(_CAT.get(vi["bot_type"], 0), 8)  # normalize SF variants
+
+        for j, gj in enumerate(active_groups):
+            if i == j or gj["dominated"]:
+                continue
+            vj = gj["variants"][0]
+            cj_top = _TOP_CAT.get(vj["top_type"], 0)
+            cj_mid = _CAT.get(vj["mid_type"], 0)
+            cj_bot = min(_CAT.get(vj["bot_type"], 0), 8)
+
+            # gj category-dominates gi
+            if (cj_top >= ci_top and cj_mid >= ci_mid and cj_bot >= ci_bot and
+                    (cj_top > ci_top or cj_mid > ci_mid or cj_bot > ci_bot)):
+                gi["dominated"] = True
+                break
 
     return {
         "stats":   stats,
