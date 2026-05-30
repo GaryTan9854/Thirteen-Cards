@@ -6,6 +6,7 @@ import OnlinePage     from './pages/OnlinePage'
 import LogsPage       from './pages/LogsPage'
 import LeaguePage     from './pages/LeaguePage'
 import RulesPage      from './pages/RulesPage'
+import StatsPage      from './pages/StatsPage'
 import ErrorBoundary  from './components/ErrorBoundary'
 
 // ─── Inner app (needs AuthProvider above) ─────────────────────────────────────
@@ -37,6 +38,7 @@ function AppInner() {
     { id: 'rules',  label: '📖', fullLabel: '遊戲說明' },
     ...(isGary ? [
       { id: 'duel',   label: '⚔️', fullLabel: '策略對決' },
+      { id: 'stats',  label: '📊', fullLabel: '戰績'     },
       { id: 'logs',   label: '📋', fullLabel: '遊戲紀錄' },
       { id: 'league', label: '🏆', fullLabel: '聯盟賽'   },
     ] : []),
@@ -131,6 +133,7 @@ function AppInner() {
 
         {tab === 'rules'  && <RulesPage />}
         {isGary && tab === 'duel'   && <DuelPage />}
+        {isGary && tab === 'stats'  && <StatsPage />}
         {isGary && tab === 'logs'   && <LogsPage />}
         {isGary && tab === 'league' && <LeaguePage />}
       </main>

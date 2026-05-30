@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "11.10"
+APP_VERSION = "11.11"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -1191,6 +1191,54 @@ def api_list_games(limit: int = 100, mode: Optional[str] = None, league_only: bo
 def api_get_game(game_id: str):
     g = gl.get_game(game_id)
     return g if g else {"error": "not_found"}
+
+@app.get("/api/log/stats")
+def api_stats(filter: str = "all"):
+    """
+    Aggregate win/loss statistics for all human players from game logs.
+
+    filter: "all" | "league" | "normal"
+    Win  = final score > 0 in that game.
+    Loss = final score < 0.
+    Tie  = final score == 0.
+
+    Returns sorted by (wins - losses) descending.
+    """
+    league_only = (filter == "league")
+    normal_only = (filter == "normal")
+    rows = gl.get_games(limit=9999, league_only=league_only)
+    if normal_only:
+        rows = [r for r in rows if not r.get("is_league")]
+
+    stats: dict = {}
+    for g in rows:
+        fs = g.get("final_scores")
+        if not fs or not isinstance(fs, dict):
+            continue
+        for player, score_val in fs.items():
+            # final_scores may store int or {"score": int} — handle both
+            if isinstance(score_val, dict):
+                score = score_val.get("score", 0) or 0
+            else:
+                try:
+                    score = int(score_val)
+                except (TypeError, ValueError):
+                    continue
+            if player not in stats:
+                stats[player] = {"player": player, "wins": 0, "losses": 0, "ties": 0, "games": 0}
+            stats[player]["games"] += 1
+            if score > 0:
+                stats[player]["wins"] += 1
+            elif score < 0:
+                stats[player]["losses"] += 1
+            else:
+                stats[player]["ties"] += 1
+
+    rows_out = sorted(stats.values(),
+                      key=lambda s: (s["wins"] - s["losses"], s["wins"]),
+                      reverse=True)
+    return {"stats": rows_out, "filter": filter}
+
 
 @app.get("/api/log/logins")
 def api_list_logins(limit: int = 200):

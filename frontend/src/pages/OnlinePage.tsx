@@ -2610,7 +2610,7 @@ export default function OnlinePage() {
       : rawCm
     // Permute badges so purple text follows the correct player column
     const badges     = perm
-      ? historyBadges.map(row => row.length > 0 ? perm.map(i => row[i] ?? []) : row)
+      ? historyBadges.map(row => (row?.length ?? 0) > 0 ? perm.map(i => row[i] ?? []) : (row ?? []))
       : historyBadges
     // Suppress "本場結束" until all cards are revealed
     const dispIsEnded = isEnded && !frozenDisplay
