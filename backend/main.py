@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "11.2"
+APP_VERSION = "11.3"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -468,33 +468,52 @@ def manual_arrange_info(req: ManualInfoRequest):
 
     groups.sort(key=_group_sort_key, reverse=True)
 
-    # Cross-group domination: group A is dominated if every one of its variants
-    # is weakly dominated (all 3 scores ≤) by some other group's best variant,
-    # with at least one strict inequality.  Dominated groups are shown disabled
-    # in the UI with strikethrough — still visible but not selectable.
-    all_best = []  # (top_score, mid_score, bot_score) for first variant of each group
-    for g in groups:
-        if g["variants"]:
-            v = g["variants"][0]
-            all_best.append((v["top_score"], v["mid_score"], v["bot_score"]))
-        else:
-            all_best.append(None)
+    # Cross-variant domination — mathematically rigorous Pareto filter.
+    #
+    # Variant A dominates variant B iff:
+    #   A.top_score >= B.top_score  AND  A.mid_score >= B.mid_score  AND
+    #   A.bot_score >= B.bot_score  AND  at least one is strictly greater.
+    #
+    # Proof of correctness: hand scores are a total order consistent with the
+    # game's row-win rule (h1.score > h2.score ↔ h1 beats h2 in direct
+    # comparison). Therefore for any set of opponents, every row win that B
+    # achieves is also achieved by A, and A wins strictly more in ≥1 situation.
+    # → A's final score ≥ B's in EVERY game configuration, no exceptions.
+    #
+    # Algorithm: check all variants against all variants (small N after dedup).
+    # Variants that are dominated are removed; groups whose ALL variants are
+    # dominated become disabled (strikethrough) in the UI.
 
-    for i, gi in enumerate(groups):
-        if all_best[i] is None:
-            gi["dominated"] = True
-            continue
-        ts_i, ms_i, bs_i = all_best[i]
-        dominated = False
-        for j, scores_j in enumerate(all_best):
-            if i == j or scores_j is None:
+    # Collect every surviving variant with its group/position index
+    all_scores: list[tuple[float,float,float]] = []
+    for g in groups:
+        for v in g["variants"]:
+            all_scores.append((v["top_score"], v["mid_score"], v["bot_score"]))
+
+    def _dominated_by_any(ts_i, ms_i, bs_i, own_idx):
+        for j, (ts_j, ms_j, bs_j) in enumerate(all_scores):
+            if j == own_idx:
                 continue
-            ts_j, ms_j, bs_j = scores_j
             if ts_j >= ts_i and ms_j >= ms_i and bs_j >= bs_i:
                 if ts_j > ts_i or ms_j > ms_i or bs_j > bs_i:
-                    dominated = True
-                    break
-        gi["dominated"] = dominated
+                    return True
+        return False
+
+    flat_idx = 0
+    for gi, g in enumerate(groups):
+        surviving = []
+        for v in g["variants"]:
+            ts_v = v["top_score"]; ms_v = v["mid_score"]; bs_v = v["bot_score"]
+            if not _dominated_by_any(ts_v, ms_v, bs_v, flat_idx):
+                surviving.append(v)
+            flat_idx += 1
+
+        if surviving:
+            g["variants"]   = surviving
+            g["dominated"]  = False
+        else:
+            # All variants eliminated — keep for display (strikethrough) but disable
+            g["dominated"] = True
 
     return {
         "stats":   stats,
