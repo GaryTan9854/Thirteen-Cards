@@ -608,8 +608,11 @@ export default function OnlinePage() {
   const gunQueueRef           = useRef<GunNotif[]>([])
   // When 逐墩比牌 is on, gun effects are deferred until all cards are flipped
   const pendingRoundEffectRef = useRef<(() => void) | null>(null)
-  const [voiceOn,      setVoiceOn]          = useState(true)
-  const voiceRef     = useRef(true)
+  // Voice off by default; persisted in localStorage
+  const [voiceOn,  setVoiceOn]  = useState(() =>
+    localStorage.getItem('tc_voice_on') === 'true'  // default OFF
+  )
+  const voiceRef = useRef(localStorage.getItem('tc_voice_on') === 'true')
   const [musicOn,      setMusicOn]          = useState(() => isMusicOn())
   const [quipCtx,      setQuipCtx]          = useState<{ loser: string; winner: string; names: string[] } | null>(null)
   const ttsGenRef          = useRef(0)
@@ -632,6 +635,7 @@ export default function OnlinePage() {
     const next = !voiceRef.current
     voiceRef.current = next
     setVoiceOn(next)
+    localStorage.setItem('tc_voice_on', String(next))
   }
 
   // ── Leave / ESC navigation ────────────────────────────────────────────────

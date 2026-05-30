@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "11.13"
+APP_VERSION = "11.14"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -1213,16 +1213,29 @@ def api_stats(scope: str = "all", period: str = "all"):
         # mismatches (frontend sends UTC ISO with 'Z'; Python may use local time).
         from datetime import timezone as _tz
         def _parse_iso(s: str):
-            """Parse ISO8601 string → UTC datetime, tolerating +00:00 / Z / local."""
+            """Parse ISO8601 → naive-UTC datetime.
+            'Z'/'+00:00' = already UTC.
+            Naive string = assume Taiwan UTC+8, subtract 8 h.
+            """
             if not s:
                 return None
             s = s.strip()
-            for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ",
-                        "%Y-%m-%dT%H:%M:%S.%f+00:00", "%Y-%m-%dT%H:%M:%S.%f",
-                        "%Y-%m-%dT%H:%M:%S"):
+            from datetime import timedelta as _td
+            for suffix, fmt in [
+                ("Z",      "%Y-%m-%dT%H:%M:%S.%f"),
+                ("Z",      "%Y-%m-%dT%H:%M:%S"),
+                ("+00:00", "%Y-%m-%dT%H:%M:%S.%f"),
+                ("+00:00", "%Y-%m-%dT%H:%M:%S"),
+            ]:
+                if s.endswith(suffix):
+                    try:
+                        return _dt.strptime(s[:-len(suffix)], fmt)  # naive UTC
+                    except ValueError:
+                        continue
+            # Naive local (Taiwan UTC+8) → subtract 8 h
+            for fmt in ("%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S"):
                 try:
-                    dt = _dt.strptime(s[:len(fmt)], fmt)
-                    return dt.replace(tzinfo=_tz.utc)
+                    return _dt.strptime(s[:len(fmt)], fmt) - _td(hours=8)
                 except ValueError:
                     continue
             return None

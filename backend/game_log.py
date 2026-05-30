@@ -177,13 +177,43 @@ def get_game(game_id: str) -> Optional[Dict[str, Any]]:
 
 _RESETS_FILE = LOGS_DIR.parent / "stats_resets.jsonl"   # one JSON obj per line
 
+def _parse_reset_dt(s: str) -> datetime:
+    """Parse reset timestamp to a comparable naive-UTC datetime.
+    Handles 'Z' (UTC), '+00:00' (UTC), and naive local strings (assume Taiwan UTC+8).
+    """
+    if not s:
+        return datetime.min
+    s = s.strip()
+    from datetime import timezone, timedelta
+    # Explicit UTC
+    for suffix, fmt in [
+        ("Z",      "%Y-%m-%dT%H:%M:%S.%f"),
+        ("Z",      "%Y-%m-%dT%H:%M:%S"),
+        ("+00:00", "%Y-%m-%dT%H:%M:%S.%f"),
+        ("+00:00", "%Y-%m-%dT%H:%M:%S"),
+    ]:
+        if s.endswith(suffix):
+            try:
+                return datetime.strptime(s[:-len(suffix)], fmt)  # already UTC, return naive
+            except ValueError:
+                continue
+    # Naive = assume Taiwan UTC+8; subtract 8h to get naive-UTC
+    for fmt in ("%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            local_dt = datetime.strptime(s[:len(fmt)], fmt)
+            return local_dt - timedelta(hours=8)     # convert Taiwan→UTC
+        except ValueError:
+            continue
+    return datetime.min
+
+
 def get_stats_resets() -> List[Dict[str, Any]]:
-    """Return all reset records, oldest first."""
+    """Return all reset records, oldest first (by UTC-normalised time)."""
     if not _RESETS_FILE.exists():
         return []
     try:
         rows = [json.loads(l) for l in _RESETS_FILE.read_text().splitlines() if l.strip()]
-        rows.sort(key=lambda r: r.get("reset_at", ""))
+        rows.sort(key=lambda r: _parse_reset_dt(r.get("reset_at", "")))
         return rows
     except Exception:
         return []

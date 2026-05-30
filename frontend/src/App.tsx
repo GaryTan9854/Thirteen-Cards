@@ -37,9 +37,9 @@ function AppInner() {
     { id: 'online', label: '🌐', fullLabel: '遊戲大廳' },
     { id: 'rules',  label: '📖', fullLabel: '遊戲說明' },
     { id: 'stats',  label: '📊', fullLabel: '戰績'     },
+    { id: 'logs',   label: '📋', fullLabel: '遊戲紀錄' },
     ...(isGary ? [
       { id: 'duel',   label: '⚔️', fullLabel: '策略對決' },
-      { id: 'logs',   label: '📋', fullLabel: '遊戲紀錄' },
       { id: 'league', label: '🏆', fullLabel: '聯盟賽'   },
     ] : []),
   ]
@@ -134,7 +134,7 @@ function AppInner() {
         {tab === 'rules'  && <RulesPage />}
         {isGary && tab === 'duel'   && <DuelPage />}
         {tab === 'stats'  && <StatsPage />}
-        {isGary && tab === 'logs'   && <LogsPage />}
+        {tab === 'logs'   && <LogsPage />}
         {isGary && tab === 'league' && <LeaguePage />}
       </main>
     </div>

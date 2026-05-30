@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 
 interface LoginEntry {
   id: number
@@ -224,6 +225,9 @@ function GameDetailPanel({ game }: { game: GameRecord }) {
 }
 
 export default function LogsPage() {
+  const { player } = useAuth()
+  const isGary = player === 'Gary'
+
   const [tab, setTab] = useState<'games' | 'logins'>('games')
   const [logins,        setLogins]        = useState<LoginEntry[]>([])
   const [activePlayers, setActivePlayers] = useState<Set<string>>(new Set())
@@ -232,7 +236,7 @@ export default function LogsPage() {
   const [loading,       setLoading]       = useState(false)
 
   useEffect(() => {
-    if (tab === 'logins') {
+    if (tab === 'logins' && isGary) {
       setLoading(true)
       Promise.all([
         fetch('/api/log/logins?limit=200').then(r => r.json()),
@@ -246,24 +250,35 @@ export default function LogsPage() {
       setLoading(true)
       fetch('/api/log/games?limit=100')
         .then(r => r.json())
-        .then(d => { setGames(d.games ?? []); setLoading(false) })
+        .then(d => {
+          let list: GameRecord[] = d.games ?? []
+          // Non-Gary: only show games they participated in
+          if (!isGary && player) {
+            list = list.filter(g => g.participants?.includes(player))
+          }
+          setGames(list)
+          setLoading(false)
+        })
         .catch(() => setLoading(false))
     }
-  }, [tab])
+  }, [tab, isGary, player])
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <div className="text-xl font-bold text-sky-300">📋 遊戲紀錄</div>
-        <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
-          {(['games', 'logins'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition
-                ${tab === t ? 'bg-yellow-400 text-gray-900 shadow' : 'text-gray-400 hover:text-white'}`}>
-              {t === 'games' ? '🃏 遊戲' : '🔑 登入'}
-            </button>
-          ))}
-        </div>
+        {/* Login tab: Gary only */}
+        {isGary && (
+          <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
+            {(['games', 'logins'] as const).map(t => (
+              <button key={t} onClick={() => setTab(t)}
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition
+                  ${tab === t ? 'bg-yellow-400 text-gray-900 shadow' : 'text-gray-400 hover:text-white'}`}>
+                {t === 'games' ? '🃏 遊戲' : '🔑 登入'}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {loading && (
