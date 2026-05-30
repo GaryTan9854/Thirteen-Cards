@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "11.12"
+APP_VERSION = "11.13"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -1208,17 +1208,41 @@ def api_stats(scope: str = "all", period: str = "all"):
         now      = _dt.now()
         month_pfx = now.strftime("%Y-%m")
 
-        # Era filter: only games after the last reset
-        resets  = gl.get_stats_resets()
+        # Era filter: only games after the last reset.
+        # Parse both timestamps as UTC datetime objects to avoid timezone/format
+        # mismatches (frontend sends UTC ISO with 'Z'; Python may use local time).
+        from datetime import timezone as _tz
+        def _parse_iso(s: str):
+            """Parse ISO8601 string → UTC datetime, tolerating +00:00 / Z / local."""
+            if not s:
+                return None
+            s = s.strip()
+            for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ",
+                        "%Y-%m-%dT%H:%M:%S.%f+00:00", "%Y-%m-%dT%H:%M:%S.%f",
+                        "%Y-%m-%dT%H:%M:%S"):
+                try:
+                    dt = _dt.strptime(s[:len(fmt)], fmt)
+                    return dt.replace(tzinfo=_tz.utc)
+                except ValueError:
+                    continue
+            return None
+
+        resets    = gl.get_stats_resets()
         era_since = resets[-1]["reset_at"] if resets else None
+        era_dt    = _parse_iso(era_since) if era_since else None
 
         rows = gl.get_games(limit=99999, league_only=(scope == "league"))
         if scope == "normal":
             rows = [r for r in rows if not r.get("is_league")]
-        if era_since:
-            rows = [r for r in rows if (r.get("start_time") or "") >= era_since]
+        if era_dt:
+            def _after_era(g):
+                gdt = _parse_iso(g.get("start_time", ""))
+                return gdt is not None and gdt >= era_dt
+            rows = [r for r in rows if _after_era(r)]
         if period == "month":
-            rows = [r for r in rows if (r.get("start_time") or "").startswith(month_pfx)]
+            # Use UTC month prefix for consistency with start_time
+            utc_month = _dt.now(_tz.utc).strftime("%Y-%m")
+            rows = [r for r in rows if (r.get("start_time") or "").startswith(utc_month)]
 
         stats: dict = {}
         for g in rows:

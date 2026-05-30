@@ -190,8 +190,13 @@ def get_stats_resets() -> List[Dict[str, Any]]:
 
 
 def add_stats_reset(label: str = "") -> Dict[str, Any]:
-    """Append a new reset point; returns the new record."""
-    record = {"reset_at": datetime.now().isoformat(), "label": label}
+    """Append a new reset point; returns the new record.
+    Uses UTC (same format as the frontend's new Date().toISOString()) so that
+    string comparison with start_time works correctly across timezones.
+    """
+    from datetime import timezone as _tz
+    utc_now = datetime.now(_tz.utc).isoformat().replace("+00:00", "Z")
+    record = {"reset_at": utc_now, "label": label}
     with _RESETS_FILE.open("a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
     return record

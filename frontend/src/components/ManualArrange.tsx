@@ -137,34 +137,6 @@ function InteractiveRow({
   )
 }
 
-// ─── Swap-divider ─────────────────────────────────────────────────────────────
-
-function SwapDivider({
-  onClick, available, label, cycleInfo,
-}: {
-  onClick:   () => void
-  available: boolean
-  label:     string
-  cycleInfo?: string   // e.g. "1/3"
-}) {
-  return (
-    <div className="flex items-center gap-2 my-0.5">
-      <div className="flex-1 border-t border-gray-700" />
-      {available ? (
-        <button
-          onClick={onClick}
-          className="text-[11px] px-2 py-0.5 rounded-full bg-sky-900/60 text-sky-300
-                     border border-sky-700 hover:bg-sky-800 transition whitespace-nowrap"
-          title={label}>
-          ↕ {label}{cycleInfo ? ` ${cycleInfo}` : ''}
-        </button>
-      ) : (
-        <span className="text-[10px] text-gray-700 px-1">—</span>
-      )}
-      <div className="flex-1 border-t border-gray-700" />
-    </div>
-  )
-}
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
@@ -452,14 +424,7 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
     setDragFrom(null); setDragOver(null)
   }
 
-  // ── Row-swap (mid↔bot) ──
-  function swapMidBot() {
-    const newArr = {top:arr.top, mid:arr.bot, bot:arr.mid}
-    setArr(newArr)
-    setSelGroup(-1)
-  }
-
-  // (top↔mid smart swap deferred — removed for now, visual divider remains)
+  // (Row-swap buttons removed — drag/click swap covers all needs)
   // Reset helper: called when user selects a preset group
   function resetSwapTM() { /* no-op, kept for pickGroup call-site */ }
 
@@ -755,11 +720,8 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
                 onDragOver={handleDragOver} onDrop={handleDrop} onDragEnd={handleDragEnd}
                 violation={!topMidOk || !midBotOk}
               />
-              <SwapDivider
-                onClick={swapMidBot}
-                available={true}
-                label="中尾換"
-              />
+              {/* 中尾換已移除：使用點牌互換或拖曳即可 */}
+              <div className="border-t border-gray-700/60 my-0.5" />
               <InteractiveRow
                 rowId="bot" label="尾墩" cards={arr.bot} slots={5}
                 size={isDesktop ? 'lg' : 'md'}
