@@ -22,6 +22,7 @@ import {
 } from '../utils/gameEffects'
 import { setScene, isMusicOn, toggleMusic, stopMusic } from '../utils/music'
 import QuipPanel from '../components/QuipPanel'
+import AvatarPicker from '../components/AvatarPicker'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -504,6 +505,12 @@ function LeagueSelect({ leagues, value, onChange }: {
 
 export default function OnlinePage() {
   const { player } = useAuth()
+
+  // ── Avatar picker: show once when player has no saved avatar ──
+  const [showAvatarPicker, setShowAvatarPicker] = useState(() => {
+    if (!player) return false
+    return !localStorage.getItem(`tc_avatar_${player}`)
+  })
 
   // ── Room entry state ──
   const [inRoom,      setInRoom]      = useState(false)
@@ -1702,6 +1709,14 @@ export default function OnlinePage() {
   return (
     <>
       {arrangePortal}
+
+      {/* ── Avatar picker (shown on first visit, before any game interaction) ── */}
+      {showAvatarPicker && player && (
+        <AvatarPicker
+          playerName={player}
+          onDone={() => setShowAvatarPicker(false)}
+        />
+      )}
 
       {/* ── 離開確認 modal (ESC / logo click when game in progress) ── */}
       {showLeaveConfirm && (
