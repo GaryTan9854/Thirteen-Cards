@@ -159,7 +159,8 @@ export default function StatsPage() {
                 <th className="text-right py-2 px-2">場</th>
                 <th className="text-right py-2 px-2 text-yellow-300">勝</th>
                 <th className="text-right py-2 px-2 text-red-400">負</th>
-                <th className="text-right py-2 pl-2">勝率 / 淨</th>
+                <th className="text-right py-2 px-2">勝率</th>
+                <th className="text-right py-2 pl-2">不敗率</th>
               </tr>
             </thead>
             <tbody>
@@ -179,14 +180,23 @@ export default function StatsPage() {
                     <td className="py-2 px-2 text-right text-gray-300 tabular-nums">{r.games}</td>
                     <td className="py-2 px-2 text-right text-yellow-300 font-bold tabular-nums">{r.wins}</td>
                     <td className="py-2 px-2 text-right text-red-400 tabular-nums">{r.losses}</td>
-                    <td className="py-2 pl-2 text-right tabular-nums">
+                    <td className="py-2 px-2 text-right tabular-nums">
                       <span className={net > 0 ? 'text-yellow-300 font-semibold'
                                                : net < 0 ? 'text-red-400' : 'text-gray-400'}>
                         {pct(r.wins, r.games)}
                       </span>
-                      <span className={`ml-1.5 text-xs
+                      <span className={`ml-1 text-xs
                         ${net > 0 ? 'text-yellow-500' : net < 0 ? 'text-red-500' : 'text-gray-500'}`}>
                         ({net > 0 ? '+' : ''}{net})
+                      </span>
+                    </td>
+                    <td className="py-2 pl-2 text-right tabular-nums">
+                      <span className={r.losses === 0
+                        ? 'text-green-400 font-semibold'
+                        : (r.games - r.losses) / r.games >= 0.7
+                          ? 'text-sky-300'
+                          : 'text-gray-400'}>
+                        {pct(r.games - r.losses, r.games)}
                       </span>
                     </td>
                   </tr>
