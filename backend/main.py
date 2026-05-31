@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "12.0"
+APP_VERSION = "12.1"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -58,6 +58,7 @@ class PlayRequest(BaseModel):
     strategies:   Optional[List[str]]       = None   # list of 4 strategy strings
     pre_dealt:    Optional[List[List[str]]] = None   # [[cardstrs]*13]*4
     overrides:    Optional[List[ManualOverride]] = None  # manual arrangements
+    ai_attitudes: Optional[List[float]]     = None   # per-seat dynamic attitude [-1, 1]
 
 
 @app.post("/api/game/deal")
@@ -75,7 +76,8 @@ def game_play(req: PlayRequest = None):
     strats  = req.strategies   if req and req.strategies   and len(req.strategies)   == 4 else None
     pre     = req.pre_dealt    if req else None
     ovs     = [o.dict() for o in req.overrides] if req and req.overrides else None
-    result  = _play(names, strats, pre_dealt=pre, overrides=ovs)
+    atts    = req.ai_attitudes if req else None
+    result  = _play(names, strats, pre_dealt=pre, overrides=ovs, ai_attitudes=atts)
     return result
 
 

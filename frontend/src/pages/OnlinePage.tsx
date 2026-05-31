@@ -1211,6 +1211,42 @@ export default function OnlinePage() {
 
     // Resolve via HTTP (30s timeout + error recovery)
     const strategies = seatNames.map((_, i) => i === 0 ? 'manual' : (state.strategies[i] ?? 'rulealpha'))
+
+    // ── Dynamic attitude: computed per-seat based on game progress + score position ──
+    const roundsPlayed  = state.currentRound - 1   // rounds completed before this one
+    const totalRounds   = state.roundsNormal + (state.appealGeneration > 0 ? state.roundsAppeal : 0)
+    const cumScores     = state.history.reduce(
+      (acc: number[], row: number[]) => row.map((v, i) => (acc[i] ?? 0) + v),
+      [] as number[]
+    )  // cumulative scores per seat so far
+
+    function computeAttitude(seatIdx: number): number {
+      const myScore    = cumScores[seatIdx] ?? 0
+      const allScores  = seatNames.map((_, i) => cumScores[i] ?? 0)
+      const gp         = totalRounds > 0 ? roundsPlayed / totalRounds : 0  // 0→1
+
+      if (gp <= 0.5) {
+        return Math.max(-1, Math.min(1, 1.0 - 2.0 * (gp / 0.5)))
+      }
+      const minS = Math.min(...allScores)
+      const maxS = Math.max(...allScores)
+      const gap  = maxS - minS
+      if (gap < 30) return -1.0
+      const pos = (myScore - minS) / gap   // 0=last, 1=first
+      return Math.max(-1, Math.min(1, 1.0 - 2.0 * pos))
+    }
+
+    // Only pass attitudes for AI seats with strategies that support it
+    const _attSupportedPfx = ['rulealpha', 'rulealpha3']
+    const ai_attitudes = seatNames.map((_, i) => {
+      if (i === 0) return 0.0  // human player, attitude unused
+      const strat = state.strategies[i] ?? 'rulealpha'
+      if (_attSupportedPfx.some(p => strat.startsWith(p))) {
+        return computeAttitude(i)
+      }
+      return 0.0
+    })
+
     let res: any
     {
       const ctrl = new AbortController()
@@ -1225,6 +1261,7 @@ export default function OnlinePage() {
             strategies,
             pre_dealt:    state.preDelt,
             overrides:    [{ player: 0, top, mid, bot, baodao: isBaodao !== false }],
+            ai_attitudes,
           }),
         })
         clearTimeout(tid)

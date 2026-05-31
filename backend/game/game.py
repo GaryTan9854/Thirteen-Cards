@@ -100,7 +100,64 @@ def compete(h1, h2):
     return res
 
 
-def _arrange(hand_cards, strategy: str) -> 'Hand13':
+def compute_dynamic_attitude(
+    rounds_played: int,
+    total_rounds: int,
+    my_score: float,
+    all_scores: list,
+) -> float:
+    """
+    Dynamic attitude for RuleAlpha/RuleAlpha3 based on game progress and score position.
+
+    Parameters
+    ----------
+    rounds_played : int
+        Number of rounds already completed (0 = before round 1).
+    total_rounds : int
+        Total expected rounds (rounds_normal + appeal rounds used/expected).
+    my_score : float
+        This player's current cumulative score.
+    all_scores : list
+        Cumulative scores of all 4 players at this point.
+
+    Attitude function (-1 = ultra conservative, 0 = neutral, +1 = ultra aggressive):
+
+    Phase 1 — game_progress 0% → 50%:
+        attitude = 1 - 2·(progress/0.5)  →  1.0 at start, 0.0 at 50%
+
+    Phase 2 — game_progress > 50%:
+        score_gap = max - min
+        if score_gap < 30:
+            attitude = -1.0   (everyone close → lock in, ultra conservative)
+        else:
+            score_position = (my_score - min) / score_gap   ∈ [0, 1]
+            attitude = 1 - 2·score_position
+            → position=0 (last)  →  +1.0 (aggressive, try to catch up)
+            → position=1 (first) →  -1.0 (conservative, protect lead)
+    """
+    if total_rounds <= 0:
+        return 0.0
+
+    game_progress = rounds_played / total_rounds   # 0.0 → 1.0
+
+    if game_progress <= 0.5:
+        return max(-1.0, min(1.0, 1.0 - 2.0 * (game_progress / 0.5)))
+
+    # Phase 2
+    if not all_scores:
+        return -1.0
+    min_s = min(all_scores)
+    max_s = max(all_scores)
+    score_gap = max_s - min_s
+
+    if score_gap < 30:
+        return -1.0
+
+    score_position = (my_score - min_s) / score_gap   # 0.0 = last, 1.0 = first
+    return max(-1.0, min(1.0, 1.0 - 2.0 * score_position))
+
+
+def _arrange(hand_cards, strategy: str, attitude_override: float = None) -> 'Hand13':
     """Arrange a hand using the specified strategy. hand_cards = list of Card objects."""
     cardstrs = [c.cardstr() for c in hand_cards]
     if strategy == 'monte_carlo':
@@ -148,7 +205,8 @@ def _arrange(hand_cards, strategy: str) -> 'Hand13':
         h.specialhand = sp
         if sp != 'normal':
             return h
-        att3 = {'rulealpha3_aggressive': 0.8, 'rulealpha3_conservative': -0.8}.get(strategy, 0.0)
+        att3 = attitude_override if attitude_override is not None \
+               else {'rulealpha3_aggressive': 0.8, 'rulealpha3_conservative': -0.8}.get(strategy, 0.0)
         result = best_arrangement_rulealpha3(cardstrs, attitude=att3)
         if result:
             h.htop, h.hmid, h.hbot = result
@@ -160,11 +218,14 @@ def _arrange(hand_cards, strategy: str) -> 'Hand13':
 
     # rulealpha | rule_base (default)：RuleAlpha 雙路徑 + 精選候選 + attitude
     from .arrange import best_arrangement_rulealpha
-    attitude = 0.0
-    if strategy == 'rulealpha_aggressive':
+    if attitude_override is not None:
+        attitude = attitude_override
+    elif strategy == 'rulealpha_aggressive':
         attitude = 0.8
     elif strategy == 'rulealpha_conservative':
         attitude = -0.8
+    else:
+        attitude = 0.0
     h = Hand13(cardstrs)
     sp = h.chk_special()
     h.specialhand = sp
@@ -188,11 +249,16 @@ def deal_game() -> list:
 
 
 def play_one_game(player_names=None, strategies=None,
-                  pre_dealt=None, overrides=None):
+                  pre_dealt=None, overrides=None,
+                  ai_attitudes=None):
     """
-    pre_dealt  : [[cardstrs]*13]*4  – use these dealt hands instead of dealing fresh
-    overrides  : [{player:int, top:[cs], mid:[cs], bot:[cs]}]
-                 – skip arrangement for the listed players; use the given rows instead
+    pre_dealt   : [[cardstrs]*13]*4  – use these dealt hands instead of dealing fresh
+    overrides   : [{player:int, top:[cs], mid:[cs], bot:[cs]}]
+                  – skip arrangement for the listed players; use the given rows instead
+    ai_attitudes: [float]*4 | None
+                  – optional per-seat attitude override (-1 to +1).
+                  – When provided, replaces the strategy-derived attitude for
+                    RuleAlpha/RuleAlpha3 strategies (dynamic game-state attitude).
     """
     if player_names is None:
         player_names = ["Glory", "Jack", "Ian", "Gary"]
@@ -238,7 +304,9 @@ def play_one_game(player_names=None, strategies=None,
                 h13.totalscore = sum(h13.ss)
                 h13.CanAttack  = False
             else:
-                arranged = _arrange(hands[idx], strategy)
+                # Use dynamic attitude if provided for this seat
+                att_override = ai_attitudes[idx] if (ai_attitudes and idx < len(ai_attitudes)) else None
+                arranged = _arrange(hands[idx], strategy, attitude_override=att_override)
                 h13.htop = arranged.htop
                 h13.hmid = arranged.hmid
                 h13.hbot = arranged.hbot
