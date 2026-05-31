@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "12.3"
+APP_VERSION = "12.4"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -678,8 +678,16 @@ def manual_arrange_info(req: ManualInfoRequest):
             tc = _TOP_CAT.get(v.get("top_type",""), 0)
             mc = _CAT.get(v.get("mid_type",""), 0)
             bc = min(_CAT.get(v.get("bot_type",""), 0), 8)
-            # Eliminate: NO monster in any row (all ≤ 対(1))
-            if tc <= 1 and mc <= 1 and bc <= 1:
+            # Monster thresholds:
+            #   top = 三條(3)  [原子頭]
+            #   mid ≥ 葫蘆(6)  [葫蘆/鐵支/SF]
+            #   bot ≥ 葫蘆(6)
+            # Examples:
+            #   [亂·対·同花]：同花(5)<6 → no monster → eliminated
+            #   [亂·葫蘆·葫蘆]：葫蘆(6)≥6 → has monster → survives
+            #   [三條·*·*]：三條(3) in top → has monster → survives
+            has_any_monster = (tc >= 3) or (mc >= 6) or (bc >= 6)
+            if not has_any_monster:
                 g["dominated"] = True
 
     # ── Rule 3: [P,P,P] mid-pair rank check ───────────────────────────────────
