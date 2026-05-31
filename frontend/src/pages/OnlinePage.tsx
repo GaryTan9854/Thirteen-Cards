@@ -539,11 +539,14 @@ export default function OnlinePage() {
   const [notices,       setNotices]       = useState<string[]>([])
 
   // ── Setup form (host only) ──
-  const [cfgNormal,       setCfgNormal]       = useState(4)
-  const [cfgAppeal,       setCfgAppeal]       = useState(1)
+  const _savedSettings = (() => {
+    try { return JSON.parse(localStorage.getItem(`tc_settings_${localStorage.getItem('tc_player')}`) || '{}') } catch { return {} }
+  })()
+  const [cfgNormal,       setCfgNormal]       = useState<number>(_savedSettings.cfgNormal    ?? 4)
+  const [cfgAppeal,       setCfgAppeal]       = useState<number>(_savedSettings.cfgAppeal    ?? 1)
   const [cfgTimeLimit,    setCfgTimeLimit]    = useState(30)
   const [cfgInvitees,     setCfgInvitees]     = useState<string[]>([])
-  const [cfgStrategies,   setCfgStrategies]   = useState<string[]>(['rulealpha', 'rulealpha', 'rulealpha', 'rulealpha'])
+  const [cfgStrategies,   setCfgStrategies]   = useState<string[]>(_savedSettings.cfgStrategies ?? ['rulealpha', 'rulealpha', 'rulealpha', 'rulealpha'])
   const [cfgAiNames,      setCfgAiNames]      = useState<string[]>(() => randomBeauties())
   const [cfgStepByStep,   setCfgStepByStep]   = useState(false)
   const [cfgRecordGame,   setCfgRecordGame]   = useState(true)
@@ -617,6 +620,12 @@ export default function OnlinePage() {
   const voiceRef = useRef(localStorage.getItem('tc_voice_on') === 'true')
   const [musicOn,      setMusicOn]          = useState(() => isMusicOn())
   const [quipCtx,      setQuipCtx]          = useState<{ loser: string; winner: string; names: string[] } | null>(null)
+
+  // Persist player-specific settings to localStorage whenever they change
+  useEffect(() => {
+    if (!player) return
+    localStorage.setItem(`tc_settings_${player}`, JSON.stringify({ cfgNormal, cfgAppeal, cfgStrategies }))
+  }, [player, cfgNormal, cfgAppeal, cfgStrategies])
   const ttsGenRef          = useRef(0)
   const soloPhaseRef       = useRef<string>('lobby')
   const soloAppealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1175,6 +1184,31 @@ export default function OnlinePage() {
 
     state.currentRound++
 
+    // Gary debug: update att/gp/pos display as soon as round starts (so it reflects the round being arranged)
+    if (player === 'Gary') {
+      const _totalR  = state.roundsNormal + state.roundsAppeal
+      const _gp      = _totalR > 0 ? state.currentRound / _totalR : 0
+      const _cumS    = state.history.reduce((acc: number[], row: number[]) => row.map((v, i) => (acc[i] ?? 0) + v), [] as number[])
+      const _allS    = state.seatNames.map((_, i) => _cumS[i] ?? 0)
+      const _minS    = Math.min(..._allS)
+      const _maxS    = Math.max(..._allS)
+      const _gap     = _maxS - _minS
+      const _myScore = _cumS[0] ?? 0
+      const _posRaw  = _gap > 0 ? (_myScore - _minS) / _gap * 100 : 0
+      let _att: number
+      if (_gp <= 0.5) {
+        _att = Math.max(-1, Math.min(1, 1.0 - 2.0 * (_gp / 0.5)))
+      } else {
+        _att = _gap < 30 ? -1.0 : Math.max(-1, Math.min(1, 1.0 - 2.0 * (_myScore - _minS) / _gap))
+      }
+      setDebugAtt([{
+        name: state.seatNames[0],
+        att:  _att,
+        gp:   parseFloat((_gp * 100).toFixed(2)),
+        pos:  Math.round(_posRaw * 100) / 100,
+      }])
+    }
+
     // Deal hands (30s timeout + error recovery)
     let hands: string[][]
     {
@@ -1266,7 +1300,7 @@ export default function OnlinePage() {
       setDebugAtt([{
         name: seatNames[0],
         att:  computeAttitude(0),   // attitude this player would have as AI
-        gp:   Math.round(gp * 100),
+        gp:   parseFloat((gp * 100).toFixed(2)),
         pos:  Math.round(posRaw * 100) / 100,   // 2 decimal places
       }])
     }
