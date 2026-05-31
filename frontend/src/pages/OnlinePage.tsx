@@ -2183,7 +2183,16 @@ export default function OnlinePage() {
                 <div className="text-xs text-gray-500">AI {i + 1}</div>
                 <select
                   value={name}
-                  onChange={e => setCfgAiNames(prev => prev.map((n, j) => j === i ? e.target.value : n))}
+                  onChange={e => {
+                    const next = e.target.value
+                    setCfgAiNames(prev => {
+                      const arr = [...prev]
+                      const conflict = arr.findIndex((n, j) => j !== i && n === next)
+                      if (conflict >= 0) arr[conflict] = arr[i]  // swap
+                      arr[i] = next
+                      return arr
+                    })
+                  }}
                   className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5
                              text-white text-xs focus:outline-none focus:border-sky-400 cursor-pointer"
                 >
@@ -2488,7 +2497,16 @@ export default function OnlinePage() {
                 ) : (
                   <select
                     value={cfgAiNames[i]}
-                    onChange={e => setCfgAiNames(prev => prev.map((n, j) => j === i ? e.target.value : n))}
+                    onChange={e => {
+                      const next = e.target.value
+                      setCfgAiNames(prev => {
+                        const arr = [...prev]
+                        const conflict = arr.findIndex((n, j) => j !== i && n === next)
+                        if (conflict >= 0) arr[conflict] = arr[i]  // swap
+                        arr[i] = next
+                        return arr
+                      })
+                    }}
                     className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5
                                text-white text-xs focus:outline-none focus:border-yellow-400 cursor-pointer"
                   >
