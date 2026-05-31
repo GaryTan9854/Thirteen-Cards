@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "12.4"
+APP_VERSION = "12.5"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -629,110 +629,9 @@ def manual_arrange_info(req: ManualInfoRequest):
                 gi["dominated"] = True
                 break
 
-    # ── Rule 4: 2-of-3 category wins → eliminate weaker group ─────────────────
-    # If group A has 2 or more rows with strictly higher HandCat than group B,
-    # B is dominated (even though B might win the remaining 1 row).
-    # Examples:
-    #   [亂,順,順] wins mid(順>対) AND bot(順>対) → dominates [対,対,対] ✓
-    #   [亂,同花,同花] wins mid(F>P) AND bot(F>P) → dominates [対,対,対] ✓
-    #   [亂,三條,三條] wins mid(TR>P) AND bot(TR>P) → dominates [対,対,対] ✓
-    active4 = [g for g in groups if not g.get("dominated") and g.get("variants")]
-    cats4   = [(
-        _TOP_CAT.get(g["variants"][0].get("top_type",""), 0),
-        _CAT.get(g["variants"][0].get("mid_type",""), 0),
-        min(_CAT.get(g["variants"][0].get("bot_type",""), 0), 8),
-    ) for g in active4]
-
-    for i, gi in enumerate(active4):
-        if gi.get("dominated"): continue
-        ci = cats4[i]
-        for j, cj in enumerate(cats4):
-            if i == j: continue
-            wins = sum(1 for a, b in zip(cj, ci) if a > b)
-            if wins >= 2:
-                gi["dominated"] = True
-                break
-
-    # ── Rule 2: Monster exists → eliminate all-weak groups ────────────────────
-    # Trigger: pool has any group with bot_cat ≥ 鐵支(7) [scores ≥4 game points]
-    #          OR any group with top_type = 三條 (原子頭, scores ~3 game points).
-    # Both triggers provide enough guaranteed advantage over "all-weak" groups.
-    #
-    # "All-weak" = ALL THREE rows have HandCat ≤ 対(1):
-    #   top_cat ≤ 1 (亂 or 対) AND mid_cat ≤ 1 (亂 or 対) AND bot_cat ≤ 1 (亂 or 対)
-    # Any group with at least one row HandCat > 1 is NOT all-weak and survives.
-    #
-    # Proof: 原子頭 (+3) or 鐵支/SF bot (+4) provides enough game points that
-    # all-weak opponents cannot compensate with pair tops/mids alone.
-    has_monster = any(
-        not g.get("dominated") and g.get("variants") and (
-            min(_CAT.get(g["variants"][0].get("bot_type",""), 0), 8) >= 7 or
-            _TOP_CAT.get(g["variants"][0].get("top_type",""), 0) >= 3   # 三條 = 原子頭
-        )
-        for g in groups
-    )
-    if has_monster:
-        for g in groups:
-            if g.get("dominated") or not g.get("variants"): continue
-            v = g["variants"][0]
-            tc = _TOP_CAT.get(v.get("top_type",""), 0)
-            mc = _CAT.get(v.get("mid_type",""), 0)
-            bc = min(_CAT.get(v.get("bot_type",""), 0), 8)
-            # Monster thresholds:
-            #   top = 三條(3)  [原子頭]
-            #   mid ≥ 葫蘆(6)  [葫蘆/鐵支/SF]
-            #   bot ≥ 葫蘆(6)
-            # Examples:
-            #   [亂·対·同花]：同花(5)<6 → no monster → eliminated
-            #   [亂·葫蘆·葫蘆]：葫蘆(6)≥6 → has monster → survives
-            #   [三條·*·*]：三條(3) in top → has monster → survives
-            has_any_monster = (tc >= 3) or (mc >= 6) or (bc >= 6)
-            if not has_any_monster:
-                g["dominated"] = True
-
-    # ── Rule 3: [P,P,P] mid-pair rank check ───────────────────────────────────
-    # For each [P,P,P] variant: if any [亂,対,順+(≥4)] challenger has a HIGHER
-    # mid pair rank than this [P,P,P] variant's mid pair rank, eliminate the variant.
-    # (Challenger wins mid AND bot, P,P,P only wins top — not enough.)
-    # If all [P,P,P] variants are eliminated, the whole group is marked dominated.
-    from collections import Counter as _CC3
-
-    def _top_pair_rank(cards):
-        by_r = _CC3(int(cs[:2]) for cs in cards)
-        prs  = [r for r, c in by_r.items() if c >= 2]
-        return max(prs) if prs else 0
-
-    for g in groups:
-        if g.get("dominated") or not g.get("variants"): continue
-        v0 = g["variants"][0]
-        if not (v0.get("top_type") == "對" and
-                v0.get("mid_type") == "對" and
-                v0.get("bot_type") == "對"):
-            continue  # not a [P,P,P] group
-
-        # Collect challenger mid pair ranks: [亂, 対, bot≥順(4)]
-        chal_mid_ranks = []
-        for cg in groups:
-            if cg.get("dominated") or not cg.get("variants"): continue
-            cv = cg["variants"][0]
-            if (cv.get("top_type") == "亂" and
-                    cv.get("mid_type") == "對" and
-                    _CAT.get(cv.get("bot_type",""), 0) >= 4):
-                chal_mid_ranks.append(_top_pair_rank(cv.get("mid", [])))
-
-        if not chal_mid_ranks: continue
-
-        # Eliminate [P,P,P] variants where any challenger has higher mid pair rank
-        surviving = []
-        for v in g["variants"]:
-            my_pr = _top_pair_rank(v.get("mid", []))
-            if not any(cpr > my_pr for cpr in chal_mid_ranks):
-                surviving.append(v)
-
-        if not surviving:
-            g["dominated"] = True
-        elif len(surviving) < len(g["variants"]):
-            g["variants"] = surviving
+    # Rules 2, 3, 4 (domain-heuristic eliminations) are disabled pending
+    # further analysis — they incorrectly eliminated some valid type combinations.
+    # Re-enable after verifying correctness with more test cases.
 
     return {
         "stats":   stats,

@@ -249,6 +249,7 @@ interface Props {
   cumScores?:      number[]  // all 4 cumulative scores so far
   isGary?:         boolean   // enables autopilot toggle
   strategy?:       string    // player's configured AI strategy — used as the default arrangement
+  attDebug?:       { att: number; gp: number; pos: number } | null  // Gary-only attitude debug
 }
 
 function scoreColor(n: number) {
@@ -256,7 +257,7 @@ function scoreColor(n: number) {
 }
 
 export default function ManualArrange({ hand, onConfirm, onLeave, countdown, submittedCount, totalPlayers,
-  roundLabel, playerNames, cumScores, isGary, strategy }: Props) {
+  roundLabel, playerNames, cumScores, isGary, strategy, attDebug }: Props) {
 
   const isDesktop = useMemo(() => window.innerWidth >= 640, [])
 
@@ -583,6 +584,14 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
                   </span>
                 </span>
               ))}
+              {/* Gary-only attitude debug */}
+              {isGary && attDebug && (
+                <span className="ml-2 text-purple-400 font-mono text-[10px]">
+                  att={attDebug.att >= 0 ? '+' : ''}{attDebug.att.toFixed(2)}
+                  {' '}gp={attDebug.gp}%
+                  {' '}pos={attDebug.pos}%
+                </span>
+              )}
             </div>
           )}
           {/* Row: 離開 + [autopilot] + 確定送出 */}

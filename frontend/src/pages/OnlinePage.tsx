@@ -1758,6 +1758,7 @@ export default function OnlinePage() {
           cumScores={arrangeSeats.length > 0 ? arrangeCumScores : undefined}
           isGary={isGary}
           strategy={cfgStrategies[0] ?? 'rulealpha'}
+          attDebug={isGary && debugAtt.length > 0 ? debugAtt[0] : null}
         />,
         document.body
       )
@@ -1942,25 +1943,6 @@ export default function OnlinePage() {
                         title="強制重置房間（Gary 限定）">
                         ⚙ 重置
                       </button>
-                    )}
-                    {/* Gary attitude debug */}
-                    {isGary && soloActive && debugAtt.length > 0 && (
-                      <details className="relative">
-                        <summary className="text-xs text-purple-400 hover:text-purple-300 cursor-pointer px-1 select-none"
-                                 title="Attitude debug">att</summary>
-                        <div className="absolute right-0 top-full mt-1 bg-gray-950 border border-purple-700 rounded-lg p-2
-                                        text-[10px] z-50 whitespace-nowrap space-y-0.5 shadow-xl">
-                          {debugAtt.map(d => (
-                            <div key={d.name} className="flex gap-2 items-center">
-                              <span className="text-gray-400 w-14 truncate">{d.name}</span>
-                              <span className={`font-bold w-10 text-right ${d.att > 0.2 ? 'text-orange-400' : d.att < -0.2 ? 'text-sky-400' : 'text-gray-300'}`}>
-                                {d.att >= 0 ? '+' : ''}{d.att.toFixed(2)}
-                              </span>
-                              <span className="text-gray-600">gp={d.gp}% pos={d.pos}%</span>
-                            </div>
-                          ))}
-                        </div>
-                      </details>
                     )}
                     <button onClick={() => { const next = toggleMusic(); setMusicOn(next) }}
                       className="text-xs px-2 py-1 rounded hover:bg-slate-700 transition text-gray-400 hover:text-white"
