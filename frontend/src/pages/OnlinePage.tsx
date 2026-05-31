@@ -1119,6 +1119,7 @@ export default function OnlinePage() {
   }) {
     // Reset server room so it stays clean
     fetch('/api/online/reset', { method: 'POST' }).catch(() => {})
+    setDebugAtt([])   // clear leftover attitude debug from previous game
 
     const seatNames = [player!, ...cfg.aiNames]
     soloStateRef.current = {
@@ -1215,33 +1216,38 @@ export default function OnlinePage() {
     const strategies = seatNames.map((_, i) => i === 0 ? 'manual' : (state.strategies[i] ?? 'rulealpha'))
 
     // ── Dynamic attitude: computed per-seat based on game progress + score position ──
-    const roundsPlayed  = state.currentRound - 1   // rounds completed before this one
-    const totalRounds   = state.roundsNormal + (state.appealGeneration > 0 ? state.roundsAppeal : 0)
-    const cumScores     = state.history.reduce(
+    const roundsPlayed = state.currentRound - 1   // rounds completed before THIS round
+    // Total rounds always includes all normal + appeal (don't wait for appealGeneration)
+    const totalRounds  = state.roundsNormal + state.roundsAppeal
+    const cumScores    = state.history.reduce(
       (acc: number[], row: number[]) => row.map((v, i) => (acc[i] ?? 0) + v),
       [] as number[]
     )  // cumulative scores per seat so far
 
+    // Shared score range (same for all seats)
+    const _allS  = seatNames.map((_, i) => cumScores[i] ?? 0)
+    const _minS  = Math.min(..._allS)
+    const _maxS  = Math.max(..._allS)
+    const _gap   = _maxS - _minS
+
     function computeAttitude(seatIdx: number): number {
-      const myScore    = cumScores[seatIdx] ?? 0
-      const allScores  = seatNames.map((_, i) => cumScores[i] ?? 0)
-      const gp         = totalRounds > 0 ? roundsPlayed / totalRounds : 0  // 0→1
+      const myScore = cumScores[seatIdx] ?? 0
+      const gp      = totalRounds > 0 ? roundsPlayed / totalRounds : 0
 
       if (gp <= 0.5) {
+        // Phase 1: 0% → 50% progress maps to attitude 1.0 → 0.0
         return Math.max(-1, Math.min(1, 1.0 - 2.0 * (gp / 0.5)))
       }
-      const minS = Math.min(...allScores)
-      const maxS = Math.max(...allScores)
-      const gap  = maxS - minS
-      if (gap < 30) return -1.0
-      const pos = (myScore - minS) / gap   // 0=last, 1=first
+      // Phase 2: score-position based
+      if (_gap < 30) return -1.0
+      const pos = (myScore - _minS) / _gap   // 0=last, 1=first
       return Math.max(-1, Math.min(1, 1.0 - 2.0 * pos))
     }
 
     // Only pass attitudes for AI seats with strategies that support it
     const _attSupportedPfx = ['rulealpha', 'rulealpha3']
     const ai_attitudes = seatNames.map((_, i) => {
-      if (i === 0) return 0.0  // human player, attitude unused
+      if (i === 0) return 0.0  // human player, attitude unused (they choose manually)
       const strat = state.strategies[i] ?? 'rulealpha'
       if (_attSupportedPfx.some(p => strat.startsWith(p))) {
         return computeAttitude(i)
@@ -1249,17 +1255,18 @@ export default function OnlinePage() {
       return 0.0
     })
 
-    // Gary debug: capture attitude details for display
+    // Gary debug: show player's computed attitude (what AI would do in same position)
     if (player === 'Gary') {
       const gp  = totalRounds > 0 ? roundsPlayed / totalRounds : 0
-      const all = seatNames.map((_, i) => cumScores[i] ?? 0)
-      const minS = Math.min(...all), maxS = Math.max(...all), gap = maxS - minS
-      setDebugAtt(seatNames.map((name, i) => ({
-        name,
-        att: ai_attitudes[i],
-        gp:  Math.round(gp * 100),
-        pos: gap > 0 ? Math.round(((cumScores[i]??0) - minS) / gap * 100) : 50,
-      })))
+      // pos: 0% when all tied (gap=0), otherwise (myScore-min)/gap×100%
+      const myS = cumScores[0] ?? 0
+      const pos = _gap > 0 ? Math.round((myS - _minS) / _gap * 100) : 0
+      setDebugAtt([{
+        name: seatNames[0],
+        att:  computeAttitude(0),   // what the attitude WOULD be if player were AI
+        gp:   Math.round(gp * 100),
+        pos,
+      }])
     }
 
     let res: any
