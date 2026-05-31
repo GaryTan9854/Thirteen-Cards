@@ -589,7 +589,7 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
                 <span className="ml-2 text-purple-400 font-mono text-[10px]">
                   att={attDebug.att >= 0 ? '+' : ''}{attDebug.att.toFixed(2)}
                   {' '}gp={attDebug.gp}%
-                  {' '}pos={attDebug.pos}%
+                  {' '}pos={attDebug.pos.toFixed(2)}%
                 </span>
               )}
             </div>

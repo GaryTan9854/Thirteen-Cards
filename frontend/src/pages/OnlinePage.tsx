@@ -1216,9 +1216,11 @@ export default function OnlinePage() {
     const strategies = seatNames.map((_, i) => i === 0 ? 'manual' : (state.strategies[i] ?? 'rulealpha'))
 
     // ── Dynamic attitude: computed per-seat based on game progress + score position ──
-    const roundsPlayed = state.currentRound - 1   // rounds completed before THIS round
-    // Total rounds always includes all normal + appeal (don't wait for appealGeneration)
-    const totalRounds  = state.roundsNormal + state.roundsAppeal
+    // gp = currentRound / totalRounds
+    //   Round 1 being arranged: gp = 1/9 (not 0)
+    //   Round 1 just finished, round 2 arranged: gp = 2/9
+    const totalRounds  = state.roundsNormal + state.roundsAppeal   // always include appeal rounds
+    const gpRound      = state.currentRound   // the round we're CURRENTLY playing
     const cumScores    = state.history.reduce(
       (acc: number[], row: number[]) => row.map((v, i) => (acc[i] ?? 0) + v),
       [] as number[]
@@ -1232,7 +1234,7 @@ export default function OnlinePage() {
 
     function computeAttitude(seatIdx: number): number {
       const myScore = cumScores[seatIdx] ?? 0
-      const gp      = totalRounds > 0 ? roundsPlayed / totalRounds : 0
+      const gp      = totalRounds > 0 ? gpRound / totalRounds : 0
 
       if (gp <= 0.5) {
         // Phase 1: 0% → 50% progress maps to attitude 1.0 → 0.0
@@ -1257,15 +1259,15 @@ export default function OnlinePage() {
 
     // Gary debug: show player's computed attitude (what AI would do in same position)
     if (player === 'Gary') {
-      const gp  = totalRounds > 0 ? roundsPlayed / totalRounds : 0
-      // pos: 0% when all tied (gap=0), otherwise (myScore-min)/gap×100%
+      const gp  = totalRounds > 0 ? gpRound / totalRounds : 0
       const myS = cumScores[0] ?? 0
-      const pos = _gap > 0 ? Math.round((myS - _minS) / _gap * 100) : 0
+      // pos: (myScore - min) / (max - min), 0% when all tied, 2 decimal places
+      const posRaw = _gap > 0 ? (myS - _minS) / _gap * 100 : 0
       setDebugAtt([{
         name: seatNames[0],
-        att:  computeAttitude(0),   // what the attitude WOULD be if player were AI
+        att:  computeAttitude(0),   // attitude this player would have as AI
         gp:   Math.round(gp * 100),
-        pos,
+        pos:  Math.round(posRaw * 100) / 100,   // 2 decimal places
       }])
     }
 
