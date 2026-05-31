@@ -1194,12 +1194,15 @@ export default function OnlinePage() {
       const _maxS    = Math.max(..._allS)
       const _gap     = _maxS - _minS
       const _myScore = _cumS[0] ?? 0
-      const _posRaw  = _gap > 0 ? (_myScore - _minS) / _gap * 100 : 0
+      const _posRaw  = _gap > 0 ? (_myScore - _minS) / _gap * 100 : 50
       let _att: number
-      if (_gp <= 0.5) {
-        _att = Math.max(-1, Math.min(1, 1.0 - 2.0 * (_gp / 0.5)))
+      if (_gap < 30) {
+        _att = Math.max(-1.0, Math.min(1.0, 1.0 - 4.0 * _gp))
       } else {
-        _att = _gap < 30 ? -1.0 : Math.max(-1, Math.min(1, 1.0 - 2.0 * (_myScore - _minS) / _gap))
+        const _pos         = (_myScore - _minS) / _gap
+        const _attProgress = 1.0 - 2.0 * _gp
+        const _attPosition = 1.0 - 2.0 * _pos
+        _att = Math.max(-1.0, Math.min(1.0, (1.0 - _gp) * _attProgress + _gp * _attPosition))
       }
       setDebugAtt([{
         name: state.seatNames[0],
@@ -1270,14 +1273,17 @@ export default function OnlinePage() {
       const myScore = cumScores[seatIdx] ?? 0
       const gp      = totalRounds > 0 ? gpRound / totalRounds : 0
 
-      if (gp <= 0.5) {
-        // Phase 1: 0% → 50% progress maps to attitude 1.0 → 0.0
-        return Math.max(-1, Math.min(1, 1.0 - 2.0 * (gp / 0.5)))
+      if (_gap < 30) {
+        // Close game: full aggressive early, full defensive from mid-game
+        // gp=0→+1.0, gp=0.25→0, gp=0.5→-1.0 (clamped)
+        return Math.max(-1.0, Math.min(1.0, 1.0 - 4.0 * gp))
       }
-      // Phase 2: score-position based
-      if (_gap < 30) return -1.0
-      const pos = (myScore - _minS) / _gap   // 0=last, 1=first
-      return Math.max(-1, Math.min(1, 1.0 - 2.0 * pos))
+      // Spread game: blend progress (dominates early) and position (dominates late)
+      const pos          = (myScore - _minS) / _gap  // 0=last, 1=first
+      const attProgress  = 1.0 - 2.0 * gp            // gp=0→+1, gp=1→-1
+      const attPosition  = 1.0 - 2.0 * pos            // trailing→+1, leading→-1
+      const att          = (1.0 - gp) * attProgress + gp * attPosition
+      return Math.max(-1.0, Math.min(1.0, att))
     }
 
     // Only pass attitudes for AI seats with strategies that support it
@@ -1295,13 +1301,13 @@ export default function OnlinePage() {
     if (player === 'Gary') {
       const gp  = totalRounds > 0 ? gpRound / totalRounds : 0
       const myS = cumScores[0] ?? 0
-      // pos: (myScore - min) / (max - min), 0% when all tied, 2 decimal places
-      const posRaw = _gap > 0 ? (myS - _minS) / _gap * 100 : 0
+      // pos: 50% when all tied, otherwise (myScore - min) / (max - min) * 100
+      const posRaw = _gap > 0 ? (myS - _minS) / _gap * 100 : 50
       setDebugAtt([{
         name: seatNames[0],
-        att:  computeAttitude(0),   // attitude this player would have as AI
+        att:  computeAttitude(0),
         gp:   parseFloat((gp * 100).toFixed(2)),
-        pos:  Math.round(posRaw * 100) / 100,   // 2 decimal places
+        pos:  Math.round(posRaw * 100) / 100,
       }])
     }
 
