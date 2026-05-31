@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "11.18"
+APP_VERSION = "11.19"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -1361,4 +1361,14 @@ if os.path.isdir(static_dir):
     @app.get("/{full_path:path}")
     def serve_spa(full_path: str):
         index = os.path.join(static_dir, "index.html")
-        return FileResponse(index)
+        # Prevent browsers (especially mobile Safari) from caching index.html.
+        # Vite JS/CSS assets are content-hashed and can be cached forever;
+        # index.html must always be fresh so the browser loads the new hashes.
+        return FileResponse(
+            index,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma":        "no-cache",
+                "Expires":       "0",
+            },
+        )
