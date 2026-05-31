@@ -248,6 +248,7 @@ interface Props {
   playerNames?:    string[]  // all 4 seat names for cumulative display
   cumScores?:      number[]  // all 4 cumulative scores so far
   isGary?:         boolean   // enables autopilot toggle
+  strategy?:       string    // player's configured AI strategy — used as the default arrangement
 }
 
 function scoreColor(n: number) {
@@ -255,7 +256,7 @@ function scoreColor(n: number) {
 }
 
 export default function ManualArrange({ hand, onConfirm, onLeave, countdown, submittedCount, totalPlayers,
-  roundLabel, playerNames, cumScores, isGary }: Props) {
+  roundLabel, playerNames, cumScores, isGary, strategy }: Props) {
 
   const isDesktop = useMemo(() => window.innerWidth >= 640, [])
 
@@ -302,12 +303,13 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
     Promise.all([
       fetch('/api/manual/arrange_info',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hand})})
         .then(r=>{ if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() }),
-      fetch('/api/game/arrange',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hand,strategy:'rulealpha'})})
+      fetch('/api/game/arrange',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({hand, strategy: strategy ?? 'rulealpha'})})
         .then(r=>r.json()).catch(()=>null),
     ])
     .then(([data, rbData]:[ArrangeInfo, any])=>{
       setInfo(data)
-      // Apply RuleAlpha as default arrangement (not groups[0])
+      // Apply player's configured strategy as default arrangement
       const rbv = rbData ? applyModelData(rbData, hand) : null
       if(rbv){
         setArr({top:rbv.top,mid:rbv.mid,bot:rbv.bot})

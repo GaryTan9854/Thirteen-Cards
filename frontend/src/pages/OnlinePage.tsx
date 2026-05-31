@@ -1705,6 +1705,7 @@ export default function OnlinePage() {
           playerNames={arrangeSeats.length > 0 ? arrangeSeats : undefined}
           cumScores={arrangeSeats.length > 0 ? arrangeCumScores : undefined}
           isGary={isGary}
+          strategy={cfgStrategies[0] ?? 'rulealpha'}
         />,
         document.body
       )
