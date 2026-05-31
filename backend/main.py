@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "12.9"
+APP_VERSION = "12.10"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -630,20 +630,12 @@ def manual_arrange_info(req: ManualInfoRequest):
                 break
 
     # ── Heuristic domination rules (third pass) ─────────────────────────────────
-    # These go beyond pure Pareto: they reason about bonus points (原子頭/鐵支/同花順)
-    # to eliminate arrangements that are definitely weaker even when they "win"
-    # some piles by category.
-    #
-    # Monster categories (score bonus > 1pt):
-    #   top:     三條 (原子頭, +3pt)
-    #   mid/bot: 鐵支 (+4-8pt), 同花順/同花次大順/同花大順 (+5-7pt)
-    #
-    # Rule B: if group A wins ≥2 piles by strictly higher category, AND all piles
-    # where B wins/ties are non-monster for B → A guarantees ≥2:1, B is dominated.
-    #
-    # Rule C: if group A wins exactly 1 pile that IS a monster (≥3pt bonus), AND
-    # all piles where B wins are non-monster for B → A's monster bonus (≥3pt)
+    # Rule C only: if group A wins exactly 1 pile that IS a monster (≥3pt bonus),
+    # AND all piles where B wins are non-monster → A's monster bonus (≥3pt)
     # exceeds B's multi-pile advantage (≤2pt), B is dominated.
+    #
+    # Rule B (2-pile guaranteed win) was removed — it over-eliminates real choices
+    # (e.g. 亂·同花·葫蘆 vs 對·三條·同花 where top pair quality matters in practice).
 
     _TOP_MONSTER = {'三條'}
     _MID_MONSTER = {'鐵支', '同花順', '同花次大順', '同花大順'}
@@ -673,28 +665,19 @@ def manual_arrange_info(req: ManualInfoRequest):
             cj_mid = _CAT.get(mj, 0)
             cj_bot = min(_CAT.get(bj, 0), 8)
 
-            # Determine which piles gi wins, ties, or loses vs gj (by category)
-            # win_i[k] = True if gi strictly beats gj in pile k
             w_top = ci_top > cj_top
             w_mid = ci_mid > cj_mid
             w_bot = ci_bot > cj_bot
-            # piles where gj wins (gi loses) — these are where gj could earn bonus
             l_top = cj_top > ci_top
             l_mid = cj_mid > ci_mid
             l_bot = cj_bot > ci_bot
 
             gi_wins = sum([w_top, w_mid, w_bot])
-            # piles gj wins: check if any is a monster for gj
             gj_pile_is_monster = (
                 (l_top and _is_monster(tj, 'top')) or
                 (l_mid and _is_monster(mj, 'mid')) or
                 (l_bot and _is_monster(bj, 'bot'))
             )
-
-            # Rule B: gi wins ≥2 piles, gj's winning piles are all non-monster
-            if gi_wins >= 2 and not gj_pile_is_monster:
-                gj["dominated"] = True
-                continue
 
             # Rule C: gi wins exactly 1 pile AND that pile is a monster for gi,
             # AND gj's winning piles are all non-monster
