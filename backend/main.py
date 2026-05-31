@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "12.2"
+APP_VERSION = "12.3"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -653,23 +653,32 @@ def manual_arrange_info(req: ManualInfoRequest):
                 gi["dominated"] = True
                 break
 
-    # ── Rule 2: Monster-bot (鐵支/SF) eliminates all-weak groups ──────────────
-    # When a group with bot_cat ≥ 鐵支(7) exists, any group whose ALL THREE rows
-    # are ≤ 対(1) (e.g., [対,対,対] = P,P,P) is eliminated.
-    # Rationale: monster bot scores ≥4 game points more in practice, enough to
-    # overcome the top+mid pair advantage of [P,P,P].
-    has_monster_bot = any(
-        not g.get("dominated") and g.get("variants") and
-        min(_CAT.get(g["variants"][0].get("bot_type",""), 0), 8) >= 7
+    # ── Rule 2: Monster exists → eliminate all-weak groups ────────────────────
+    # Trigger: pool has any group with bot_cat ≥ 鐵支(7) [scores ≥4 game points]
+    #          OR any group with top_type = 三條 (原子頭, scores ~3 game points).
+    # Both triggers provide enough guaranteed advantage over "all-weak" groups.
+    #
+    # "All-weak" = ALL THREE rows have HandCat ≤ 対(1):
+    #   top_cat ≤ 1 (亂 or 対) AND mid_cat ≤ 1 (亂 or 対) AND bot_cat ≤ 1 (亂 or 対)
+    # Any group with at least one row HandCat > 1 is NOT all-weak and survives.
+    #
+    # Proof: 原子頭 (+3) or 鐵支/SF bot (+4) provides enough game points that
+    # all-weak opponents cannot compensate with pair tops/mids alone.
+    has_monster = any(
+        not g.get("dominated") and g.get("variants") and (
+            min(_CAT.get(g["variants"][0].get("bot_type",""), 0), 8) >= 7 or
+            _TOP_CAT.get(g["variants"][0].get("top_type",""), 0) >= 3   # 三條 = 原子頭
+        )
         for g in groups
     )
-    if has_monster_bot:
+    if has_monster:
         for g in groups:
             if g.get("dominated") or not g.get("variants"): continue
             v = g["variants"][0]
             tc = _TOP_CAT.get(v.get("top_type",""), 0)
             mc = _CAT.get(v.get("mid_type",""), 0)
             bc = min(_CAT.get(v.get("bot_type",""), 0), 8)
+            # Eliminate: NO monster in any row (all ≤ 対(1))
             if tc <= 1 and mc <= 1 and bc <= 1:
                 g["dominated"] = True
 
