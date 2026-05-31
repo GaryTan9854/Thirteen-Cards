@@ -2020,6 +2020,7 @@ export default function OnlinePage() {
     const modelOptions = [
       { value: 'rulealpha',  label: 'RuleAlpha' },
       { value: 'rulealpha2', label: 'RuleAlpha2' },
+      { value: 'rulealpha3', label: 'RuleAlpha3' },
       { value: 'ml',         label: 'ML Alpha' },
     ]
     const ModelSelect = ({ idx }: { idx: number }) => (
@@ -2320,6 +2321,7 @@ export default function OnlinePage() {
     const modelOptions = [
       { value: 'rulealpha',  label: 'RuleAlpha' },
       { value: 'rulealpha2', label: 'RuleAlpha2' },
+      { value: 'rulealpha3', label: 'RuleAlpha3' },
       { value: 'ml',         label: 'ML Alpha' },
     ]
     const ModelSelect = ({ idx }: { idx: number }) => (

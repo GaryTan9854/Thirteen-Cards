@@ -137,7 +137,7 @@ export default function StatsPage() {
                          border border-gray-600 focus:outline-none focus:border-sky-500">
               <option value="">全局視角</option>
               {allPlayers.map(p => (
-                <option key={p} value={p}>{p} 的視角</option>
+                <option key={p} value={p}>{p}</option>
               ))}
             </select>
           )}
@@ -181,7 +181,7 @@ export default function StatsPage() {
           {(['all', 'month'] as Period[]).map(p => (
             <button key={p} onClick={() => setPeriod(p)}
               className={`px-3 py-1 rounded-full text-xs font-semibold transition
-                ${period === p ? 'bg-orange-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+                ${period === p ? 'bg-gray-600 text-gray-100 border border-gray-400' : 'bg-gray-800 text-gray-500 hover:text-gray-300'}`}>
               {p === 'all' ? '全期' : `本月 (${data?.month ?? ''})`}
             </button>
           ))}

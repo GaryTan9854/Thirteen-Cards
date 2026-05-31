@@ -601,6 +601,120 @@ def best_arrangement(handstrs: list):
     return best_arrangement_rulealpha(handstrs, attitude=0.0)
 
 
+# ─── RuleAlpha3 ───────────────────────────────────────────────────────────────
+
+def _ra3_filtered_pool(handstrs: list) -> list:
+    """
+    Build the same candidate pool as the '牌型排法' display panel.
+
+    Pipeline (mirrors manual_arrange_info in main.py):
+      1. enumerate_arrangements (or pure-pair canonical)
+      2. Group by (top_type, mid_type, bot_type); keep 1 best per group
+         (score_defensive descending → canonical representative)
+      3. Score-level Pareto: remove variants dominated component-wise
+      4. Type-category Pareto: remove groups whose type-triple is category-dominated
+         (same non-overlapping HandScor logic as display panel)
+
+    Returns list of (Hand3, Hand5_mid, Hand5_bot) tuples — the surviving
+    canonical arrangement for each distinct hand-type combination.
+    """
+    from collections import defaultdict
+
+    # Step 1 — candidates
+    if _is_pure_pairs(handstrs):
+        candidates = enumerate_pure_pair_arrangements(handstrs)
+        if not candidates:
+            candidates = enumerate_arrangements(handstrs)
+    else:
+        candidates = enumerate_arrangements(handstrs)
+
+    if not candidates:
+        return []
+
+    # Step 2 — one canonical per (top_ht, mid_ht, bot_ht) type group
+    groups: dict = defaultdict(list)
+    for h3, hm, hb in candidates:
+        key = (h3.handtype_val, hm.handtype_val, min(hb.handtype_val, 8))
+        groups[key].append((h3, hm, hb))
+
+    pool: list = []
+    for variants in groups.values():
+        variants.sort(key=lambda t: score_defensive(*t), reverse=True)
+        pool.append(variants[0])   # canonical = highest score_defensive
+
+    if not pool:
+        return []
+
+    # Step 3 — score-level Pareto
+    scores = [(h3.score, hm.score, hb.score) for h3, hm, hb in pool]
+    score_ok = []
+    for i, t in enumerate(pool):
+        ts_i, ms_i, bs_i = scores[i]
+        dominated = any(
+            scores[j][0] >= ts_i and scores[j][1] >= ms_i and scores[j][2] >= bs_i
+            and (scores[j][0] > ts_i or scores[j][1] > ms_i or scores[j][2] > bs_i)
+            for j in range(len(pool)) if j != i
+        )
+        if not dominated:
+            score_ok.append(t)
+
+    if not score_ok:
+        score_ok = pool
+
+    # Step 4 — type-category Pareto (HandCat non-overlapping ranges)
+    _TOP_CAT = {0: 0, 1: 1, 3: 3}   # 3-card hand categories
+
+    def _c3(ht: int) -> int:
+        return _TOP_CAT.get(ht, 0)
+
+    def _c5(ht: int) -> int:
+        return min(ht, 8)   # normalise SF variants
+
+    cats = [(_c3(h3.handtype_val), _c5(hm.handtype_val), _c5(hb.handtype_val))
+            for h3, hm, hb in score_ok]
+
+    final = []
+    for i, t in enumerate(score_ok):
+        ci = cats[i]
+        cat_dominated = any(
+            cats[j][0] >= ci[0] and cats[j][1] >= ci[1] and cats[j][2] >= ci[2]
+            and (cats[j][0] > ci[0] or cats[j][1] > ci[1] or cats[j][2] > ci[2])
+            for j in range(len(score_ok)) if j != i
+        )
+        if not cat_dominated:
+            final.append(t)
+
+    return final if final else score_ok
+
+
+def best_arrangement_rulealpha3(handstrs: list, attitude: float = 0.0):
+    """
+    RuleAlpha3 — uses the '牌型排法' display-panel filtering pipeline as the
+    candidate pool, then selects the best via the standard score_defensive /
+    eval_attack + attitude module.
+
+    The pool = canonical representatives of each surviving (top, mid, bot)
+    hand-type group after both score-level and type-category Pareto filters.
+    This is the cleanest version of the candidate set available to the player.
+
+    attitude ∈ [-1, 1]: same semantics as RuleAlpha.
+    """
+    pool = _ra3_filtered_pool(handstrs)
+
+    if not pool:
+        return best_arrangement_rulealpha(handstrs, attitude)   # safe fallback
+
+    best_def = max(pool, key=lambda t: score_defensive(*t))
+    attack_cands = [c for c in pool if eval_attack(*c)]
+
+    if not attack_cands:
+        return best_def
+
+    best_att = max(attack_cands, key=lambda t: score_arrangement(*t))
+    bot_edge = 0.3 if best_def[2].handtype_val > best_att[2].handtype_val else -0.3
+    return best_att if attitude > bot_edge else best_def
+
+
 # ─── RuleAlpha2 helper: double full-house monster ─────────────────────────────
 
 def _enum_double_fullhouse(handstrs: list, inv: dict):
