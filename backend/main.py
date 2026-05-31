@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "11.17"
+APP_VERSION = "11.18"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -1191,6 +1191,12 @@ def api_list_games(limit: int = 100, mode: Optional[str] = None, league_only: bo
 def api_get_game(game_id: str):
     g = gl.get_game(game_id)
     return g if g else {"error": "not_found"}
+
+@app.get("/api/players")
+def api_players():
+    """Return the list of allowed player names for the Gary view-as dropdown."""
+    return {"players": _load_allowed()}
+
 
 @app.get("/api/log/stats")
 def api_stats(scope: str = "all", period: str = "all", player: str = ""):

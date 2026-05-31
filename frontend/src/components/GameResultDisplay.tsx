@@ -185,24 +185,29 @@ export default function GameResultDisplay({
       onClick={canAdvance ? () => advanceRevealRef.current?.() : undefined}
     >
       {/* ── 本局比分 strip (mobile only, hidden until all cards revealed) ── */}
+      {/* Uses players[] order (already permuted to drawn-seat order) not raw final_scores order */}
       <div className={`sm:hidden bg-slate-800 rounded-2xl p-4 shadow-inner ${stepByStep && globalPhase < 3 ? 'invisible' : ''}`}>
         <div className="text-[15px] text-sky-400 mb-2 font-semibold text-center">本局比分</div>
         <div className="grid grid-cols-4 gap-3">
-          {(result.final_scores ?? []).map((fs: any) => (
-            <div key={fs.name} className="flex flex-col items-center gap-1">
-              <span className={`text-xl font-bold font-cinzel ${scoreColor(fs.score)}`}>
-                {fmt(fs.score)}
-              </span>
-              {multiplier > 1 && (
-                <>
-                  <span className="text-xs text-orange-400 font-bold leading-tight">×{multiplier}</span>
-                  <span className={`text-lg font-bold ${scoreColor(Math.round(fs.score * multiplier))}`}>
-                    {fmt(Math.round(fs.score * multiplier))}
-                  </span>
-                </>
-              )}
-            </div>
-          ))}
+          {players.map((p: any) => {
+            const sc = scoreMap[p.name] ?? 0
+            return (
+              <div key={p.name} className="flex flex-col items-center gap-1">
+                <span className="text-[10px] text-gray-400 truncate max-w-full px-0.5">{p.name}</span>
+                <span className={`text-xl font-bold font-cinzel ${scoreColor(sc)}`}>
+                  {fmt(sc)}
+                </span>
+                {multiplier > 1 && (
+                  <>
+                    <span className="text-xs text-orange-400 font-bold leading-tight">×{multiplier}</span>
+                    <span className={`text-lg font-bold ${scoreColor(Math.round(sc * multiplier))}`}>
+                      {fmt(Math.round(sc * multiplier))}
+                    </span>
+                  </>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
 

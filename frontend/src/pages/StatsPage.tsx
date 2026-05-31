@@ -38,6 +38,8 @@ function fmtDate(iso: string) {
   } catch { return iso.slice(0, 10) }
 }
 
+type SortCol = 'player' | 'games' | 'wins' | 'losses' | 'winRate' | 'undefeated'
+
 export default function StatsPage() {
   const { player } = useAuth()
   const isGary = player === 'Gary'
@@ -48,17 +50,36 @@ export default function StatsPage() {
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
 
+  // Sortable columns
+  const [sortCol, setSortCol] = useState<SortCol>('wins')
+  const [sortDir, setSortDir] = useState<'desc'|'asc'>('desc')
+  function toggleSort(col: SortCol) {
+    if (sortCol === col) setSortDir(d => d === 'desc' ? 'asc' : 'desc')
+    else { setSortCol(col); setSortDir('desc') }
+  }
+
+  // Gary: view stats as a specific user via dropdown
+  const [viewAs,     setViewAs]     = useState('')   // '' = Gary's own (no filter)
+  const [allPlayers, setAllPlayers] = useState<string[]>([])
+  useEffect(() => {
+    if (isGary) {
+      fetch('/api/players').then(r => r.json()).then(d => setAllPlayers(d.players ?? [])).catch(() => {})
+    }
+  }, [isGary])
+
   // Reset dialog
   const [showReset,   setShowReset]   = useState(false)
   const [resetLabel,  setResetLabel]  = useState('')
   const [resetting,   setResetting]   = useState(false)
 
+  // Effective player filter: Gary with viewAs → use viewAs; everyone else → use themselves
+  const effectivePlayer = isGary ? viewAs : (player ?? '')
+
   const load = useCallback(() => {
     setLoading(true)
     setError(null)
-    // Always pass the current player so only their games are counted
-    const playerParam = player ? `&player=${encodeURIComponent(player)}` : ''
-    fetch(`/api/log/stats?scope=${scope}&period=${period}${playerParam}`)
+    const pParam = effectivePlayer ? `&player=${encodeURIComponent(effectivePlayer)}` : ''
+    fetch(`/api/log/stats?scope=${scope}&period=${period}${pParam}`)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
@@ -66,7 +87,7 @@ export default function StatsPage() {
       .then(d => setData(d))
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false))
-  }, [scope, period, player])
+  }, [scope, period, effectivePlayer])
 
   useEffect(() => { load() }, [load])
 
@@ -86,7 +107,19 @@ export default function StatsPage() {
     }
   }
 
-  const rows = data?.stats ?? []
+  // Sort rows
+  const baseRows = data?.stats ?? []
+  const rows = [...baseRows].sort((a, b) => {
+    let va = 0, vb = 0
+    if (sortCol === 'player')     { va = a.player.localeCompare(b.player); vb = 0 }
+    else if (sortCol === 'games')      { va = a.games;   vb = b.games }
+    else if (sortCol === 'wins')       { va = a.wins;    vb = b.wins }
+    else if (sortCol === 'losses')     { va = a.losses;  vb = b.losses }
+    else if (sortCol === 'winRate')    { va = a.games ? a.wins/a.games : 0; vb = b.games ? b.wins/b.games : 0 }
+    else if (sortCol === 'undefeated') { va = a.games ? (a.games-a.losses)/a.games : 0; vb = b.games ? (b.games-b.losses)/b.games : 0 }
+    if (sortCol === 'player') return sortDir === 'asc' ? va : -va
+    return sortDir === 'asc' ? va - vb : vb - va
+  })
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
@@ -94,14 +127,29 @@ export default function StatsPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-xl font-bold text-sky-300">📊 戰績統計</h2>
-        {isGary && (
-          <button
-            onClick={() => setShowReset(true)}
-            className="text-xs px-3 py-1.5 rounded-lg bg-gray-700 text-gray-400
-                       hover:bg-gray-600 hover:text-white transition border border-gray-600">
-            🗂 封存並重置
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Gary: view-as dropdown */}
+          {isGary && allPlayers.length > 0 && (
+            <select
+              value={viewAs}
+              onChange={e => setViewAs(e.target.value)}
+              className="text-xs px-2 py-1.5 rounded-lg bg-gray-800 text-gray-200
+                         border border-gray-600 focus:outline-none focus:border-sky-500">
+              <option value="">全局視角</option>
+              {allPlayers.map(p => (
+                <option key={p} value={p}>{p} 的視角</option>
+              ))}
+            </select>
+          )}
+          {isGary && (
+            <button
+              onClick={() => setShowReset(true)}
+              className="text-xs px-3 py-1.5 rounded-lg bg-gray-700 text-gray-400
+                         hover:bg-gray-600 hover:text-white transition border border-gray-600">
+              🗂 封存並重置
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Era info */}
@@ -154,13 +202,22 @@ export default function StatsPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-gray-400 text-xs border-b border-gray-700">
-                <th className="text-left py-2 pr-4">玩家</th>
-                <th className="text-right py-2 px-2">場</th>
-                <th className="text-right py-2 px-2 text-yellow-300">勝</th>
-                <th className="text-right py-2 px-2 text-red-400">負</th>
-                <th className="text-right py-2 px-2">勝率</th>
-                <th className="text-right py-2 pl-2">不敗率</th>
+              <tr className="text-gray-400 text-xs border-b border-gray-700 select-none">
+                {([
+                  ['player',     '玩家',   'text-left   pr-4', ''],
+                  ['games',      '場',     'text-right px-2',  ''],
+                  ['wins',       '勝',     'text-right px-2 text-yellow-300', ''],
+                  ['losses',     '負',     'text-right px-2 text-red-400', ''],
+                  ['winRate',    '最勝率', 'text-right px-2',  ''],
+                  ['undefeated', '不敗率', 'text-right pl-2',  ''],
+                ] as [SortCol, string, string, string][]).map(([col, label, cls]) => (
+                  <th key={col}
+                      className={`py-2 cursor-pointer hover:text-white transition ${cls}`}
+                      onClick={() => toggleSort(col)}>
+                    {label}
+                    {sortCol === col ? (sortDir === 'desc' ? ' ↓' : ' ↑') : ''}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -184,10 +241,6 @@ export default function StatsPage() {
                       <span className={net > 0 ? 'text-yellow-300 font-semibold'
                                                : net < 0 ? 'text-red-400' : 'text-gray-400'}>
                         {pct(r.wins, r.games)}
-                      </span>
-                      <span className={`ml-1 text-xs
-                        ${net > 0 ? 'text-yellow-500' : net < 0 ? 'text-red-500' : 'text-gray-500'}`}>
-                        ({net > 0 ? '+' : ''}{net})
                       </span>
                     </td>
                     <td className="py-2 pl-2 text-right tabular-nums">
