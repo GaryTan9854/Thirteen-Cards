@@ -2124,7 +2124,6 @@ export default function OnlinePage() {
       { value: 'rulealpha',  label: 'RuleAlpha' },
       { value: 'rulealpha2', label: 'RuleAlpha2' },
       { value: 'rulealpha3', label: 'RuleAlpha3' },
-      { value: 'ml',         label: 'ML Alpha' },
     ]
     const ModelSelect = ({ idx }: { idx: number }) => (
       <select
@@ -2434,7 +2433,6 @@ export default function OnlinePage() {
       { value: 'rulealpha',  label: 'RuleAlpha' },
       { value: 'rulealpha2', label: 'RuleAlpha2' },
       { value: 'rulealpha3', label: 'RuleAlpha3' },
-      { value: 'ml',         label: 'ML Alpha' },
     ]
     const ModelSelect = ({ idx }: { idx: number }) => (
       <select
