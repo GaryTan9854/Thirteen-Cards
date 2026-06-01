@@ -62,7 +62,8 @@ def _key3(h) -> str:
     if ht == 3:
         return f"3:{p[0]}"
     if ht == 1:
-        k = p[1] if p[1] else next(x for x in nn if nn.count(x) == 1)
+        k = (p[1] if len(p) > 1 and p[1] else
+             next((x for x in nn if nn.count(x) == 1), 0))
         return f"1:{p[0]},{k}"
     r = sorted(nn, reverse=True)
     return f"0:{r[0]},{r[1]},{r[2]}"
@@ -87,7 +88,10 @@ def _key5(h) -> str:
         ks = sorted([x for x in nn if nn.count(x) == 1], reverse=True)
         return f"3:{p[0]},{ks[0]},{ks[1]}"
     if ht == 2:
-        k = p[2] if p[2] else next(x for x in sorted(nn) if nn.count(x) == 1)
+        # p[2] may be absent if score_hand() was not called or p was rebuilt by
+        # _check_highcard() with fewer elements; fall back to scanning nn directly.
+        k = (p[2] if len(p) > 2 and p[2] else
+             next((x for x in sorted(nn) if nn.count(x) == 1), 0))
         return f"2:{p[0]},{p[1]},{k}"
     if ht == 1:
         ks = sorted([x for x in nn if nn.count(x) == 1], reverse=True)
