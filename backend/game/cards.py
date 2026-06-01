@@ -51,7 +51,7 @@ SpecialChargeByName = {
 
 
 def convert_cardnum(value):
-    return Values[value]
+    return Values.get(value, f'?{value}')
 
 
 class Card:

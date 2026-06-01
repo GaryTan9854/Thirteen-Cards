@@ -104,6 +104,8 @@ class Hand3(Hand):
             return sorted(self, key=lambda c: c.value, reverse=True)
 
     def hand_dscp(self):
+        if not self.p or self.p[0] == 0:
+            self.score_hand()
         ht = self.handtype
         if ht == "三條":
             return convert_cardnum(self.p[0]) + " 衝三"
@@ -277,6 +279,10 @@ class Hand5(Hand):
             return sorted(self, key=lambda c: c.value, reverse=True)
 
     def hand_dscp(self):
+        # Guard: if score_hand() was never called, self.p is still [0,0,0,0,0]
+        # (card values are always 2-14, so p[0]==0 means uninitialised).
+        if not self.p or self.p[0] == 0:
+            self.score_hand()
         hh = self.handtype
         if hh == "同花順":
             return f"{self.p[0]} 同花順"
