@@ -546,7 +546,7 @@ export default function OnlinePage() {
   const [cfgAppeal,       setCfgAppeal]       = useState<number>(_savedSettings.cfgAppeal    ?? 1)
   const [cfgTimeLimit,    setCfgTimeLimit]    = useState(30)
   const [cfgInvitees,     setCfgInvitees]     = useState<string[]>([])
-  const [cfgStrategies,   setCfgStrategies]   = useState<string[]>(_savedSettings.cfgStrategies ?? ['rulealpha', 'rulealpha', 'rulealpha', 'rulealpha'])
+  const [cfgStrategies,   setCfgStrategies]   = useState<string[]>(_savedSettings.cfgStrategies ?? ['rulealpha3', 'rulealpha3', 'rulealpha3', 'rulealpha3'])
   const [cfgAiNames,      setCfgAiNames]      = useState<string[]>(() => randomBeauties())
   const [cfgStepByStep,   setCfgStepByStep]   = useState(false)
   const [cfgRecordGame,   setCfgRecordGame]   = useState(true)

@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "12.12"
+APP_VERSION = "12.13"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -1371,9 +1371,12 @@ def api_stats(scope: str = "all", period: str = "all", player: str = ""):
                     stats[pname] = {"player": pname, "wins": 0, "losses": 0, "games": 0}
                 stats[pname]["games"] += 1
                 if s == max_score and max_score != min_score:
-                    # Sole-winner rule: only award win if not a four-way tie
+                    # Co-champion rule: all players at the highest score get +1 win
+                    # (tied 1st place counts as a win for each tied player).
+                    # Exception: four-way tie (max==min) → no one wins.
                     stats[pname]["wins"] += 1
                 elif s == min_score and max_score != min_score:
+                    # Co-last rule: all players at the lowest score get +1 loss.
                     stats[pname]["losses"] += 1
                 # 2nd/3rd place: no win, no loss
 
