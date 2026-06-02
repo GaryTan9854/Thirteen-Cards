@@ -733,7 +733,9 @@ def _ra3_core(handstrs: list, attitude: float):
     inv = analyze_inventory(handstrs)
 
     # ── C0b: Double 葫蘆 (≥2 trip ranks) ────────────────────────────────────
-    if len(inv['trips']) >= 2:
+    # Skip when a quad exists: 鐵支 (×4 bot / ×8 mid bonus) trumps double-葫蘆,
+    # so let the pool + C0a monster-priority path handle it instead.
+    if len(inv['trips']) >= 2 and not inv['quads']:
         dh = _enum_double_fullhouse(handstrs, inv)
         if dh:
             return dh
