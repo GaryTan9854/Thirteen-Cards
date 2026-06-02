@@ -522,6 +522,7 @@ export default function OnlinePage() {
   const [soloDrawnSeats,     setSoloDrawnSeats]     = useState<string[]>([])
   const [soloActive,  setSoloActive]  = useState(false)
   const [soloPhase,   setSoloPhase]   = useState<string>('lobby')
+  const [soloGameJustEnded, setSoloGameJustEnded] = useState(false)  // track if last solo game ended; reset on re-entering setup
   // Gary debug: attitude values computed for last round
   const [debugAtt, setDebugAtt] = useState<{name:string; att:number; gp:number; pos:number}[]>([])
   const soloStateRef = useRef<SoloState | null>(null)
@@ -647,6 +648,23 @@ export default function OnlinePage() {
     voiceRef.current = next
     setVoiceOn(next)
     localStorage.setItem('tc_voice_on', String(next))
+  }
+
+  // ── Enter solo setup mode (with smart AI name randomization) ────────────────
+  function enterSoloSetup() {
+    if (!soloGameJustEnded) {
+      // First time or after going home — randomize AI names
+      setCfgAiNames(randomBeauties())
+    } else {
+      // Game just ended and player wants to rematch — keep same AI names
+      setSoloGameJustEnded(false)
+    }
+    setSoloSetupMode(true)
+  }
+
+  // ── Randomize AI players manually ──────────────────────────────────────────
+  function randomizeAiPlayers() {
+    setCfgAiNames(randomBeauties())
   }
 
   // ── Leave / ESC navigation ────────────────────────────────────────────────
@@ -2038,7 +2056,8 @@ export default function OnlinePage() {
                         setRoundMultipliers([])
                         setNextMultiplier(1)
                         setHistoryBadges([])
-                        setSoloSetupMode(true)
+                        setSoloGameJustEnded(true)
+                        enterSoloSetup()
                       } else {
                         send({ type: 'new_game' })
                       }
@@ -2112,7 +2131,7 @@ export default function OnlinePage() {
       <BeautyCarousel
         player={player}
         onEnterRoom={() => { autoNewGameRef.current = true; setWaitingForOnlineSetup(true); setInRoom(true) }}
-        onSolo={() => setSoloSetupMode(true)}
+        onSolo={() => enterSoloSetup()}
       />
     )
   }
@@ -2139,7 +2158,7 @@ export default function OnlinePage() {
       <div className="bg-slate-800/30 rounded-xl p-6 space-y-5">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setSoloSetupMode(false)}
+            onClick={() => { setSoloGameJustEnded(false); setSoloSetupMode(false) }}
             className="text-sm text-gray-400 hover:text-white transition">
             ← 返回
           </button>
@@ -2165,7 +2184,15 @@ export default function OnlinePage() {
 
         {/* 各座設定 */}
         <div className="space-y-2">
-          <div className="text-sm text-gray-400">各座模型設定</div>
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-400">各座模型設定</div>
+            <button
+              onClick={randomizeAiPlayers}
+              className="text-xs px-3 py-1 rounded-lg bg-slate-700 text-sky-300 hover:bg-slate-600
+                         transition whitespace-nowrap font-semibold">
+              🎲 換人玩
+            </button>
+          </div>
           <div className="grid grid-cols-4 gap-2">
             {/* 你 */}
             <div className="space-y-1.5">
