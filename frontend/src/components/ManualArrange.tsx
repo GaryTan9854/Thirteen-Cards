@@ -775,7 +775,7 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
                                   : active
                                     ? 'bg-sky-800 border-sky-500 text-sky-100 font-bold'
                                     : matched
-                                      ? 'bg-gray-700 text-gray-200 border-orange-400 font-semibold'
+                                      ? 'bg-gray-700 text-gray-200 border-2 border-orange-400 font-semibold'
                                       : 'bg-gray-700 border-gray-500 text-white hover:border-sky-500'}`}>
                               {g.label}
                               {!dominated && active && cnt>1 && <span className="ml-1 opacity-70 text-sm">{varIdx+1}/{cnt}</span>}

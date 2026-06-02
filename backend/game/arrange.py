@@ -684,7 +684,38 @@ def _ra3_filtered_pool(handstrs: list) -> list:
         if not cat_dominated:
             final.append(t)
 
-    return final if final else score_ok
+    # Step 5 — Rule C (same as manual_arrange_info heuristic pass):
+    # If A wins exactly 1 pile that IS a monster AND all piles B wins are non-monster
+    # → B is dominated.  Keeps the pool consistent with the UI display panel.
+    _TOP_MON = {3}           # 三條 (原子頭) in top = monster
+    _MID_MON = {7, 8}        # 鐵支 / 同花順 in mid = monster
+    _BOT_MON = {7, 8}        # 鐵支 / 同花順 in bot = monster
+
+    rc_ok = list(final) if final else list(score_ok)
+    dominated_flags = [False] * len(rc_ok)
+    for i, ti in enumerate(rc_ok):
+        if dominated_flags[i]:
+            continue
+        ci = (_c3(ti[0].handtype_val), _c5(ti[1].handtype_val), _c5(ti[2].handtype_val))
+        for j, tj in enumerate(rc_ok):
+            if i == j or dominated_flags[j]:
+                continue
+            cj = (_c3(tj[0].handtype_val), _c5(tj[1].handtype_val), _c5(tj[2].handtype_val))
+            w_top = ci[0] > cj[0]; w_mid = ci[1] > cj[1]; w_bot = ci[2] > cj[2]
+            l_top = cj[0] > ci[0]; l_mid = cj[1] > ci[1]; l_bot = cj[2] > ci[2]
+            if sum([w_top, w_mid, w_bot]) == 1 and not (
+                (l_top and cj[0] in _TOP_MON) or
+                (l_mid and cj[1] in _MID_MON) or
+                (l_bot and cj[2] in _BOT_MON)
+            ):
+                i_mon = ((w_top and ci[0] in _TOP_MON) or
+                         (w_mid and ci[1] in _MID_MON) or
+                         (w_bot and ci[2] in _BOT_MON))
+                if i_mon:
+                    dominated_flags[j] = True
+
+    rc_final = [t for t, d in zip(rc_ok, dominated_flags) if not d]
+    return rc_final if rc_final else rc_ok
 
 
 def best_arrangement_rulealpha3(handstrs: list, attitude: float = 0.0):
@@ -711,7 +742,15 @@ def best_arrangement_rulealpha3(handstrs: list, attitude: float = 0.0):
         return best_def
 
     best_att = max(attack_cands, key=lambda t: score_arrangement(*t))
-    bot_edge = 0.3 if best_def[2].handtype_val > best_att[2].handtype_val else -0.3
+    # Raise threshold when defensive best has bot monster (鐵支/同花順):
+    # need a very aggressive attitude to abandon a bot monster.
+    _BOT_MONSTER_CAT = {7, 8}
+    if best_def[2].handtype_val in _BOT_MONSTER_CAT:
+        bot_edge = 0.7
+    elif best_def[2].handtype_val > best_att[2].handtype_val:
+        bot_edge = 0.3
+    else:
+        bot_edge = -0.3
     return best_att if attitude > bot_edge else best_def
 
 

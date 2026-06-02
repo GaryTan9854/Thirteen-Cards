@@ -66,13 +66,20 @@ export default function TournamentPanel({
   const leftRounds  = displayRows.slice(0, SPLIT)
   const rightRounds = displayRows.slice(SPLIT)
 
+  // Dedup-aware initial: if two names share the same first char, use 2 chars
+  const initials = names.map((n, i) => {
+    const first = n[0] ?? n
+    const clash = names.some((m, j) => j !== i && m[0] === first)
+    return clash ? (n.slice(0, 2) ?? n) : first
+  })
+
   const ColHeader = () => (
     <div className="flex mb-1">
       <span className="w-14 shrink-0" />
-      {names.map(n => (
+      {names.map((n, i) => (
         <span key={n} className="flex-1 text-left text-sky-400 font-semibold text-lg pl-2 truncate">
-          {/* mobile: first char only; desktop: full name */}
-          <span className="sm:hidden">{n[0] ?? n}</span>
+          {/* mobile: dedup-aware initial; desktop: full name */}
+          <span className="sm:hidden">{initials[i]}</span>
           <span className="hidden sm:inline">{n}</span>
         </span>
       ))}
