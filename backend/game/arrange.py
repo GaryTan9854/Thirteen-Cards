@@ -480,14 +480,23 @@ def _try_monster_bot(handstrs: list):
         return _best_mid_top(bot_cards, remaining8)
 
     # ── Case 2: Only Quads (no SF) ───────────────────────────────────────
+    # Try every possible kicker and pick the overall best arrangement.
     if has_quads and not has_sf:
         quad_rank  = quad_ranks[0]
         quad_cards = by_rank[quad_rank][:4]
         remaining9 = [cs for cs in handstrs if cs not in quad_cards]
-        kicker     = sorted(remaining9, key=lambda cs: int(cs[:2]))[0]
-        bot_cards  = quad_cards + [kicker]
-        remaining8 = [cs for cs in remaining9 if cs != kicker]
-        return _best_mid_top(bot_cards, remaining8)
+        best_arr   = None
+        best_s     = -float('inf')
+        for kicker in remaining9:
+            bot_cards  = quad_cards + [kicker]
+            remaining8 = [cs for cs in remaining9 if cs != kicker]
+            arr = _best_mid_top(bot_cards, remaining8)
+            if arr:
+                s = score_arrangement(*arr)
+                if s > best_s:
+                    best_s   = s
+                    best_arr = arr
+        return best_arr
 
     # ── Case 3: Only SF (no Quads) ───────────────────────────────────────
     # The main scoring loop handles this correctly — no domain rule needed.
@@ -729,11 +738,32 @@ def best_arrangement_rulealpha3(handstrs: list, attitude: float = 0.0):
     This is the cleanest version of the candidate set available to the player.
 
     attitude ∈ [-1, 1]: same semantics as RuleAlpha.
+
+    C0 preprocessing (same as RuleAlpha2, attitude-independent):
+      • 怪物早退  — 鐵支 / 同花順 → _try_monster_bot, return immediately
+      • 雙葫蘆    — ≥2 trips         → _enum_double_fullhouse, return if found
     """
+    inv = analyze_inventory(handstrs)
+
+    # ── C0b: Double 葫蘆 (≥2 trip ranks) ────────────────────────────────────
+    # Return best double-fullhouse immediately, attitude-independent.
+    if len(inv['trips']) >= 2:
+        dh = _enum_double_fullhouse(handstrs, inv)
+        if dh:
+            return dh
+
     pool = _ra3_filtered_pool(handstrs)
 
     if not pool:
         return best_arrangement_rulealpha(handstrs, attitude)   # safe fallback
+
+    # ── C0a: Monster early-abort (鐵支 / 同花順) in pool ─────────────────────
+    # If the filtered pool contains any bot-monster variant, return the best
+    # one by score_defensive — no attitude switching for monster bots.
+    _BOT_MONSTER_CAT = {7, 8}
+    monster_pool = [t for t in pool if min(t[2].handtype_val, 8) in _BOT_MONSTER_CAT]
+    if monster_pool:
+        return max(monster_pool, key=lambda t: score_defensive(*t))
 
     best_def = max(pool, key=lambda t: score_defensive(*t))
     attack_cands = [c for c in pool if eval_attack(*c)]
@@ -742,12 +772,7 @@ def best_arrangement_rulealpha3(handstrs: list, attitude: float = 0.0):
         return best_def
 
     best_att = max(attack_cands, key=lambda t: score_arrangement(*t))
-    # Raise threshold when defensive best has bot monster (鐵支/同花順):
-    # need a very aggressive attitude to abandon a bot monster.
-    _BOT_MONSTER_CAT = {7, 8}
-    if best_def[2].handtype_val in _BOT_MONSTER_CAT:
-        bot_edge = 0.7
-    elif best_def[2].handtype_val > best_att[2].handtype_val:
+    if best_def[2].handtype_val > best_att[2].handtype_val:
         bot_edge = 0.3
     else:
         bot_edge = -0.3
