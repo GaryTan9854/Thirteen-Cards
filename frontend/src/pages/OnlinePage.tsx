@@ -1291,16 +1291,18 @@ export default function OnlinePage() {
       const myScore = cumScores[seatIdx] ?? 0
       const gp      = totalRounds > 0 ? gpRound / totalRounds : 0
 
+      // Close game (gap < 30): keep moderate attack throughout.
+      // The gun-bonus (×1.5 / ×2) non-linearity rewards risk when scores
+      // are tight — one 全壘打 flips the game regardless of who's leading.
       if (_gap < 30) {
-        // Close game: full aggressive early, full defensive from mid-game
-        // gp=0→+1.0, gp=0.25→0, gp=0.5→-1.0 (clamped)
-        return Math.max(-1.0, Math.min(1.0, 1.0 - 4.0 * gp))
+        return Math.max(-1.0, Math.min(1.0, 0.7 - 0.4 * gp))
       }
-      // Spread game: blend progress (dominates early) and position (dominates late)
-      const pos          = (myScore - _minS) / _gap  // 0=last, 1=first
-      const attProgress  = 1.0 - 2.0 * gp            // gp=0→+1, gp=1→-1
-      const attPosition  = 1.0 - 2.0 * pos            // trailing→+1, leading→-1
-      const att          = (1.0 - gp) * attProgress + gp * attPosition
+
+      // Spread game: position-based, urgency scales with progress.
+      // pos=0 (last) → attack ; pos=1 (leader) → defend
+      // (0.4 + 0.6·gp): early game muted; final round amplified.
+      const pos = (myScore - _minS) / _gap
+      const att = (1.0 - 2.0 * pos) * (0.4 + 0.6 * gp)
       return Math.max(-1.0, Math.min(1.0, att))
     }
 

@@ -120,41 +120,49 @@ def compute_dynamic_attitude(
     all_scores : list
         Cumulative scores of all 4 players at this point.
 
-    Attitude function (-1 = ultra conservative, 0 = neutral, +1 = ultra aggressive):
+    Attitude function (-1 = ultra conservative, 0 = neutral, +1 = ultra aggressive).
 
-    Phase 1 — game_progress 0% → 50%:
-        attitude = 1 - 2·(progress/0.5)  →  1.0 at start, 0.0 at 50%
+    Design insight (Gary, 2026):
+      gun bonus (×1.5/×2) is a *non-linear* payoff. When everyone is close,
+      attacking has positive EV regardless of who is leading — one 全壘打
+      can flip the game. Therefore "close gap" should NOT collapse to full
+      defense like the old version did.
 
-    Phase 2 — game_progress > 50%:
-        score_gap = max - min
-        if score_gap < 30:
-            attitude = -1.0   (everyone close → lock in, ultra conservative)
-        else:
-            score_position = (my_score - min) / score_gap   ∈ [0, 1]
-            attitude = 1 - 2·score_position
-            → position=0 (last)  →  +1.0 (aggressive, try to catch up)
-            → position=1 (first) →  -1.0 (conservative, protect lead)
+    Close game  (gap < 30):
+        # Mild-to-moderate attack throughout; taper slightly late to avoid
+        # blowing a tied game on the last round.
+        attitude = 0.7 − 0.4·gp        # gp=0 → +0.7 ; gp=1 → +0.3
+
+    Spread game (gap ≥ 30):
+        pos = (my − min) / gap         # 0 = last ; 1 = first
+        # Trailing pushes attack, leading pushes defense.
+        # Magnitude scales with gp so urgency grows toward the final rounds.
+        attitude = (1 − 2·pos) · (0.4 + 0.6·gp)
+            pos=0, gp=1  → +1.0   (last, final round → all-in)
+            pos=1, gp=1  → −1.0   (leader, final round → lock)
+            pos=0, gp=0  → +0.4   (last, early → moderate attack)
+            pos=1, gp=0  → −0.4   (leader, early → moderate defense)
     """
     if total_rounds <= 0:
         return 0.0
 
-    game_progress = rounds_played / total_rounds   # 0.0 → 1.0
+    gp = rounds_played / total_rounds   # 0.0 → 1.0
 
-    if game_progress <= 0.5:
-        return max(-1.0, min(1.0, 1.0 - 2.0 * (game_progress / 0.5)))
-
-    # Phase 2
     if not all_scores:
-        return -1.0
+        # No score info yet — treat as close game.
+        return max(-1.0, min(1.0, 0.7 - 0.4 * gp))
+
     min_s = min(all_scores)
     max_s = max(all_scores)
     score_gap = max_s - min_s
 
     if score_gap < 30:
-        return -1.0
+        # Close game: keep attack momentum, gun-bonus upside is real.
+        return max(-1.0, min(1.0, 0.7 - 0.4 * gp))
 
-    score_position = (my_score - min_s) / score_gap   # 0.0 = last, 1.0 = first
-    return max(-1.0, min(1.0, 1.0 - 2.0 * score_position))
+    pos = (my_score - min_s) / score_gap   # 0.0 = last, 1.0 = first
+    att = (1.0 - 2.0 * pos) * (0.4 + 0.6 * gp)
+    return max(-1.0, min(1.0, att))
 
 
 def _arrange(hand_cards, strategy: str, attitude_override: float = None) -> 'Hand13':
