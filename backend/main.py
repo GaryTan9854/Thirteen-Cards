@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "13.3"
+APP_VERSION = "13.4"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -593,41 +593,11 @@ def manual_arrange_info(req: ManualInfoRequest):
             # All variants eliminated — keep for display (strikethrough) but disable
             g["dominated"] = True
 
-    # ── Type-category Pareto (second pass) ───────────────────────────────────────
-    # After score-level Pareto, run one more pass using HandCat categories instead
-    # of specific card scores.  Non-overlapping HandScor guarantees that a higher
-    # bot TYPE always beats a lower bot TYPE (e.g. F=75+ always beats TR=45-64).
-    # For top/mid rows of the SAME category, treat them as "equal" and ignore the
-    # minor within-category score difference.
-    #
-    # Rule: group G_A category-dominates G_B if
-    #   _cat(G_A.top) >= _cat(G_B.top)  AND
-    #   _cat(G_A.mid) >= _cat(G_B.mid)  AND
-    #   _cat(G_A.bot) >= _cat(G_B.bot)  AND at least one strict >
-    # → G_B is marked dominated (further eliminations beyond score-level Pareto).
-    active_groups = [g for g in groups
-                     if not g.get("dominated") and g.get("variants")]
-    for i, gi in enumerate(active_groups):
-        if gi.get("dominated"):
-            continue
-        vi = gi["variants"][0]
-        ci_top = _TOP_CAT.get(vi.get("top_type", ""), 0)
-        ci_mid = _CAT.get(vi.get("mid_type", ""), 0)
-        ci_bot = min(_CAT.get(vi.get("bot_type", ""), 0), 8)
-
-        for j, gj in enumerate(active_groups):
-            if i == j or gj.get("dominated") or not gj.get("variants"):
-                continue
-            vj = gj["variants"][0]
-            cj_top = _TOP_CAT.get(vj.get("top_type", ""), 0)
-            cj_mid = _CAT.get(vj.get("mid_type", ""), 0)
-            cj_bot = min(_CAT.get(vj.get("bot_type", ""), 0), 8)
-
-            # gj category-dominates gi
-            if (cj_top >= ci_top and cj_mid >= ci_mid and cj_bot >= ci_bot and
-                    (cj_top > ci_top or cj_mid > ci_mid or cj_bot > ci_bot)):
-                gi["dominated"] = True
-                break
+    # ── Type-category Pareto (second pass) — DISABLED ───────────────────────────
+    # Removed: treating same-category piles as "equal" over-prunes legitimate options.
+    # e.g. (1,3,4) 對·三條·順 with QQ top is wrongly eliminated by (1,4,5) 對·順·同花
+    # with 22 top, even though the QQ-top arrangement is strategically distinct.
+    # Score-level Pareto (above) already handles true dominance correctly.
 
     # ── Heuristic domination rules (third pass) ─────────────────────────────────
     # Rule C only: if group A wins exactly 1 pile that IS a monster (≥3pt bonus),

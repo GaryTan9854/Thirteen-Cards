@@ -671,7 +671,11 @@ def _ra3_filtered_pool(handstrs: list) -> list:
         score_ok = pool
 
     # Step 4 — type-category Pareto (HandCat non-overlapping ranges)
-    _TOP_CAT = {0: 0, 1: 1, 3: 3}   # 3-card hand categories
+    # Removed pure category-dominance: same-category piles can have very different
+    # actual scores (e.g. QQ pair vs 22 pair both = "對"), so eliminating B by category
+    # alone over-prunes when B has a meaningfully stronger pile within an equal category.
+    # Step 3 (score Pareto) already handles true dominance correctly.
+    _TOP_CAT = {0: 0, 1: 1, 3: 3}   # kept for Step 5 Rule C use
 
     def _c3(ht: int) -> int:
         return _TOP_CAT.get(ht, 0)
@@ -679,19 +683,7 @@ def _ra3_filtered_pool(handstrs: list) -> list:
     def _c5(ht: int) -> int:
         return min(ht, 8)   # normalise SF variants
 
-    cats = [(_c3(h3.handtype_val), _c5(hm.handtype_val), _c5(hb.handtype_val))
-            for h3, hm, hb in score_ok]
-
-    final = []
-    for i, t in enumerate(score_ok):
-        ci = cats[i]
-        cat_dominated = any(
-            cats[j][0] >= ci[0] and cats[j][1] >= ci[1] and cats[j][2] >= ci[2]
-            and (cats[j][0] > ci[0] or cats[j][1] > ci[1] or cats[j][2] > ci[2])
-            for j in range(len(score_ok)) if j != i
-        )
-        if not cat_dominated:
-            final.append(t)
+    final = list(score_ok)
 
     # Step 5 — Rule C (same as manual_arrange_info heuristic pass):
     # If A wins exactly 1 pile that IS a monster AND all piles B wins are non-monster
