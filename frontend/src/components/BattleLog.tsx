@@ -62,14 +62,19 @@ export default function BattleLog({ battles, stepByStep = false }: Props) {
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
   }, [battles, stepByStep])
 
-  function skipToEnd() {
-    setRevealStep(4)
-  }
+  function skipToEnd() { setRevealStep(4) }
 
   const visible = (step: number) =>
     revealStep >= step
       ? 'opacity-100 transition-opacity duration-700'
       : 'opacity-0 pointer-events-none'
+
+  // Pre-compute per-player gun counts for multiplier display
+  const gunCounts: Record<string, number> = {}
+  battles.forEach((b: any) => {
+    if (b.gun > 0) gunCounts[b.p1] = (gunCounts[b.p1] ?? 0) + 1
+    if (b.gun < 0) gunCounts[b.p2] = (gunCounts[b.p2] ?? 0) + 1
+  })
 
   return (
     <div
@@ -77,45 +82,64 @@ export default function BattleLog({ battles, stepByStep = false }: Props) {
       onClick={stepByStep && revealStep < 4 ? skipToEnd : undefined}
       style={{ cursor: stepByStep && revealStep < 4 ? 'pointer' : 'default' }}
     >
+      {/* Title row: label left, column headers right */}
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-bold text-gray-600">
           {stepByStep ? STEP_LABELS[revealStep] : '⚔️ 比牌結果'}
         </h3>
-        {stepByStep && revealStep < 4 && (
-          <span className="text-xs text-gray-400">點擊跳過</span>
-        )}
+        <div className="flex items-center gap-x-3 text-xs text-gray-400 font-semibold pr-1">
+          <span>頭</span>
+          <span className={visible(2)}>中</span>
+          <span className={visible(3)}>尾</span>
+          <span className={`w-16 text-right ${visible(4)}`}>合計</span>
+          {stepByStep && revealStep < 4 && (
+            <span className="text-gray-400 ml-1">點擊跳過</span>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">
-        {battles.map((b: any, i) => (
-          <div key={i} className={`flex items-start justify-between rounded-lg px-3 py-2 text-sm gap-2
-            ${b.gun !== 0 ? 'bg-red-50 border border-red-200' : 'bg-gray-50'}`}>
-            <span className={`font-semibold shrink-0 ${b.gun !== 0 ? 'text-red-700' : 'text-gray-700'}`}>
-              {b.desc}
-            </span>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs justify-end">
-              {/* 頭 — always visible (step 1+) */}
-              <span className="flex items-center gap-0.5 text-gray-500">
-                頭 {resIcon(b.top)}
-                <MonsterBadge type={b.p1_top} shortMap={TOP_MONSTER_SHORT} />
+        {battles.map((b: any, i) => {
+          // Determine gun shooter and multiplier
+          const shooter = b.gun > 0 ? b.p1 : b.gun < 0 ? b.p2 : null
+          const gc = shooter ? (gunCounts[shooter] ?? 1) : 1
+          const mul = gc >= 3 ? 2 : gc === 2 ? 1.5 : 1
+          const multiplied = Math.round(b.total * mul)
+          const showMul = b.gun !== 0 && gc >= 2
+
+          return (
+            <div key={i} className={`flex items-start justify-between rounded-lg px-3 py-2 text-sm gap-2
+              ${b.gun !== 0 ? 'bg-red-50 border border-red-200' : 'bg-gray-50'}`}>
+              <span className={`font-semibold shrink-0 ${b.gun !== 0 ? 'text-red-700' : 'text-gray-700'}`}>
+                {b.desc}
               </span>
-              {/* 中 — visible at step 2+ */}
-              <span className={`flex items-center gap-0.5 text-gray-500 ${visible(2)}`}>
-                中 {resIcon(b.mid)}
-                <MonsterBadge type={b.p1_mid ?? b.p2_mid} shortMap={MID_MONSTER_SHORT} />
-              </span>
-              {/* 尾 — visible at step 3+ */}
-              <span className={`flex items-center gap-0.5 text-gray-500 ${visible(3)}`}>
-                尾 {resIcon(b.bot)}
-                <MonsterBadge type={b.p1_bot ?? b.p2_bot} shortMap={BOT_MONSTER_SHORT} />
-              </span>
-              {/* 合計 — visible at step 4 */}
-              <span className={`font-bold text-gray-700 ${visible(4)}`}>
-                = {b.total > 0 ? '+' : ''}{b.total}
-              </span>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs justify-end">
+                {/* 頭 — always visible (step 1+) */}
+                <span className="flex items-center gap-0.5 text-gray-500">
+                  {resIcon(b.top)}
+                  <MonsterBadge type={b.p1_top} shortMap={TOP_MONSTER_SHORT} />
+                </span>
+                {/* 中 — visible at step 2+ */}
+                <span className={`flex items-center gap-0.5 text-gray-500 ${visible(2)}`}>
+                  {resIcon(b.mid)}
+                  <MonsterBadge type={b.p1_mid ?? b.p2_mid} shortMap={MID_MONSTER_SHORT} />
+                </span>
+                {/* 尾 — visible at step 3+ */}
+                <span className={`flex items-center gap-0.5 text-gray-500 ${visible(3)}`}>
+                  {resIcon(b.bot)}
+                  <MonsterBadge type={b.p1_bot ?? b.p2_bot} shortMap={BOT_MONSTER_SHORT} />
+                </span>
+                {/* 合計 — visible at step 4 */}
+                <span className={`font-bold text-gray-700 w-16 text-right ${visible(4)}`}>
+                  {showMul
+                    ? <>= {b.total > 0 ? '+' : ''}{b.total} <span className="text-orange-600">×{gc}</span> = {multiplied > 0 ? '+' : ''}{multiplied}</>
+                    : <>= {b.total > 0 ? '+' : ''}{b.total}</>
+                  }
+                </span>
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
