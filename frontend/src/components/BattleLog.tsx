@@ -109,7 +109,9 @@ export default function BattleLog({ battles, stepByStep = false }: Props) {
           const top = Math.round(b.top * rowMul)
           const mid = Math.round(b.mid * rowMul)
           const bot = Math.round(b.bot * rowMul)
-          const total = top + mid + bot
+          // For special hands (報到) b.top/mid/bot are all 0 but b.total holds the charge.
+          // For normal play, b.total = b.top+b.mid+b.bot, so b.total * rowMul is consistent.
+          const total = Math.round(b.total * rowMul)
           const gunSuffix = b.gun !== 0
             ? (gc >= 3 ? '（全壘打）' : gc === 2 ? '（打兩人）' : '')
             : ''
