@@ -1167,6 +1167,9 @@ def _is_pure_pairs(handstrs: list) -> bool:
     for hi in range(14, 5, -1):
         if set(range(hi - 4, hi + 1)).issubset(ranks):
             return False
+    # A,2,3,4,5 wheel straight — Ace acts as low (rank 1 conceptually)
+    if {14, 2, 3, 4, 5}.issubset(ranks):
+        return False
     by_suit: dict = defaultdict(int)
     for cs in handstrs:
         by_suit[cs[2]] += 1
