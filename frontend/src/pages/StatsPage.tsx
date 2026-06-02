@@ -58,8 +58,10 @@ export default function StatsPage() {
     else { setSortCol(col); setSortDir('desc') }
   }
 
-  // Gary: view stats as a specific user via dropdown
-  const [viewAs,     setViewAs]     = useState('')   // '' = Gary's own (no filter)
+  // View mode: 'me' = self only; 'public' = all players (Gary only)
+  const [viewMode,   setViewMode]   = useState<'me' | 'public'>('me')
+  // Gary: view stats as a specific user via dropdown (within public leaderboard)
+  const [viewAs,     setViewAs]     = useState('')   // '' = public leaderboard
   const [allPlayers, setAllPlayers] = useState<string[]>([])
   useEffect(() => {
     if (isGary) {
@@ -72,8 +74,8 @@ export default function StatsPage() {
   const [resetLabel,  setResetLabel]  = useState('')
   const [resetting,   setResetting]   = useState(false)
 
-  // Effective player filter: Gary with viewAs → use viewAs; everyone else → use themselves
-  const effectivePlayer = isGary ? viewAs : (player ?? '')
+  // Effective player filter: viewMode controls whether to show self or public leaderboard
+  const effectivePlayer = viewMode === 'me' ? (player ?? '') : (isGary ? viewAs : '')
 
   const load = useCallback(() => {
     setLoading(true)
@@ -87,7 +89,7 @@ export default function StatsPage() {
       .then(d => setData(d))
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false))
-  }, [scope, period, effectivePlayer])
+  }, [scope, period, viewMode, effectivePlayer])
 
   useEffect(() => { load() }, [load])
 
@@ -125,17 +127,33 @@ export default function StatsPage() {
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
 
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-xl font-bold text-sky-300">📊 戰績統計</h2>
-        <div className="flex items-center gap-2">
-          {/* Gary: view-as dropdown */}
-          {isGary && allPlayers.length > 0 && (
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* View mode: 我 / 公榜 (visible to all) */}
+          <div className="flex gap-1.5">
+            {(['me', 'public'] as const).map(mode => (
+              <button key={mode}
+                onClick={() => setViewMode(mode)}
+                disabled={mode === 'public' && !isGary}
+                className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition
+                  ${viewMode === mode
+                    ? 'bg-sky-600 text-white'
+                    : mode === 'public' && !isGary
+                      ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+                {mode === 'me' ? '我' : '公榜'}
+              </button>
+            ))}
+          </div>
+          {/* Gary: view-as dropdown (only in public mode) */}
+          {isGary && viewMode === 'public' && allPlayers.length > 0 && (
             <select
               value={viewAs}
               onChange={e => setViewAs(e.target.value)}
               className="text-xs px-2 py-1.5 rounded-lg bg-gray-800 text-gray-200
                          border border-gray-600 focus:outline-none focus:border-sky-500">
-              <option value="">全局視角</option>
+              <option value="">全部玩家</option>
               {allPlayers.map(p => (
                 <option key={p} value={p}>{p}</option>
               ))}
