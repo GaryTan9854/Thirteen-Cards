@@ -197,7 +197,7 @@ def _arrange(hand_cards, strategy: str, attitude_override: float = None) -> 'Han
             h.CanAttack  = getattr(result, 'CanAttack', False)
         return h
 
-    # rulealpha3 — 牌型排法候選池 + 雙層Pareto + attitude
+    # rulealpha3 — 牌型排法候選池 + Pareto；attitude 永遠 0（pure hand-based）
     if strategy in ('rulealpha3', 'rulealpha3_aggressive', 'rulealpha3_conservative'):
         from .arrange import best_arrangement_rulealpha3
         h = Hand13(cardstrs)
@@ -205,9 +205,26 @@ def _arrange(hand_cards, strategy: str, attitude_override: float = None) -> 'Han
         h.specialhand = sp
         if sp != 'normal':
             return h
-        att3 = attitude_override if attitude_override is not None \
-               else {'rulealpha3_aggressive': 0.8, 'rulealpha3_conservative': -0.8}.get(strategy, 0.0)
-        result = best_arrangement_rulealpha3(cardstrs, attitude=att3)
+        result = best_arrangement_rulealpha3(cardstrs, attitude=0.0)
+        if result:
+            h.htop, h.hmid, h.hbot = result
+            h.ss = [h.htop.score, h.hmid.score, h.hbot.score]
+            h.score = sum(h.ss)
+            h.totalscore = h.score
+            h.CanAttack  = getattr(result, 'CanAttack', False)
+        return h
+
+    # rulealpha4 — 同 RA3 pipeline 但用動態 attitude
+    if strategy in ('rulealpha4', 'rulealpha4_aggressive', 'rulealpha4_conservative'):
+        from .arrange import best_arrangement_rulealpha4
+        h = Hand13(cardstrs)
+        sp = h.chk_special()
+        h.specialhand = sp
+        if sp != 'normal':
+            return h
+        att4 = attitude_override if attitude_override is not None \
+               else {'rulealpha4_aggressive': 0.8, 'rulealpha4_conservative': -0.8}.get(strategy, 0.0)
+        result = best_arrangement_rulealpha4(cardstrs, attitude=att4)
         if result:
             h.htop, h.hmid, h.hbot = result
             h.ss = [h.htop.score, h.hmid.score, h.hbot.score]

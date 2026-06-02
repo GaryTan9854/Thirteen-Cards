@@ -1304,12 +1304,16 @@ export default function OnlinePage() {
       return Math.max(-1.0, Math.min(1.0, att))
     }
 
-    // Only pass attitudes for AI seats with strategies that support it
-    const _attSupportedPfx = ['rulealpha', 'rulealpha3']
+    // Only pass attitudes for AI seats with strategies that honor it.
+    // RuleAlpha and RuleAlpha4 honor dynamic attitude.
+    // RuleAlpha3 explicitly ignores attitude (pure hand-based).
+    // RuleAlpha2 hard-codes attitude=0 internally.
+    const _attSupports = (s: string) =>
+      s === 'rulealpha' || s.startsWith('rulealpha_') || s.startsWith('rulealpha4')
     const ai_attitudes = seatNames.map((_, i) => {
       if (i === 0) return 0.0  // human player, attitude unused (they choose manually)
       const strat = state.strategies[i] ?? 'rulealpha'
-      if (_attSupportedPfx.some(p => strat.startsWith(p))) {
+      if (_attSupports(strat)) {
         return computeAttitude(i)
       }
       return 0.0
@@ -2164,6 +2168,7 @@ export default function OnlinePage() {
       { value: 'rulealpha',  label: 'RuleAlpha' },
       { value: 'rulealpha2', label: 'RuleAlpha2' },
       { value: 'rulealpha3', label: 'RuleAlpha3' },
+      { value: 'rulealpha4', label: 'RuleAlpha4' },
     ]
     const ModelSelect = ({ idx }: { idx: number }) => (
       <select
@@ -2481,6 +2486,7 @@ export default function OnlinePage() {
       { value: 'rulealpha',  label: 'RuleAlpha' },
       { value: 'rulealpha2', label: 'RuleAlpha2' },
       { value: 'rulealpha3', label: 'RuleAlpha3' },
+      { value: 'rulealpha4', label: 'RuleAlpha4' },
     ]
     const ModelSelect = ({ idx }: { idx: number }) => (
       <select

@@ -719,39 +719,30 @@ def _ra3_filtered_pool(handstrs: list) -> list:
     return rc_final if rc_final else rc_ok
 
 
-def best_arrangement_rulealpha3(handstrs: list, attitude: float = 0.0):
+def _ra3_core(handstrs: list, attitude: float):
     """
-    RuleAlpha3 — uses the '牌型排法' display-panel filtering pipeline as the
-    candidate pool, then selects the best via the standard score_defensive /
-    eval_attack + attitude module.
+    Shared core for RuleAlpha3 (attitude=0 fixed) and RuleAlpha4 (dynamic attitude).
 
-    The pool = canonical representatives of each surviving (top, mid, bot)
-    hand-type group after both score-level and type-category Pareto filters.
-    This is the cleanest version of the candidate set available to the player.
+    Uses the '牌型排法' display-panel filtering pipeline as the candidate pool,
+    then selects the best via score_defensive / eval_attack + attitude.
 
-    attitude ∈ [-1, 1]: same semantics as RuleAlpha.
-
-    C0 preprocessing (same as RuleAlpha2, attitude-independent):
-      • 怪物早退  — 鐵支 / 同花順 → _try_monster_bot, return immediately
-      • 雙葫蘆    — ≥2 trips         → _enum_double_fullhouse, return if found
+    C0 preprocessing (attitude-independent):
+      • 雙葫蘆 — ≥2 trips → _enum_double_fullhouse, return if found
+      • 怪物尾墩 — pool 含鐵支/同花順 → 取 score_defensive 最高者
     """
     inv = analyze_inventory(handstrs)
 
     # ── C0b: Double 葫蘆 (≥2 trip ranks) ────────────────────────────────────
-    # Return best double-fullhouse immediately, attitude-independent.
     if len(inv['trips']) >= 2:
         dh = _enum_double_fullhouse(handstrs, inv)
         if dh:
             return dh
 
     pool = _ra3_filtered_pool(handstrs)
-
     if not pool:
         return best_arrangement_rulealpha(handstrs, attitude)   # safe fallback
 
     # ── C0a: Monster early-abort (鐵支 / 同花順) in pool ─────────────────────
-    # If the filtered pool contains any bot-monster variant, return the best
-    # one by score_defensive — no attitude switching for monster bots.
     _BOT_MONSTER_CAT = {7, 8}
     monster_pool = [t for t in pool if min(t[2].handtype_val, 8) in _BOT_MONSTER_CAT]
     if monster_pool:
@@ -769,6 +760,32 @@ def best_arrangement_rulealpha3(handstrs: list, attitude: float = 0.0):
     else:
         bot_edge = -0.3
     return best_att if attitude > bot_edge else best_def
+
+
+def best_arrangement_rulealpha3(handstrs: list, attitude: float = 0.0):
+    """
+    RuleAlpha3 — pure hand-based arrangement (attitude FIXED to 0).
+
+    Same pool & filtering as RuleAlpha4, but ignores any passed-in attitude.
+    Picks the default arrangement based solely on the hand itself (defensive
+    or balanced attack/defense at the neutral threshold).
+
+    Use this when you want a stable, hand-only default that does not shift
+    with game progress / score gap.
+    """
+    return _ra3_core(handstrs, 0.0)
+
+
+def best_arrangement_rulealpha4(handstrs: list, attitude: float = 0.0):
+    """
+    RuleAlpha4 — RuleAlpha3 pipeline with DYNAMIC attitude.
+
+    Same pool / filters as RuleAlpha3 but honors the passed attitude
+    ∈ [-1, 1] to swing between defense (negative) and attack (positive).
+    Use this when you want AI behavior to adapt to game progress and
+    score position (via compute_dynamic_attitude()).
+    """
+    return _ra3_core(handstrs, attitude)
 
 
 # ─── RuleAlpha2 helper: double full-house monster ─────────────────────────────

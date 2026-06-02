@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "13.4"
+APP_VERSION = "13.5"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -137,9 +137,20 @@ def arrange_hand(req: ArrangeRequest):
             h13.arrange13()
             arr = h13
     elif strategy in ("rulealpha3", "rulealpha3_aggressive", "rulealpha3_conservative"):
+        # RuleAlpha3 ignores attitude (always 0); keep aliases for backward compat.
         from game.arrange import best_arrangement_rulealpha3
-        attitude = {"rulealpha3_aggressive": 0.8, "rulealpha3_conservative": -0.8}.get(strategy, 0.0)
-        result = best_arrangement_rulealpha3(req.hand, attitude=attitude)
+        result = best_arrangement_rulealpha3(req.hand, attitude=0.0)
+        if result:
+            h13.htop, h13.hmid, h13.hbot = result
+            h13.ss = [h13.htop.score, h13.hmid.score, h13.hbot.score]
+            arr = h13
+        else:
+            h13.arrange13()
+            arr = h13
+    elif strategy in ("rulealpha4", "rulealpha4_aggressive", "rulealpha4_conservative"):
+        from game.arrange import best_arrangement_rulealpha4
+        attitude = {"rulealpha4_aggressive": 0.8, "rulealpha4_conservative": -0.8}.get(strategy, 0.0)
+        result = best_arrangement_rulealpha4(req.hand, attitude=attitude)
         if result:
             h13.htop, h13.hmid, h13.hbot = result
             h13.ss = [h13.htop.score, h13.hmid.score, h13.hbot.score]
