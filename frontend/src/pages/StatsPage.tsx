@@ -135,25 +135,22 @@ export default function StatsPage() {
             {(['me', 'public'] as const).map(mode => (
               <button key={mode}
                 onClick={() => setViewMode(mode)}
-                disabled={mode === 'public' && !isGary}
                 className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition
                   ${viewMode === mode
                     ? 'bg-sky-600 text-white'
-                    : mode === 'public' && !isGary
-                      ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
                 {mode === 'me' ? '我' : '公榜'}
               </button>
             ))}
           </div>
-          {/* Gary: view-as dropdown (only in public mode) */}
+          {/* Gary: view-as dropdown (only in public mode) — drill into a specific player */}
           {isGary && viewMode === 'public' && allPlayers.length > 0 && (
             <select
               value={viewAs}
               onChange={e => setViewAs(e.target.value)}
               className="text-xs px-2 py-1.5 rounded-lg bg-gray-800 text-gray-200
                          border border-gray-600 focus:outline-none focus:border-sky-500">
-              <option value="">全部玩家</option>
+              <option value="">公榜</option>
               {allPlayers.map(p => (
                 <option key={p} value={p}>{p}</option>
               ))}
