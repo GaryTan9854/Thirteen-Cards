@@ -1467,7 +1467,15 @@ export default function OnlinePage() {
       }
     }
 
-    if (circleSeat >= 0) state.circleMarks[state.currentRound - 1] = circleSeat
+    if (circleSeat >= 0) {
+      // Store drawn-order display index directly so no permutation is needed at render time.
+      // drawnOrder: the visual column order; seatNames: the game-logic order.
+      const drawnOrder = state.drawnOrder
+      const displayIdx = (drawnOrder && drawnOrder.length === seatNames.length)
+        ? drawnOrder.indexOf(seatNames[circleSeat])
+        : circleSeat
+      state.circleMarks[state.currentRound - 1] = displayIdx >= 0 ? displayIdx : circleSeat
+    }
 
     // Build event-like message for display functions
     const isEnded = newPhase === 'ended'
@@ -1508,9 +1516,16 @@ export default function OnlinePage() {
     addRoundBadges(state.currentRound, res)
     setRoundMultipliers([...state.roundMultipliers])
     setNextMultiplier(state.multiplier)
-    if (circleSeat >= 0) setCircleMarks(prev => ({ ...prev, [state.currentRound - 1]: circleSeat }))
+    if (circleSeat >= 0) {
+      // Use the same display-index already stored in state.circleMarks (converted above)
+      const displayIdx = state.circleMarks[state.currentRound - 1]
+      setCircleMarks(prev => ({ ...prev, [state.currentRound - 1]: displayIdx }))
+    }
 
     soloPhaseRef.current = newPhase
+    // Set appealInfo in the same batch as setSoloPhase so the popup always
+    // renders in the same cycle as phase === 'appeal_pending'.
+    if (newAppealInfo && !effectiveStepByStep) setAppealInfo(newAppealInfo)
     setSoloPhase(newPhase)
 
     if (isBoring && state.multiplier > 1 && voiceRef.current) {
@@ -1534,7 +1549,7 @@ export default function OnlinePage() {
       fireRoundEffects(res, fakeMsg)
       if (isEnded) scheduleEndGameVoice(fakeMsg)
       if (newAppealInfo) {
-        setAppealInfo(newAppealInfo)
+        // appealInfo already set above, just schedule voice
         scheduleAppealVoice(newAppealInfo, false, (accept) => soloAppealDecision(accept))
       }
     }
@@ -1576,7 +1591,13 @@ export default function OnlinePage() {
       const history   = state2.history
       const totals    = seatNames.map((_, i) => history.reduce((s, r) => s + (r[i] ?? 0), 0))
       const loserIdx  = totals.indexOf(Math.min(...totals))
-      if (loserIdx >= 0) setCircleMarks(prev => ({ ...prev, [state2.currentRound - 1]: loserIdx }))
+      if (loserIdx >= 0) {
+        const drawnOrder = state2.drawnOrder
+        const displayIdx = (drawnOrder && drawnOrder.length === seatNames.length)
+          ? drawnOrder.indexOf(seatNames[loserIdx])
+          : loserIdx
+        setCircleMarks(prev => ({ ...prev, [state2.currentRound - 1]: displayIdx >= 0 ? displayIdx : loserIdx }))
+      }
       const endMsg: any = {
         type: 'game_ended', result: lastResult?.result ?? {}, round: state2.currentRound,
         history, seat_names: seatNames, from_appeal_decline: true,
@@ -2757,7 +2778,9 @@ export default function OnlinePage() {
     const rm         = frozenDisplay ? frozenDisplay.multipliers
                      : (roundMultipliers.length > 0 ? roundMultipliers : (room?.round_multipliers ?? []))
     const rawCm      = frozenDisplay ? frozenDisplay.circleMarks : circleMarks
-    const cm         = perm
+    // Solo mode: circleMarks already store drawn-order display index — no permutation needed.
+    // Online mode: circle_seat comes from server in seat order, so permute as before.
+    const cm         = (perm && !soloActive)
       ? Object.fromEntries(Object.entries(rawCm).map(([k, v]) => [k, perm.indexOf(v)]))
       : rawCm
     // Permute badges so purple text follows the correct player column
