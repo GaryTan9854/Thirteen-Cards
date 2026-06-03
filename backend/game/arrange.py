@@ -693,15 +693,20 @@ def _ra3_filtered_pool(handstrs: list) -> list:
     _BOT_MON = {7, 8}        # 鐵支 / 同花順 in bot = monster
 
     rc_ok = list(final) if final else list(score_ok)
+    cats_all = [(_c3(t[0].handtype_val), _c5(t[1].handtype_val), _c5(t[2].handtype_val))
+                for t in rc_ok]
+    def _has_monster(c):
+        return c[0] in _TOP_MON or c[1] in _MID_MON or c[2] in _BOT_MON
+
     dominated_flags = [False] * len(rc_ok)
     for i, ti in enumerate(rc_ok):
         if dominated_flags[i]:
             continue
-        ci = (_c3(ti[0].handtype_val), _c5(ti[1].handtype_val), _c5(ti[2].handtype_val))
+        ci = cats_all[i]
         for j, tj in enumerate(rc_ok):
             if i == j or dominated_flags[j]:
                 continue
-            cj = (_c3(tj[0].handtype_val), _c5(tj[1].handtype_val), _c5(tj[2].handtype_val))
+            cj = cats_all[j]
             w_top = ci[0] > cj[0]; w_mid = ci[1] > cj[1]; w_bot = ci[2] > cj[2]
             l_top = cj[0] > ci[0]; l_mid = cj[1] > ci[1]; l_bot = cj[2] > ci[2]
             if sum([w_top, w_mid, w_bot]) == 1 and not (
@@ -714,6 +719,21 @@ def _ra3_filtered_pool(handstrs: list) -> list:
                          (w_bot and ci[2] in _BOT_MON))
                 if i_mon:
                     dominated_flags[j] = True
+
+    # ── Rule D — 原子頭 absolute dominance ──────────────────────────────────
+    # 三條 in top = 原子頭 = ×3 bonus + ~100% top winrate. Any arrangement with
+    # 原子頭 dominates any arrangement that has NO monster anywhere.
+    # (The top monster's payoff swamps whatever the non-monster arrangement
+    # could gain from mid/bot wins in 4-player play.)
+    for i, ci in enumerate(cats_all):
+        if dominated_flags[i] or ci[0] != 3:   # i must have 三條 top
+            continue
+        for j, cj in enumerate(cats_all):
+            if i == j or dominated_flags[j]:
+                continue
+            if _has_monster(cj):
+                continue
+            dominated_flags[j] = True
 
     rc_final = [t for t, d in zip(rc_ok, dominated_flags) if not d]
     return rc_final if rc_final else rc_ok

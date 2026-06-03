@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "13.7"
+APP_VERSION = "13.8"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -670,6 +670,27 @@ def manual_arrange_info(req: ManualInfoRequest):
                 )
                 if gi_monster:
                     gj["dominated"] = True
+
+    # ── Rule D — 原子頭 absolute dominance ──────────────────────────────────
+    # 三條 in top = 原子頭 = ×3 bonus + near-100% top winrate. Any arrangement
+    # with 原子頭 dominates any arrangement that has NO monster anywhere.
+    active_groups = [g for g in groups
+                     if not g.get("dominated") and g.get("variants")]
+    for gi in active_groups:
+        if gi.get("dominated"):
+            continue
+        vi = gi["variants"][0]
+        if not _is_monster(vi.get("top_type", ""), 'top'):
+            continue   # gi must have 原子頭 in top
+        for gj in active_groups:
+            if gj is gi or gj.get("dominated"):
+                continue
+            vj = gj["variants"][0]
+            j_has_monster = (_is_monster(vj.get("top_type", ""), 'top') or
+                             _is_monster(vj.get("mid_type", ""), 'mid') or
+                             _is_monster(vj.get("bot_type", ""), 'bot'))
+            if not j_has_monster:
+                gj["dominated"] = True
 
     return {
         "stats":   stats,
