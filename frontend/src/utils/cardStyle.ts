@@ -2,8 +2,7 @@
  * Card face style preference (browser-level).
  *   v1 = 初版 — single line centered (♥A)
  *   v2 = 二版 — rank corners + tiny suit centre
- *   v3 = 三版 — rank+suit stacked top-left & rotated bottom-right (mirror layout);
- *               grey frame, SemiBold for face ranks, suit +25 %.
+ *   v3 = 三版 — v1 base; uniform grey frame, rank+suit +10 %.
  */
 import { useEffect, useState } from 'react'
 
@@ -36,5 +35,5 @@ export function useCardStyle(): CardStyle {
 export const CARD_STYLE_LABELS: Record<CardStyle, string> = {
   v1: '初版',
   v2: '二版',
-  v3: '四色版',
+  v3: '三版',
 }
