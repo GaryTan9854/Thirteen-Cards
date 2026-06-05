@@ -59,14 +59,22 @@ function sortCards(cards: string[], mode: SortMode): string[] {
 // ─── CardTile ─────────────────────────────────────────────────────────────────
 
 function CardTile({ cs, size='md' }: { cs:string; size?:'xs'|'sm'|'md'|'lg' }) {
-  const dim = size==='lg' ? 'w-14 h-20 text-base'
-            : size==='md' ? 'w-11 h-16 text-sm'
-            : size==='sm' ? 'w-9 h-12 text-xs'
-            : 'w-6 h-9 text-[10px]'
+  const suit = SUIT_SYM[cs[2]]
+  const rank = RANK_STR[parseInt(cs.slice(0,2))]
+  // outer box size
+  const box  = size==='lg' ? 'w-14 h-20' : size==='md' ? 'w-11 h-16' : size==='sm' ? 'w-9 h-12' : 'w-6 h-9'
+  // rank font (corner)
+  const rkf  = size==='lg' ? 'text-[13px]' : size==='md' ? 'text-[11px]' : size==='sm' ? 'text-[10px]' : 'text-[8px]'
+  // suit font (center)
+  const stf  = size==='lg' ? 'text-[26px]' : size==='md' ? 'text-[22px]' : size==='sm' ? 'text-[17px]' : 'text-[11px]'
+  // padding
+  const pad  = size==='xs' ? 'p-[2px]' : 'p-[3px]'
   return (
-    <span className={`inline-flex items-center justify-center rounded-lg border-2 font-bold shadow select-none
-      ${dim} ${isRed(cs) ? 'border-red-300 bg-white text-red-600' : 'border-gray-400 bg-white text-gray-900'}`}>
-      {cardShow(cs)}
+    <span className={`inline-flex flex-col justify-between rounded-lg border-2 font-bold shadow select-none overflow-hidden
+      ${box} ${pad} ${isRed(cs) ? 'border-red-300 bg-white text-red-600' : 'border-gray-400 bg-white text-gray-900'}`}>
+      <span className={`${rkf} leading-none self-start`}>{rank}</span>
+      <span className={`${stf} leading-none self-center`}>{suit}</span>
+      <span className={`${rkf} leading-none self-end rotate-180`}>{rank}</span>
     </span>
   )
 }
@@ -771,7 +779,7 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
                               title={dominated ? '此排法被其他排法全面壓制' : undefined}
                               className={`text-[16px] px-2 py-1.5 rounded-lg border transition-colors text-left
                                 ${dominated
-                                  ? 'bg-gray-800 border-gray-700 text-gray-600 cursor-not-allowed line-through opacity-60'
+                                  ? 'bg-red-950/50 border-red-900/60 text-red-300/50 cursor-not-allowed line-through decoration-red-500 decoration-2 opacity-70'
                                   : active
                                     ? 'bg-sky-800 border-sky-500 text-sky-100 font-bold'
                                     : matched

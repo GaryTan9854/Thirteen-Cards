@@ -51,7 +51,7 @@ export default function StatsPage() {
   const [error,   setError]   = useState<string | null>(null)
 
   // Sortable columns
-  const [sortCol, setSortCol] = useState<SortCol>('wins')
+  const [sortCol, setSortCol] = useState<SortCol>('undefeated')
   const [sortDir, setSortDir] = useState<'desc'|'asc'>('desc')
   function toggleSort(col: SortCol) {
     if (sortCol === col) setSortDir(d => d === 'desc' ? 'asc' : 'desc')
