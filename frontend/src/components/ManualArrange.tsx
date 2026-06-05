@@ -58,28 +58,36 @@ function sortCards(cards: string[], mode: SortMode): string[] {
 
 // ─── CardTile ─────────────────────────────────────────────────────────────────
 
-// SVG-cards sprite ID mapping (htdebeer/SVG-cards)
-const SUIT_SVG: Record<string, string> = { H:'heart', D:'diamond', S:'spade', C:'club' }
-const RANK_SVG: Record<number, string> = {
-  14:'1', 13:'king', 12:'queen', 11:'jack',
-  10:'10', 9:'9', 8:'8', 7:'7', 6:'6', 5:'5', 4:'4', 3:'3', 2:'2',
-}
 const isRedSuit = (cs: string) => cs[2] === 'H' || cs[2] === 'D'
+const FACE_RANK_NUMS = new Set([14, 13, 12, 11])
 
 function CardTile({ cs, size='md' }: { cs:string; size?:'xs'|'sm'|'md'|'lg' }) {
   const style = useCardStyle()
   const box   = size==='lg' ? 'w-14 h-20' : size==='md' ? 'w-11 h-16' : size==='sm' ? 'w-9 h-12' : 'w-6 h-9'
 
-  // ── v3: SVG sprite (圖版) ──
+  // ── v3: mirror layout (三版) ──
   if (style === 'v3') {
-    const id = `${SUIT_SVG[cs[2]]}_${RANK_SVG[parseInt(cs.slice(0,2))]}`
+    const suit    = SUIT_SYM[cs[2]]
+    const rankNum = parseInt(cs.slice(0,2))
+    const rank    = RANK_STR[rankNum]
+    const isFace  = FACE_RANK_NUMS.has(rankNum)
+    const textCol = isRedSuit(cs) ? 'text-red-600' : 'text-gray-900'
+    const rkW     = isFace ? 'font-semibold' : 'font-normal'
+    // sizes: numbers stay v2, suit +25 %
+    const rkf = size==='lg' ? 'text-[17px]' : size==='md' ? 'text-[14px]' : size==='sm' ? 'text-[12px]' : 'text-[9px]'
+    const stf = size==='lg' ? 'text-[21px]' : size==='md' ? 'text-[17px]' : size==='sm' ? 'text-[15px]' : 'text-[11px]'
+    const pad = size==='xs' ? 'p-[2px]' : 'p-[3px]'
+    const corner = (
+      <span className="flex flex-col items-center leading-none">
+        <span className={`${rkf} leading-none ${rkW}`}>{rank}</span>
+        <span className={`${stf} leading-none`}>{suit}</span>
+      </span>
+    )
     return (
-      <span className={`inline-block rounded-lg overflow-hidden shadow select-none flex-shrink-0
-                        bg-white border border-gray-300 ${box}`}>
-        <svg viewBox="0 0 169.075 244.640" className="w-full h-full block"
-             preserveAspectRatio="xMidYMid meet">
-          <use href={`/assets/cards/svg-cards.svg#${id}`} />
-        </svg>
+      <span className={`inline-flex flex-col justify-between rounded-lg border-2 border-gray-300 bg-white
+                        shadow select-none overflow-hidden flex-shrink-0 ${box} ${pad} ${textCol}`}>
+        <span className="self-start">{corner}</span>
+        <span className="self-end rotate-180">{corner}</span>
       </span>
     )
   }

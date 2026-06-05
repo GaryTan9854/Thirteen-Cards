@@ -26,12 +26,10 @@ const STRATEGY_LABEL: Record<string, string> = {
 /** Face-down card back — same size as CardChip (w-11 h-16) */
 function CardBack() {
   return (
-    <span className="inline-block w-11 h-16 rounded-lg overflow-hidden border border-blue-900
-                     shadow-sm select-none flex-shrink-0 bg-white">
-      <svg viewBox="0 0 169.075 244.640" className="w-full h-full block"
-           preserveAspectRatio="xMidYMid meet">
-        <use href="/assets/cards/svg-cards.svg#back" />
-      </svg>
+    <span className="inline-flex items-center justify-center w-11 h-16 rounded-lg border-2
+                     border-blue-700 select-none flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg,#1e3a5f,#0f2040)' }}>
+      <span style={{ fontSize: 18, opacity: 0.55 }}>🂠</span>
     </span>
   )
 }

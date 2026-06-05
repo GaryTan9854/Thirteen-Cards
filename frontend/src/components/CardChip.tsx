@@ -4,12 +4,7 @@ interface Props {
   card: string   // format: "♥A", "♠K", "♦10", "♣2" …
 }
 
-const SUIT_NAME: Record<string, string> = {
-  '♥': 'heart', '♦': 'diamond', '♠': 'spade', '♣': 'club',
-}
-const RANK_NAME: Record<string, string> = {
-  'A': '1', 'J': 'jack', 'Q': 'queen', 'K': 'king',
-}
+const FACE_RANKS = new Set(['A', 'K', 'Q', 'J'])
 
 export default function CardChip({ card }: Props) {
   const style = useCardStyle()
@@ -17,16 +12,22 @@ export default function CardChip({ card }: Props) {
   const rank  = card.slice(1)
   const isRed = suit === '♥' || suit === '♦'
 
-  // ── v3: SVG-cards sprite ──
+  // ── v3: mirror layout (三版) — rank+suit stacked at top-left & bottom-right ──
   if (style === 'v3') {
-    const id = `${SUIT_NAME[suit]}_${RANK_NAME[rank] ?? rank}`
+    const textColor  = isRed ? 'text-red-600' : 'text-gray-900'
+    const rankWeight = FACE_RANKS.has(rank) ? 'font-semibold' : 'font-normal'
+    const corner = (
+      <span className="flex flex-col items-center leading-none">
+        <span className={`text-[14px] leading-none ${rankWeight}`}>{rank}</span>
+        <span className="text-[17px] leading-none">{suit}</span>
+      </span>
+    )
     return (
-      <span className="inline-block w-11 h-16 rounded-lg overflow-hidden shadow-sm select-none
-                       flex-shrink-0 bg-white border border-gray-300">
-        <svg viewBox="0 0 169.075 244.640" className="w-full h-full block"
-             preserveAspectRatio="xMidYMid meet">
-          <use href={`/assets/cards/svg-cards.svg#${id}`} />
-        </svg>
+      <span className={`inline-flex flex-col justify-between p-[3px] w-11 h-16 rounded-lg border-2
+                        border-gray-300 bg-white shadow-sm select-none overflow-hidden flex-shrink-0
+                        ${textColor}`}>
+        <span className="self-start">{corner}</span>
+        <span className="self-end rotate-180">{corner}</span>
       </span>
     )
   }
