@@ -112,30 +112,26 @@ export default function GameResultDisplay({
 
   const advanceRevealRef = useRef<() => void>()
   advanceRevealRef.current = () => {
-    const { animating, globalPhase, players, myName } = stateRef.current
+    const { animating, globalPhase, players } = stateRef.current
     if (animating || globalPhase >= 3) return
 
     const nextPhase = globalPhase + 1
     setAnimating(true)
 
-    // Self seat flips first; others in random order
-    const selfSeat    = players.findIndex((p: any) => p.name === myName)
-    const firstSeat   = selfSeat >= 0 ? selfSeat : 0
-    const otherSeats  = players
-      .map((_: any, i: number) => i)
-      .filter((i: number) => i !== firstSeat)
-      .sort(() => Math.random() - 0.5)
+    // Reveal in ascending strength order: weakest pile first, strongest last.
+    // Special-hand players have no top/mid/bot → sort to the end.
+    const pileKey = nextPhase === 1 ? 'top' : nextPhase === 2 ? 'mid' : 'bot'
+    const order = players
+      .map((p: any, i: number) => {
+        const sc = p[pileKey]?.score
+        return { i, score: typeof sc === 'number' ? sc : Number.POSITIVE_INFINITY }
+      })
+      .sort((a, b) => a.score - b.score)
+      .map(o => o.i)
 
-    // Reveal self immediately
-    setSeatReveal(prev => {
-      const next = [...prev]
-      next[firstSeat] = nextPhase
-      return next
-    })
-    playFlipSound()
-
-    // Reveal each other seat with 0.5 s head-start + 0.2 s spacing
-    otherSeats.forEach((seatIdx: number, order: number) => {
+    // Reveal each seat in order, 350ms apart
+    const STEP = 350
+    order.forEach((seatIdx: number, k: number) => {
       setTimeout(() => {
         setSeatReveal(prev => {
           const next = [...prev]
@@ -143,11 +139,11 @@ export default function GameResultDisplay({
           return next
         })
         playFlipSound()
-      }, 500 + order * 200)
+      }, k * STEP)
     })
 
     // Unlock after last flip + small buffer
-    const unlockAt = 500 + otherSeats.length * 200 + 120
+    const unlockAt = (order.length - 1) * STEP + 200
     setTimeout(() => {
       setGlobalPhase(nextPhase)
       setAnimating(false)
