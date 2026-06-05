@@ -20,7 +20,9 @@ import {
   detectGrandSlam, buildGunNotifs, buildSpecialTTS,
   speak, speakSequence,
 } from '../utils/gameEffects'
-import { setScene, isMusicOn, toggleMusic, stopMusic } from '../utils/music'
+import { setScene, stopMusic } from '../utils/music'
+import { useVoiceOn } from '../utils/voice'
+import { useCardStyle, setCardStyle, CARD_STYLE_LABELS, CardStyle } from '../utils/cardStyle'
 import QuipPanel from '../components/QuipPanel'
 import AvatarPicker from '../components/AvatarPicker'
 
@@ -480,6 +482,26 @@ function LogToggle({ label, value, onChange }: { label: string; value: boolean; 
   )
 }
 
+function CardStyleSelect({ value, onChange }: { value: CardStyle; onChange: (v: CardStyle) => void }) {
+  return (
+    <label className="flex items-center gap-2 select-none">
+      <span className="text-sm text-gray-300">牌面</span>
+      <div className="flex gap-1">
+        {(Object.keys(CARD_STYLE_LABELS) as CardStyle[]).map(s => (
+          <button key={s}
+            onClick={() => onChange(s)}
+            className={`px-2 py-0.5 rounded-md text-xs font-semibold transition border
+              ${value === s
+                ? 'bg-sky-500 border-sky-400 text-white'
+                : 'bg-slate-700 border-slate-600 text-gray-300 hover:border-sky-400'}`}>
+            {CARD_STYLE_LABELS[s]}
+          </button>
+        ))}
+      </div>
+    </label>
+  )
+}
+
 function LeagueSelect({ leagues, value, onChange }: {
   leagues: { league_id: string; name: string; year: number }[]
   value: string
@@ -614,12 +636,11 @@ export default function OnlinePage() {
   const gunQueueRef           = useRef<GunNotif[]>([])
   // When 逐墩比牌 is on, gun effects are deferred until all cards are flipped
   const pendingRoundEffectRef = useRef<(() => void) | null>(null)
-  // Voice off by default; persisted in localStorage
-  const [voiceOn,  setVoiceOn]  = useState(() =>
-    localStorage.getItem('tc_voice_on') === 'true'  // default OFF
-  )
-  const voiceRef = useRef(localStorage.getItem('tc_voice_on') === 'true')
-  const [musicOn,      setMusicOn]          = useState(() => isMusicOn())
+  // Voice ref kept in sync with global tc_voice_on; toggle UI lives in App.tsx
+  const _voiceOn = useVoiceOn()
+  const voiceRef = useRef(_voiceOn)
+  useEffect(() => { voiceRef.current = _voiceOn }, [_voiceOn])
+  const cardStyle = useCardStyle()
   const [quipCtx,      setQuipCtx]          = useState<{ loser: string; winner: string; names: string[] } | null>(null)
 
   // Persist player-specific settings to localStorage whenever they change
@@ -642,13 +663,6 @@ export default function OnlinePage() {
   const seatingDrawBtnRef     = useRef<HTMLButtonElement>(null)
   const seatingStartBtnRef    = useRef<HTMLButtonElement>(null)
   const leaveConfirmBtnRef    = useRef<HTMLButtonElement>(null)
-
-  function toggleVoice() {
-    const next = !voiceRef.current
-    voiceRef.current = next
-    setVoiceOn(next)
-    localStorage.setItem('tc_voice_on', String(next))
-  }
 
   // ── Enter solo setup mode (with smart AI name randomization) ────────────────
   function enterSoloSetup() {
@@ -2025,38 +2039,16 @@ export default function OnlinePage() {
                 </div>
               )}
 
-              {/* Nav header portal: 🔊 + ⚙重置 (Gary) */}
-              {(() => {
+              {/* Nav header portal: ⚙重置 (Gary only) — music/voice now live in App.tsx top bar */}
+              {isGary && (() => {
                 const slot = document.getElementById('tournament-header-slot')
                 return slot ? createPortal(
-                  <div className="flex items-center gap-1">
-                    {isGary && (
-                      <button
-                        onClick={async () => { await fetch('/api/online/reset', { method: 'POST' }) }}
-                        className="text-xs text-gray-400 hover:text-red-400 px-2 py-1 rounded hover:bg-slate-700 transition"
-                        title="強制重置房間（Gary 限定）">
-                        ⚙ 重置
-                      </button>
-                    )}
-                    <button onClick={() => { const next = toggleMusic(); setMusicOn(next) }}
-                      className="text-xs px-2 py-1 rounded hover:bg-slate-700 transition text-gray-400 hover:text-white"
-                      title={musicOn ? '配樂開啟（點擊關閉）' : '配樂關閉（點擊開啟）'}>
-                      <span className="relative inline-block leading-none">
-                        🎵
-                        {!musicOn && (
-                          <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible"
-                               viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                            <line x1="1" y1="1" x2="15" y2="15" stroke="#ef4444" strokeWidth="2.2" strokeLinecap="round"/>
-                          </svg>
-                        )}
-                      </span>
-                    </button>
-                    <button onClick={toggleVoice}
-                      className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-slate-700 transition"
-                      title={voiceOn ? '語音開啟（點擊關閉）' : '語音關閉（點擊開啟）'}>
-                      {voiceOn ? '🔊' : '🔇'}
-                    </button>
-                  </div>,
+                  <button
+                    onClick={async () => { await fetch('/api/online/reset', { method: 'POST' }) }}
+                    className="text-xs text-gray-400 hover:text-red-400 px-2 py-1 rounded hover:bg-slate-700 transition"
+                    title="強制重置房間（Gary 限定）">
+                    ⚙ 重置
+                  </button>,
                   slot
                 ) : null
               })()}
@@ -2261,8 +2253,9 @@ export default function OnlinePage() {
         {/* 顯示設定 */}
         <div className="space-y-2 border-t border-slate-600/40 pt-4">
           <div className="text-sm text-gray-400">顯示設定</div>
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap gap-4 items-center">
             <LogToggle label="逐墩比牌" value={cfgStepByStep} onChange={setCfgStepByStep} />
+            <CardStyleSelect value={cardStyle} onChange={setCardStyle} />
           </div>
         </div>
 
@@ -2598,8 +2591,9 @@ export default function OnlinePage() {
 
         {/* 顯示設定 */}
         <div className="space-y-2 border-t border-slate-600/40 pt-3">
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap gap-4 items-center">
             <LogToggle label="逐墩比牌" value={cfgStepByStep} onChange={setCfgStepByStep} />
+            <CardStyleSelect value={cardStyle} onChange={setCardStyle} />
           </div>
         </div>
 

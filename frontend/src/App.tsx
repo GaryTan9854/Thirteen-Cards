@@ -8,6 +8,36 @@ import LeaguePage     from './pages/LeaguePage'
 import RulesPage      from './pages/RulesPage'
 import StatsPage      from './pages/StatsPage'
 import ErrorBoundary  from './components/ErrorBoundary'
+import { useMusicOn, toggleMusic } from './utils/music'
+import { useVoiceOn, toggleVoice } from './utils/voice'
+
+// ─── Sound toggle bar (left of player chip) ───────────────────────────────────
+function SoundToggles() {
+  const musicOn = useMusicOn()
+  const voiceOn = useVoiceOn()
+  return (
+    <div className="flex items-center gap-0.5">
+      <button onClick={() => toggleMusic()}
+        className="text-base px-1.5 py-1 rounded hover:bg-slate-700 transition text-gray-400 hover:text-white"
+        title={musicOn ? '配樂開啟（點擊關閉）' : '配樂關閉（點擊開啟）'}>
+        <span className="relative inline-block leading-none">
+          🎵
+          {!musicOn && (
+            <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible"
+                 viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+              <line x1="1" y1="1" x2="15" y2="15" stroke="#ef4444" strokeWidth="2.2" strokeLinecap="round"/>
+            </svg>
+          )}
+        </span>
+      </button>
+      <button onClick={() => toggleVoice()}
+        className="text-base px-1.5 py-1 rounded hover:bg-slate-700 transition text-gray-400 hover:text-white"
+        title={voiceOn ? '語音開啟（點擊關閉）' : '語音關閉（點擊開啟）'}>
+        {voiceOn ? '🔊' : '🔇'}
+      </button>
+    </div>
+  )
+}
 
 // ─── Inner app (needs AuthProvider above) ─────────────────────────────────────
 
@@ -82,8 +112,9 @@ function AppInner() {
             ))}
           </div>
 
-          {/* Player chip + logout (portal slot for 成績表 toggle between them) */}
+          {/* Sound toggles + player chip + logout */}
           <div className="flex items-center gap-2">
+            <SoundToggles />
             <span className={`font-bold px-3 py-1 rounded-full text-sm
               ${isGary
                 ? 'bg-yellow-400 text-gray-900'

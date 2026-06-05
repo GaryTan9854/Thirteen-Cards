@@ -21,9 +21,12 @@ function pickTrack(scene: string): string | null {
   return variants[Math.random() < 0.5 ? 0 : 1]
 }
 
+import { useEffect, useState } from 'react'
+
 let audio: HTMLAudioElement | null = null
 let _scene = ''
 let _enabled = localStorage.getItem('tc_music_on') !== 'false'   // default ON
+const listeners = new Set<(b: boolean) => void>()
 
 function makeAudio(src: string, loop = true): HTMLAudioElement {
   if (audio) { audio.pause(); audio.src = '' }
@@ -69,13 +72,22 @@ export function toggleMusic(): boolean {
   _enabled = !_enabled
   localStorage.setItem('tc_music_on', String(_enabled))
   if (_enabled) {
-    if (_scene === 'playing') { playPlaying(); return true }
-    const src = pickTrack(_scene)
-    if (src) tryPlay(makeAudio(src))
+    if (_scene === 'playing') { playPlaying() }
+    else {
+      const src = pickTrack(_scene)
+      if (src) tryPlay(makeAudio(src))
+    }
   } else {
     audio?.pause()
   }
+  listeners.forEach(l => l(_enabled))
   return _enabled
+}
+
+export function useMusicOn(): boolean {
+  const [s, set] = useState(_enabled)
+  useEffect(() => { listeners.add(set); return () => { listeners.delete(set) } }, [])
+  return s
 }
 
 export function stopMusic() {

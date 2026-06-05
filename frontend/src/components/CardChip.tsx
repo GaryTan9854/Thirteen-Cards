@@ -1,12 +1,7 @@
-/**
- * CardChip — renders a single playing card via the SVG-cards sprite
- * (htdebeer/SVG-cards, LGPL). Sprite served from /assets/cards/svg-cards.svg.
- * Browser fetches the file once and caches it for all subsequent <use> refs.
- */
+import { useCardStyle } from '../utils/cardStyle'
 
 interface Props {
   card: string   // format: "♥A", "♠K", "♦10", "♣2" …
-  size?: 'sm' | 'md' | 'lg'
 }
 
 const SUIT_NAME: Record<string, string> = {
@@ -16,24 +11,47 @@ const RANK_NAME: Record<string, string> = {
   'A': '1', 'J': 'jack', 'Q': 'queen', 'K': 'king',
 }
 
-function cardSymbolId(card: string): string {
-  const suit = SUIT_NAME[card[0]]
-  const rankRaw = card.slice(1)
-  const rank = RANK_NAME[rankRaw] ?? rankRaw   // '2'..'10' pass through
-  return `${suit}_${rank}`
-}
+export default function CardChip({ card }: Props) {
+  const style = useCardStyle()
+  const suit  = card[0]
+  const rank  = card.slice(1)
+  const isRed = suit === '♥' || suit === '♦'
 
-export default function CardChip({ card, size = 'md' }: Props) {
-  const id = cardSymbolId(card)
-  // 169 × 244 native viewBox ≈ 1 : 1.445
-  const box = size === 'lg' ? 'w-14 h-20' : size === 'sm' ? 'w-9 h-12' : 'w-11 h-16'
+  // ── v3: SVG-cards sprite ──
+  if (style === 'v3') {
+    const id = `${SUIT_NAME[suit]}_${RANK_NAME[rank] ?? rank}`
+    return (
+      <span className="inline-block w-11 h-16 rounded-lg overflow-hidden shadow-sm select-none
+                       flex-shrink-0 bg-white border border-gray-300">
+        <svg viewBox="0 0 169.075 244.640" className="w-full h-full block"
+             preserveAspectRatio="xMidYMid meet">
+          <use href={`/assets/cards/svg-cards.svg#${id}`} />
+        </svg>
+      </span>
+    )
+  }
+
+  const color = isRed
+    ? 'border-red-300 bg-white text-red-600'
+    : 'border-gray-400 bg-white text-gray-900'
+
+  // ── v1: plain text centred (初版) ──
+  if (style === 'v1') {
+    return (
+      <span className={`inline-flex items-center justify-center w-11 h-16 rounded-lg border-2
+                        text-sm font-bold shadow-sm select-none flex-shrink-0 ${color}`}>
+        {card}
+      </span>
+    )
+  }
+
+  // ── v2: rank corners + small centre suit (二版) ──
   return (
-    <span className={`inline-block rounded-lg overflow-hidden shadow-sm select-none flex-shrink-0
-                      bg-white border border-gray-300 ${box}`}>
-      <svg viewBox="0 0 169.075 244.640" className="w-full h-full block"
-           preserveAspectRatio="xMidYMid meet">
-        <use href={`/assets/cards/svg-cards.svg#${id}`} />
-      </svg>
+    <span className={`inline-flex flex-col justify-between p-[3px] w-11 h-16 rounded-lg border-2
+                      font-bold shadow-sm select-none overflow-hidden flex-shrink-0 ${color}`}>
+      <span className="text-[14px] leading-none self-start">{rank}</span>
+      <span className="text-[14px] leading-none self-center">{suit}</span>
+      <span className="text-[14px] leading-none self-end rotate-180">{rank}</span>
     </span>
   )
 }
