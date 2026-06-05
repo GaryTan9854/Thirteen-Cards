@@ -1,213 +1,206 @@
 # ThirteenCards — CLAUDE.md
 
-十三支 (Chinese Poker / Big Two Variant) 遊戲平台。當前版本 v7.19。
+十三支 (Chinese Poker / Big Two Variant) 平台。**當前版本 v13.8**。
+
+> Recent session 詳情 → `SESSION_HANDOFF.md`
 
 ## 部署
-- **MBA** = 開發 / git source of truth (`~/Documents/ThirteenCards/`)
-- **MBP** = 運行 (gary@192.168.1.11)，PM2 id 12，port 3013
-- URL: https://thirteencards.visadelab.xyz
-- Deploy: `cd ~/Documents/ThirteenCards && ./deploy.sh --quick` (無新 deps 時)
-- **重要**: Vite build 在 MBP 上跑 (MBA 的 Node 會 crash)，`deploy.sh --quick` 透過 SSH 在 MBP build
-- **Python venv**: MBP venv 路徑 `~/thirteencards-dist/backend/venv`，**必須用 `/usr/local/bin/python3.10` 建立**。系統預設 python3 是 3.9，`tuple | None` 等 3.10+ 語法會報錯。重建指令：`cd ~/thirteencards-dist/backend && rm -rf venv && /usr/local/bin/python3.10 -m venv venv && venv/bin/pip install -r requirements.txt`
+- **MBA** = 開發 / git source of truth (`~/Documents/thirteencards/`)。**M3 Tahoe 26.5**，有 MPS 加速，ML 訓練/sweep 全在這跑。
+- **MBP** = production 跑時 (`gary@192.168.1.11`)，**2015 Intel Monterey 12.7.6**，PM2 id 10/12，port 3013。CPU 慢，不要拿來跑重 ML，會卡線上玩家。
+- URL: <https://thirteencards.visadelab.xyz>
+- Deploy: `cd ~/Documents/thirteencards && ./deploy.sh`（自動 bump 版本、sync MBA→MBP、SSH MBP build、PM2 restart）
+- Vite build **必須在 MBP 跑**（MBA 的 Node 跑會 crash，deploy.sh --quick 已透過 SSH 處理）
+- **MBP Python venv**: `~/thirteencards-dist/backend/venv`，**必須用 `/usr/local/bin/python3.10`**（系統 3.9 不支援 `tuple | None` 等語法）
 
 ## 架構
 ```
 backend/
-  main.py          # FastAPI + WebSocket server，/api/* + /ws
+  main.py          # FastAPI + WebSocket，/api/* + /ws，含 manual_arrange_info Rule C/D
   game/
     cards.py       # Card, HandCat, HandName, HandScor, SpecialHand, SpecialChargeByName
     hands.py       # Hand, Hand3, Hand5, Hand13
-    hist.py        # Hist_Cards, Hist_Cards13 (special hand detection)
-    arrange.py     # best_arrangement() — 枚舉所有 3+5+5 排列，找最高分
-    game.py        # GameState, 回合邏輯, 計分
-    evaluate.py    # 勝負評估
-    pct_score.py   # 百分位排名
-    hand_lookup.py # 查表優化
+    hist.py        # Hist_Cards13 (special hand detection)
+    arrange.py     # 排牌演算法（RA / RA2 / RA3 / RA4 / ML）
+    game.py        # GameState、compete()、compute_dynamic_attitude()、_arrange 派發
+    evaluate.py    # 勝負評估 + best_arrangement_mc (monte carlo)
+    hand_lookup.py # 查表 + 攻擊閾值 _ATK_RANK3/5M/5B + eval_attack()
+  ml/              # ScoringNet (93-dim → μ/σ)
 
 frontend/src/
-  App.tsx                 # Router + 頂部導覽
-  pages/OnlinePage.tsx    # 主頁面（最複雜，含 solo mode）
-  pages/LoginPage.tsx
-  components/             # CardDisplay, HandPanel, etc.
-  hooks/                  # useAuth, useWebSocket
-  types/                  # TypeScript interfaces
+  App.tsx                    # Router + 頂部導覽
+  pages/OnlinePage.tsx       # 主頁面（最複雜，含 solo mode + AI 設定 + 動態 attitude）
+  pages/StatsPage.tsx        # 戰績（我 / 公榜 切換）
+  pages/LogsPage.tsx         # Gary 專用：登入紀錄 + 遊戲紀錄
+  pages/LeaguePage.tsx       # Gary 專用：聯盟賽
+  components/
+    ManualArrange.tsx        # 手動排牌彈窗 + 牌型排法面板
+    BattleLog.tsx            # 比牌結果（含打槍倍率顯示）
+    TournamentPanel.tsx      # 累積比分（dedup initial）
+    GameResultDisplay.tsx    # 本局結算
+    BeautyAvatar.tsx         # 美女頭像
 ```
 
 ## 遊戲規則
 - 4 人，每人 13 張牌
-- 排成 頭墩(3張) + 中墩(5張) + 尾墩(5張)
-- 牌力必須: 尾 ≥ 中 ≥ 頭 (否則為「倒水」，犯規)
-- 每墩各自與其他3人比較（共9場比較，每贏一場+1分，每輸一場-1分）
-- 前3者(上家/對家/下家)的分數是相對零和
+- 頭墩(3) + 中墩(5) + 尾墩(5)；牌力 尾≥中≥頭（否則倒水犯規）
+- 每墩各自與其他 3 人比較（9 場 pairwise，每勝/敗 ±1）
+- 打槍（單人 3-0 sweep）= 該局 ×2；累積 2 槍 ×1.5；3 槍（全壘打）×2
 
-## 牌型分類
-### 3張 (頭墩)
-`HandCat`: 亂(0) 一對(1) 三條(3)
+### 牌型分類（HandCat）
+- **3 張頭墩**：亂(0) 對(1) 三條(3)
+- **5 張中/尾墩**：散(0) 對(1) 兩對(2) 三條(3) 順(4) 同花(5) 葫蘆(6) 鐵支(7) 同花順(8) 同花次大順(9) 同花大順(10)
 
-### 5張 (中/尾墩)
-`HandCat`: 散牌(0) 一對(1) 兩對(2) 三條(3) 順(4) 同花(5) 葫蘆(6) 鐵支(7) 同花次大順(9) 同花大順(10)
+### 怪物（monster）加分（compete() 中）
+| 位置 | 牌型 | 倍率 |
+|---|---|---|
+| 頭 | 三條（原子頭） | ×3（A3條 ×6） |
+| 中 | 葫蘆 | ×2 |
+| 中 | 鐵支 | ×8（A鐵 ×16） |
+| 中 | 同花順 | ×10 |
+| 中 | 同花次大順 | ×12 |
+| 中 | 同花大順 | ×14 |
+| 尾 | 鐵支 | ×4（A鐵 ×8） |
+| 尾 | 同花順 | ×5 |
+| 尾 | 同花次大順 | ×6 |
+| 尾 | 同花大順 | ×7 |
 
-## 特殊牌型 (報到) — SpecialChargeByName
-| 牌型 | 分數 | 條件 |
-|------|------|------|
-| 三同花 | 6 | 三組各同花(3+5+5不同花色) |
-| 三順子 | 6 | 三組各為順子 |
-| 六對半 | 6 | 6組對子+1張 |
-| 全黑一張紅 | 6 | 12黑+1非Ace紅 |
-| 全紅一張黑 | 6 | 12紅+1非Ace黑 |
-| 全大 | 6 | 全部5-K(或6-A) |
-| 全小 | 6 | 全部A-9(或2-10) |
-| 單pair | 6 | 只有1對其餘單張 |
-| 單三條 | 6 | 只有1組三條其餘單張 |
-| 雙報到 | 9 | 同時符合兩種6分牌型 |
-| 雙pair無花無順 | 12 | 2對+9單，無順無同花 |
-| 兩花色 | 12 | 全部只有2種花色 |
-| 全黑一點紅 | 18 | 12黑+1紅Ace |
-| 全紅一點黑 | 18 | 12紅+1黑Ace |
-| 全紅 | 18 | 全紅 |
-| 全黑 | 18 | 全黑 |
-| 大全小 | 18 | 2-8之間(min≥2,max≤8) |
-| 大全大 | 18 | 8-A之間(min≥8,max≤14) |
-| 六對半帶葫蘆 | 18 | 5對+1三條 |
-| 一條龍 | 39 | A-K各一張，不同花 |
-| 四套三條 | 45 | 4組三條+1張 |
-| 三分天下 | 45 | 3組鐵支+1張 |
-| 三同花順 | 45 | 3組同花順(5+5+3) |
-| 十二皇族 | 45 | 12張JQK(4J4Q4K)+1張 |
-| 清龍 | 100 | 一條龍且全同花 |
+## 特殊牌型 (報到) — 6/9/12/18/39/45/100 分
+詳見 `cards.py: SpecialChargeByName`（25 種）。偵測優先序：100→45→39→18→12→9→6→normal。
+玩家可選報到或正常比牌；正常比牌時 `isBaodao=false` 不套用特殊計分。
 
-## 特殊牌型偵測優先序 (hist.py: chk_special)
-100pt → 45pt → 39pt → 18pt → 12pt → 9pt → 6pt → normal
+## 排牌策略
 
-## 關鍵實作細節
+### 攻擊閾值（hand_lookup.py，所有策略共用）
+```python
+_ATK_RANK3  = 257   # top  ≥ 56.5%  (AJ2 亂)
+_ATK_RANK5M = 4545  # mid  ≥ 60.9%  (JJ33+2 兩對)
+_ATK_RANK5B = 3707  # bot  ≥ 69.9%  (23457 同花)
+```
+`eval_attack(h3, hm, hb)` 三墩同時達標才算攻擊候選。**這些是一筆畫下訂的常數，未來 ML sweep 可調**。
 
-### arrange.py — 枚舉排列
-- `best_arrangement()` — 枚舉所有 C(13,3)×C(10,5) = 72,072 種排列，過濾倒水，取最高分
-- `best_arrangement_rulealpha(handstrs, attitude)` — RuleAlpha：攻守評分 + attitude 切換
-- `best_arrangement_rulealpha2(handstrs, attitude)` — **RuleAlpha2（實驗）**，A/B/C/E 程序候選池：
-  - **A**: 頭墩優先，`_generate_3card_tops` 枚舉所有頭型 + C(10,5)=252 中/尾搜索，取 top-20（防禦分最高）
-  - **B**: 純對子手（無 TR/S/F/H/QD/L）的固定排法（2P~5P 各 1~2 種）
-  - **C**: 尾墩牌型枚舉（SF→QD→F→S→H→TR），怪物型早期 abort
-  - **E**: 與 RuleAlpha 同邏輯：eval_attack + attitude 決定攻/守；fallback 回 RuleAlpha
-- 攻擊閾值：頭≥0.5648，中≥0.6091，尾≥0.6988（三者同時達標才算攻擊候選）
-- rule-based scoring: defense=`s1*4+s2*2+s3`，attack=`s1*5.5+s2+s3`
+### Rule-based scoring
+- defense = `s1*4 + s2*2 + s3`
+- attack  = `s1*5.5 + s2 + s3`
 
-### main.py — WebSocket 與 API
-- `/ws/{room_id}/{player_name}` — 遊戲 WebSocket
-- `/api/game/play` — 送出排列（含 overrides 用於 solo mode）
-- `/api/health` — 版本資訊
-- AI 玩家: 後端自動呼叫 `arrange13()` 為 AI 排牌
+### 策略對照
+
+| 策略 | Attitude | 演算法 |
+|---|---|---|
+| `rulealpha` | 動態 | 原始版 |
+| `rulealpha2` | 固定 0 | A/B/C/E 程序候選池（實驗）|
+| **`rulealpha3`** | **強制 0** | RA3 pipeline，純牌型決策、default 穩定 |
+| **`rulealpha4`** | **動態** | 同 RA3 pipeline + dynamic attitude |
+| `monte_carlo` | n/a | 100手 × 150 sims |
+| `ml` / `ml_aggressive` / `ml_conservative` | -0.8 / 0 / +0.8 | ScoringNet |
+
+### `_ra3_core(handstrs, attitude)`（RA3/RA4 共享核心）
+1. **C0b 雙葫蘆**：`≥2 trips AND no quads` → `_enum_double_fullhouse`。**有 quad 必須跳過**讓鐵支優先。
+2. **`_ra3_filtered_pool`**（4 步）：
+   - **Step 1**: `enumerate_arrangements`（pure-pair 走 `enumerate_pure_pair_arrangements`，`_is_pure_pairs` 已含 A2345 wheel 偵測）
+   - **Step 2**: 每個 (top_ht, mid_ht, bot_ht) 取 canonical（score_defensive 最高）
+   - **Step 3**: Score-level Pareto
+   - **Step 4**: ~~Category Pareto~~（已移除，會誤殺同 category 強 pile）
+   - **Step 5**: Rule C + Rule D
+3. **C0a 怪物尾墩**：pool 含鐵支(7)/同花順(8) → 取 score_defensive 最高，跳過 attitude 邏輯
+4. **Attitude 決策**：`best_def vs best_att`，`bot_edge = ±0.3`
+
+### Dominance Rules
+- **Rule C**：i 剛好贏 1 pile 且該 pile 是怪物，j 贏的 pile 全非怪物 → j dominated
+- **Rule D**：i 的 top 是三條（原子頭），j 無任何怪物 → j dominated（原子頭 ×3 + ~100% top 勝率壓倒非怪物 mid/bot 優勢）
+- `_TOP_MON = {3}` (三條)，`_MID_MON = _BOT_MON = {7, 8}` (鐵支/同花順)
+- **顯示面板** (`main.py: manual_arrange_info`) 與 pool 用相同規則，保證 UI 一致
+
+### Dynamic Attitude (`compute_dynamic_attitude` + frontend `computeAttitude`)
+**設計洞察**：打槍 ×1.5/×2 是非線性 payoff，**gap 小時也該攻**（搶全壘打逆轉）。
+```python
+if gap < 30:   # close game
+    att = 0.7 - 0.4 * gp        # gp=0→+0.7, gp=1→+0.3
+else:          # spread game
+    pos = (my - min) / gap      # 0=last, 1=first
+    att = (1 - 2*pos) * (0.4 + 0.6 * gp)
+```
+RA4 honors attitude；RA3 永遠傳 0；前端 `_attSupports()` 限制只有 RA / RA4 傳動態值。
+
+## 前端
 
 ### Solo Mode (OnlinePage.tsx)
-- `soloActive`, `soloSetupMode` state flags
-- 不使用 WebSocket；直接 call `/api/game/play` with overrides
-- 點「獨自練功」→ 先顯示 `renderSoloSetup()` (局數/AI名稱/策略設定)
-- 設定完 → `startSoloGame({roundsNormal, roundsAppeal, aiStrategy, aiNames})`
-- 玩家出牌時，`resolveSoloRound(top, mid, bot, isBaodao)` 送出
+- `soloActive`, `soloSetupMode`, `soloGameJustEnded` state
+- 不用 WebSocket；直接呼叫 `/api/game/play` with overrides
+- AI 玩家管理：
+  - 首次進入/從首頁 → **隨機化 AI**
+  - 「再玩一場」（end-of-game）→ **保持原玩家**
+  - 「🎲 換人玩」按鈕手動 reshuffle
+  - dropdown 選到重複名字自動 swap
+- 圈圈位置 (`circleMarks`)：solo 存「顯示列 index」(drawnOrder)，避免換座位錯位
+- 各座獨立模型設定（dropdown 顯示 RA / RA2 / RA3 / RA4）
 
-### 報到 (Baodao) 流程
-1. 排牌時若偵測到特殊牌型，右上角顯示報到提示
-2. 玩家可選「報到（點數加成）」或「正常比牌（不報）」
-3. 若選正常比牌，`isBaodao=false` 送出，不套用特殊計分
+### 設定保存（per-player localStorage）
+- `tc_settings_{player}` → cfgNormal, cfgAppeal, cfgStrategies
+- `tc_avatar_{name}`, `tc_voice_on` 等獨立保存
 
-## 已完成功能
-- [x] 多人線上房間 (WebSocket)
-- [x] 獨自練功 (Solo vs 3 AI)
-- [x] 完整報到牌型偵測（25種）
-- [x] 正確計分系統
-- [x] 排列演算法（rule-based）
-- [x] 牌型統計面板（右上角）
-- [x] 排列選擇面板（右下角，最多顯示前5種分類）
-- [x] 局數設定、申訴制度
-- [x] TunaLogin 認證
-- [x] RuleAlpha2 AI 策略（實驗，可在 Solo/Online 設定頁選用）
-- [x] ManualArrange 支援 rulealpha2 下拉，並依遊戲設定預選策略
-- [x] 各座獨立模型設定（你 + AI 1/2/3 各自一個 dropdown），替代原本單一 AI 模型選項
-- [x] 遊戲模擬（Gary superuser tab）已移除
+### 戰績頁面（StatsPage）
+- 「**我** / **公榜**」切換（兩者對所有人開放）
+- Gary superuser dropdown 在公榜模式下可 drill into specific player（option 「公榜」= 看全部）
+- 「🗂 封存並重置」Gary 專用
 
-## 機器學習系統（進行中）
+### 比牌結果（BattleLog）
+- 標題列右邊 `頭 中 尾 合計` header；各行去掉文字標籤
+- 打槍倍率融入各墩分數：
+  - 1人 (backend 已 ×2)：`▲2 ▲2 ▲2 = +6`
+  - 2人 (+×1.5)：`▲3 ▲3 ▲3 = +9` + 描述「（打兩人）」
+  - 3人 (+×2)：`▲4 ▲4 ▲4 = +12` + 描述「（全壘打）」
+- 報到牌用 `b.total * rowMul`（per-row 為 0）
 
-### 資料收集（已完成）
-- **`backend/game/features.py`** — 93-dim 特徵編碼器
-  - [0:3] pt,pm,pb 百分位強度  [3:55] ternary 4×13矩陣
-  - [55:68] rank_hist  [68:72] suit_hist  [72:93] 牌型 one-hot
-- **`backend/game/data_collector.py`** — 自對弈資料收集
-  - 關鍵優化：每手牌預算 n_sims 組對手一次，所有排列共用
-- **`backend/ml/data/train_10k.npz`** — 訓練資料
-  - 9,587 手牌 × 平均 187 排列 = **1,789,358 筆** (37 MB 壓縮)
-  - μ ∈ [-20.5, 43.0]，σ ∈ [0, 13.78]
+### 美女頭像
+- 8 個 PNG 在 `frontend/public/assets/beauties/`：妲己、妹喜、褒姒、驪姬、西施、王昭君、楊貴妃、貂蟬
+- `BeautyAvatar.tsx` 的 `idx` 對應座位
+- `isMe` prop 啟用相機上傳（裁切存 localStorage `tc_avatar_{name}`）
 
-### 模型（訓練中）
-- **`backend/ml/scoring_model.py`** — ScoringNet 架構 + ScoringModel 推理封裝
-  - Input: 93-dim (Z-score 正規化)
-  - Architecture: LayerNorm → [256→256→128→64] → μ head + σ head (Softplus)
-  - Output: (μ, σ) 期望得分與標準差
-- **`backend/ml/train_scoring.py`** — 訓練腳本
-  - Loss: HuberLoss(μ) + 0.3×HuberLoss(σ) + 0.2×PairwiseRanking
-  - Device: MPS (M1 GPU)，60 epochs，batch 4096
-- **`backend/ml/data/scoring_net.pt`** — checkpoint（訓練完成後可用）
+## API（main.py）
+- `POST /api/game/deal` — 發 4 手牌
+- `POST /api/game/play` — 跑一局（overrides + ai_attitudes）
+- `POST /api/game/arrange` — 用指定策略排單手
+- `POST /api/manual/arrange_info` — 牌型統計 + 排法面板（含 Rule C/D）
+- `GET  /api/health` — 版本
+- `POST /api/log/auth` / `POST /api/log/game` / `GET /api/log/games` / `GET /api/log/game/{id}` / `GET /api/log/logins`
+- `POST /api/log/stats/reset` (Gary 專用)
+- `POST /api/league` / `GET /api/league` / `GET /api/league/{id}`
+- `GET  /api/players` — 公榜玩家清單
+
+## ML 系統
+
+### 資料 (`data_collector.py`)
+- `train_10k.npz`：9.5k hands × 187 排列 = 1.79M 筆 (37 MB)
+- 特徵：93-dim（`features.py`）
+
+### 模型 (`ml/scoring_model.py`)
+- ScoringNet: LayerNorm → [256→256→128→64] → μ + σ heads
+- Loss: Huber(μ) + 0.3·Huber(σ) + 0.2·PairwiseRanking
+- MPS 加速，60 epochs ~5hr
 
 ### 整合
-- **`backend/game/arrange.py`** — 新增 `best_arrangement_ml(handstrs, attitude)`
-  - ScoringModel 不存在時自動 fallback 到 rule-based
-- **`backend/game/game.py`** — `_arrange()` 支援新 strategy：
-  - `'ml'` / `'ml_neutral'` — 中性 (attitude=0)
-  - `'ml_aggressive'`       — 激進 (attitude=+0.8)
-  - `'ml_conservative'`     — 保守 (attitude=-0.8)
-
-### 訓練指令
-```bash
-# 重新收集訓練資料（約 55 分鐘，6 workers）
-cd backend && nohup caffeinate -i python3 run_collect.py > /tmp/collect.log 2>&1 &
-
-# 訓練 ScoringNet（約 5 小時，60 epochs，MPS）
-nohup caffeinate -i python3 -u run_train_scoring.py > /tmp/train_scoring.log 2>&1 &
-tail -f /tmp/train_scoring.log   # 監看進度
-```
+- `best_arrangement_ml(handstrs, attitude)` (`arrange.py`)
+- `_arrange` strategies: `ml` / `ml_neutral` / `ml_aggressive` / `ml_conservative`
 
 ### 待辦
-- [ ] 訓練完成後跑 benchmark：ML vs rule-based vs monte_carlo（100手 × 50 sims）
-- [ ] 若 ML 勝率 > 55%，更新 OnlinePage.tsx AI strategy 選項加入 ml 選項
+- [ ] **階段 a**：sweep `_ATK_RANK3/5M/5B`（att=0 baseline）。M3 MBA 6³×2000 場 ~30min、7³×5000 場 ~3.5hr。**前置**：把閾值改為可注入參數。
+- [ ] **階段 b**：在 a 的 baseline 之上研究 attitude 動態公式
+- [ ] ML benchmark：ScoringNet vs RA vs MC（100手×50sims）
+- [ ] 觀察 RA4 vs RA3 實戰勝率，可能簡化 UI（移除模型選擇）
 
-## Log & League 系統（v7.19）
+## Log & League 系統
 
-### 資料存放（visadelab 標準模式）
-- **MBP 路徑**（存在 `~/db/` 時）：
-  - `~/db/thirteencards/logs/` — JSONL 月份檔（不在 rsync 範圍，不被 deploy 覆蓋）
-  - `~/db/thirteencards/game_logs.db` — SQLite（僅 leagues 表）
-  - `~/db-backups/thirteencards/` — 時戳備份，保留最新 5 份（deploy.sh step 1）
-- **MBA 備份**：`~/Documents/.db-backups/thirteencards/`（deploy.sh step 5 pull-back）
-  - `~/Documents/backup-dbs-from-mbp.sh` 亦涵蓋此目錄（rsync 整個 `~/db/`）
-- **本機開發**（`~/db/` 不存在）：fallback 到 `backend/logs/` + `backend/game_logs.db`
+### 資料存放
+- **MBP** (`~/db/` 存在時)：
+  - `~/db/thirteencards/logs/` — JSONL 月份檔（不在 rsync 範圍）
+  - `~/db/thirteencards/game_logs.db` — SQLite（leagues 表）
+  - `~/db-backups/thirteencards/` — 時戳備份保留 5 份
+- **MBA 備份**：`~/Documents/.db-backups/thirteencards/`
+- **本機開發**：fallback `backend/logs/` + `backend/game_logs.db`
 
-### JSONL 檔案格式（月份一檔）
-- `login_YYYY-MM.jsonl` — 登入/登出事件（每行一筆）
-- `games_YYYY-MM.jsonl` — 遊戲紀錄（以 start_time 決定月份）
-- `rounds_YYYY-MM.jsonl` — 每局牌局（注入 game_id）
-
-### API
-- `POST /api/log/auth` — 登入/登出記錄
-- `POST /api/log/game` — 儲存遊戲紀錄（含局內容）
-- `GET /api/log/games` — 列出遊戲（Gary 查看）
-- `GET /api/log/game/{id}` — 遊戲詳情 + 每局
-- `GET /api/log/logins` — 登入紀錄
-- `POST /api/league` — 創建聯盟賽（SQLite）
-- `GET /api/league` — 列出聯盟賽
-- `GET /api/league/{id}` — 聯盟賽成績與排名
-
-### 前端
-- `AuthContext.tsx` — login/logout 自動呼叫 `/api/log/auth`
-- `OnlinePage.tsx` — 「記錄遊戲」/「記錄每局牌局」/「聯盟賽」toggle
-- `LogsPage.tsx` — Gary 專用：登入紀錄 + 遊戲紀錄
-- `LeaguePage.tsx` — Gary 專用：創建聯盟賽 + 查看排名
-- `RulesPage.tsx` — 所有用戶：規則說明
-
-## 美女頭像系統（v7.14+）
-- 8 個 PNG 檔在 `frontend/public/assets/beauties/`：妲己、妹喜、褒姒、驪姬、西施、王昭君、楊貴妃、貂蟬
-- `components/BeautyAvatar.tsx` — `idx` prop 決定座位對應（0→妲己，1→妹喜，...），確保每座位各不同且名稱吻合
-- `isMe` prop 啟用相機上傳功能（裁切存 localStorage `tc_avatar_{name}`）
-- 用於 `TournamentPanel`（累積比分格，size=104）；`GameResultDisplay`（本局比分）不顯示頭像
+### JSONL 月份檔
+- `login_YYYY-MM.jsonl`、`games_YYYY-MM.jsonl`、`rounds_YYYY-MM.jsonl`
 
 ## 版本規則
 - bump +0.1 每次 deploy；minor=20 時升 major
-- 目前 v7.19
+- **目前 v13.8**

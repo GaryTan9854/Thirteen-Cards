@@ -225,7 +225,9 @@ export default function StatsPage() {
                   ['losses',     '負',     'text-right px-2 text-red-400', ''],
                   ['winRate',    '最勝率', 'text-right px-2',  ''],
                   ['undefeated', '不敗率', 'text-right pl-2',  ''],
-                ] as [SortCol, string, string, string][]).map(([col, label, cls]) => (
+                ] as [SortCol, string, string, string][])
+                .filter(([col]) => !(col === 'games' && viewMode === 'public' && !isGary))
+                .map(([col, label, cls]) => (
                   <th key={col}
                       className={`py-2 cursor-pointer hover:text-white transition ${cls}`}
                       onClick={() => toggleSort(col)}>
@@ -249,7 +251,9 @@ export default function StatsPage() {
                       {r.player}
                       {isMe && <span className="ml-1 text-sky-400 text-xs">(你)</span>}
                     </td>
-                    <td className="py-2 px-2 text-right text-gray-300 tabular-nums">{r.games}</td>
+                    {(isGary || viewMode !== 'public') && (
+                      <td className="py-2 px-2 text-right text-gray-300 tabular-nums">{r.games}</td>
+                    )}
                     <td className="py-2 px-2 text-right text-yellow-300 font-bold tabular-nums">{r.wins}</td>
                     <td className="py-2 px-2 text-right text-red-400 tabular-nums">{r.losses}</td>
                     <td className="py-2 px-2 text-right tabular-nums">
