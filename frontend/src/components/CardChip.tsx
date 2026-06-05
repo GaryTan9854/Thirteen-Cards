@@ -5,6 +5,13 @@ interface Props {
 }
 
 const FACE_RANKS = new Set(['A', 'K', 'Q', 'J'])
+// 4-colour deck palette (♠ black, ♥ red, ♦ orange, ♣ green)
+const SUIT_COLOR: Record<string, string> = {
+  '♠': 'text-gray-900',
+  '♥': 'text-red-600',
+  '♦': 'text-orange-500',
+  '♣': 'text-green-600',
+}
 
 export default function CardChip({ card }: Props) {
   const style = useCardStyle()
@@ -12,22 +19,28 @@ export default function CardChip({ card }: Props) {
   const rank  = card.slice(1)
   const isRed = suit === '♥' || suit === '♦'
 
-  // ── v3: mirror layout (三版) — rank+suit stacked at top-left & bottom-right ──
+  // ── v3: 4-colour deck w/ pale centre watermark (三版) ──
   if (style === 'v3') {
-    const textColor  = isRed ? 'text-red-600' : 'text-gray-900'
-    const rankWeight = FACE_RANKS.has(rank) ? 'font-semibold' : 'font-normal'
+    const suitColor = SUIT_COLOR[suit] ?? 'text-gray-900'
+    const rankWeight = FACE_RANKS.has(rank) ? 'font-bold' : 'font-semibold'
     const corner = (
-      <span className="flex flex-col items-center leading-none">
-        <span className={`text-[14px] leading-none ${rankWeight}`}>{rank}</span>
-        <span className="text-[17px] leading-none">{suit}</span>
+      <span className="flex flex-col items-start leading-none">
+        <span className={`text-[14px] leading-[1] ${rankWeight}`}>{rank}</span>
+        <span className="text-[11px] leading-[1] mt-[1px]">{suit}</span>
       </span>
     )
     return (
-      <span className={`inline-flex flex-col justify-between p-[3px] w-11 h-16 rounded-lg border-2
-                        border-gray-300 bg-white shadow-sm select-none overflow-hidden flex-shrink-0
-                        ${textColor}`}>
-        <span className="self-start">{corner}</span>
-        <span className="self-end rotate-180">{corner}</span>
+      <span className="relative inline-block w-11 h-16 rounded-lg border border-gray-200 bg-white
+                       shadow-sm select-none overflow-hidden flex-shrink-0">
+        {/* centre watermark */}
+        <span className={`absolute inset-0 flex items-center justify-center pointer-events-none
+                          text-[34px] leading-none ${suitColor} opacity-20`}>
+          {suit}
+        </span>
+        {/* top-left corner */}
+        <span className={`absolute top-[3px] left-[4px] ${suitColor}`}>{corner}</span>
+        {/* bottom-right corner (rotated 180°) */}
+        <span className={`absolute bottom-[3px] right-[4px] rotate-180 ${suitColor}`}>{corner}</span>
       </span>
     )
   }
