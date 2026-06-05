@@ -17,11 +17,11 @@ export default function CardChip({ card }: Props) {
         }`}
     >
       {/* top-left rank */}
-      <span className="text-[11px] leading-none self-start">{rank}</span>
-      {/* centre suit — large */}
-      <span className="text-[22px] leading-none self-center">{suit}</span>
+      <span className="text-[14px] leading-none self-start">{rank}</span>
+      {/* centre suit — decorative */}
+      <span className="text-[14px] leading-none self-center">{suit}</span>
       {/* bottom-right rank — rotated */}
-      <span className="text-[11px] leading-none self-end rotate-180">{rank}</span>
+      <span className="text-[14px] leading-none self-end rotate-180">{rank}</span>
     </span>
   )
 }

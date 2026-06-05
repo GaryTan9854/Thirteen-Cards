@@ -63,10 +63,10 @@ function CardTile({ cs, size='md' }: { cs:string; size?:'xs'|'sm'|'md'|'lg' }) {
   const rank = RANK_STR[parseInt(cs.slice(0,2))]
   // outer box size
   const box  = size==='lg' ? 'w-14 h-20' : size==='md' ? 'w-11 h-16' : size==='sm' ? 'w-9 h-12' : 'w-6 h-9'
-  // rank font (corner)
-  const rkf  = size==='lg' ? 'text-[13px]' : size==='md' ? 'text-[11px]' : size==='sm' ? 'text-[10px]' : 'text-[8px]'
-  // suit font (center)
-  const stf  = size==='lg' ? 'text-[26px]' : size==='md' ? 'text-[22px]' : size==='sm' ? 'text-[17px]' : 'text-[11px]'
+  // rank font (corner) — larger for readability
+  const rkf  = size==='lg' ? 'text-[17px]' : size==='md' ? 'text-[14px]' : size==='sm' ? 'text-[12px]' : 'text-[9px]'
+  // suit font (center) — smaller, decorative
+  const stf  = size==='lg' ? 'text-[18px]' : size==='md' ? 'text-[14px]' : size==='sm' ? 'text-[12px]' : 'text-[9px]'
   // padding
   const pad  = size==='xs' ? 'p-[2px]' : 'p-[3px]'
   return (
