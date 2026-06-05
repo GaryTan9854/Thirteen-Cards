@@ -81,7 +81,6 @@ function CardTile({ cs, size='md' }: { cs:string; size?:'xs'|'sm'|'md'|'lg' }) {
     const rkW     = isFace ? 'font-bold' : 'font-semibold'
     const rkf = size==='lg' ? 'text-[17px]' : size==='md' ? 'text-[14px]' : size==='sm' ? 'text-[12px]' : 'text-[9px]'
     const stf = size==='lg' ? 'text-[14px]' : size==='md' ? 'text-[11px]' : size==='sm' ? 'text-[10px]' : 'text-[7px]'
-    const wmf = size==='lg' ? 'text-[44px]' : size==='md' ? 'text-[34px]' : size==='sm' ? 'text-[26px]' : 'text-[18px]'
     const corner = (
       <span className="flex flex-col items-start leading-none">
         <span className={`${rkf} leading-[1] ${rkW}`}>{rank}</span>
@@ -91,10 +90,6 @@ function CardTile({ cs, size='md' }: { cs:string; size?:'xs'|'sm'|'md'|'lg' }) {
     return (
       <span className={`relative inline-block rounded-lg border border-gray-200 bg-white
                         shadow select-none overflow-hidden flex-shrink-0 ${box}`}>
-        <span className={`absolute inset-0 flex items-center justify-center pointer-events-none
-                          ${wmf} leading-none ${suitCol} opacity-20`}>
-          {suit}
-        </span>
         <span className={`absolute top-[2px] left-[3px] ${suitCol}`}>{corner}</span>
         <span className={`absolute bottom-[2px] right-[3px] rotate-180 ${suitCol}`}>{corner}</span>
       </span>

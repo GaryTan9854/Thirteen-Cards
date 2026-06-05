@@ -36,5 +36,5 @@ export function useCardStyle(): CardStyle {
 export const CARD_STYLE_LABELS: Record<CardStyle, string> = {
   v1: '初版',
   v2: '二版',
-  v3: '三版',
+  v3: '四色版',
 }

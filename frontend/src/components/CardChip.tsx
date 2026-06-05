@@ -32,14 +32,7 @@ export default function CardChip({ card }: Props) {
     return (
       <span className="relative inline-block w-11 h-16 rounded-lg border border-gray-200 bg-white
                        shadow-sm select-none overflow-hidden flex-shrink-0">
-        {/* centre watermark */}
-        <span className={`absolute inset-0 flex items-center justify-center pointer-events-none
-                          text-[34px] leading-none ${suitColor} opacity-20`}>
-          {suit}
-        </span>
-        {/* top-left corner */}
         <span className={`absolute top-[3px] left-[4px] ${suitColor}`}>{corner}</span>
-        {/* bottom-right corner (rotated 180°) */}
         <span className={`absolute bottom-[3px] right-[4px] rotate-180 ${suitColor}`}>{corner}</span>
       </span>
     )
