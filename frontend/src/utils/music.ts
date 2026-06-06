@@ -3,7 +3,7 @@
  *
  * Three scenes:
  *   lobby   → 我對緣份小心翼翼(伴奏)  — single track, loop
- *   playing → fixed queue: 清清如我 → 眾裡尋他千百度 → 一念 → 我對緣份小心翼翼; loop.
+ *   playing → fixed queue: 一念 → 木已成舟 → 清清如我 → 眾裡尋他千百度; loop.
  *   ended   → 我對緣份小心翼翼        — single track, loop
  *
  * Also exposes pauseScene()/resumeScene() so the 歌曲欣賞 page can temporarily
@@ -19,10 +19,10 @@ const LOBBY_TRACK  = M('wodui_i.mp3')
 const ENDED_TRACK  = M('wodui.mp3')
 
 const PLAYING_QUEUE: string[] = [
+  M('yinian.mp3'),
+  M('muyichengzhou.mp3'),
   M('qingqing.mp3'),
   M('zhongli.mp3'),
-  M('yinian.mp3'),
-  M('wodui.mp3'),
 ]
 
 function buildPlayingQueue(): string[] { return [...PLAYING_QUEUE] }
