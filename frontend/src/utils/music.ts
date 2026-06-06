@@ -2,10 +2,13 @@
  * Scene-based background music — singleton, browser-safe.
  *
  * Three scenes:
- *   lobby   → 我對緣份小心翼翼(伴奏)               — single track, loop
- *   playing → queue: shuffle [我對緣份小心翼翼, 一念, 清清如我, 眾裡尋他千百度, 木已成舟]
- *             then append [前路, 我對緣份小心翼翼(伴奏), 清清如我(伴奏)]; loop the queue.
- *   ended   → 眾裡尋他千百度(伴奏)                 — single track, loop
+ *   lobby   → 我對緣份小心翼翼(伴奏)  — single track, loop
+ *   playing → fixed queue: 清清如我 → 眾裡尋他千百度 → 一念 → 我對緣份小心翼翼
+ *             → 前路 → 我對緣份小心翼翼(伴奏) → 清清如我(伴奏); loop the queue.
+ *   ended   → 眾裡尋他千百度(伴奏)    — single track, loop
+ *
+ * Also exposes pauseScene()/resumeScene() so the 歌曲欣賞 page can temporarily
+ * silence the background while users preview individual tracks.
  *
  * Handles autoplay policy by deferring play to first user gesture.
  */
@@ -16,31 +19,17 @@ const M = (f: string) => `/assets/music/${f}`
 const LOBBY_TRACK  = M('wodui_i.mp3')
 const ENDED_TRACK  = M('zhongli_i.mp3')
 
-const PLAYING_RANDOM = [
-  M('wodui.mp3'),
-  M('yinian.mp3'),
+const PLAYING_QUEUE: string[] = [
   M('qingqing.mp3'),
   M('zhongli.mp3'),
-  M('muyichengzhou.mp3'),
-]
-const PLAYING_TAIL = [
+  M('yinian.mp3'),
+  M('wodui.mp3'),
   M('qianlu.mp3'),
   M('wodui_i.mp3'),
   M('qingqing_i.mp3'),
 ]
 
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr]
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]]
-  }
-  return a
-}
-
-function buildPlayingQueue(): string[] {
-  return [...shuffle(PLAYING_RANDOM), ...PLAYING_TAIL]
-}
+function buildPlayingQueue(): string[] { return [...PLAYING_QUEUE] }
 
 let audio: HTMLAudioElement | null = null
 let _scene = ''
@@ -119,6 +108,19 @@ export function stopMusic() {
   _scene = ''
   audio?.pause()
   audio = null
+}
+
+// ── Temporary pause/resume (for 歌曲欣賞 preview page) ──
+let _suspended = false
+export function pauseScene() {
+  if (audio && !audio.paused) {
+    audio.pause()
+    _suspended = true
+  }
+}
+export function resumeScene() {
+  if (_suspended && audio && _enabled) tryPlay(audio)
+  _suspended = false
 }
 
 export function useMusicOn(): boolean {

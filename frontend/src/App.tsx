@@ -7,6 +7,7 @@ import LogsPage       from './pages/LogsPage'
 import LeaguePage     from './pages/LeaguePage'
 import RulesPage      from './pages/RulesPage'
 import StatsPage      from './pages/StatsPage'
+import MusicPage      from './pages/MusicPage'
 import ErrorBoundary  from './components/ErrorBoundary'
 import { useMusicOn, toggleMusic } from './utils/music'
 import { useVoiceOn, toggleVoice } from './utils/voice'
@@ -68,6 +69,7 @@ function AppInner() {
     { id: 'rules',  label: '📖', fullLabel: '遊戲說明' },
     { id: 'stats',  label: '📊', fullLabel: '戰績'     },
     { id: 'logs',   label: '📋', fullLabel: '遊戲紀錄' },
+    { id: 'music',  label: '🎵', fullLabel: '歌曲欣賞' },
     ...(isGary ? [
       { id: 'duel',   label: '⚔️', fullLabel: '策略對決' },
       { id: 'league', label: '🏆', fullLabel: '聯盟賽'   },
@@ -163,6 +165,7 @@ function AppInner() {
         </div>
 
         {tab === 'rules'  && <RulesPage />}
+        {tab === 'music'  && <MusicPage />}
         {isGary && tab === 'duel'   && <DuelPage />}
         {tab === 'stats'  && <StatsPage />}
         {tab === 'logs'   && <LogsPage />}
