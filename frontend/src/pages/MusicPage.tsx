@@ -38,26 +38,32 @@ export default function MusicPage() {
     }
   }, [])
 
+  function playAt(idx: number) {
+    audioRef.current?.pause()
+    const i = ((idx % SONGS.length) + SONGS.length) % SONGS.length
+    const song = SONGS[i]
+    const a = new Audio(`/assets/music/${song.file}`)
+    a.volume = 0.6
+    a.onended = () => { if (audioRef.current === a) playAt(i + 1) }   // auto-advance, wraps to start
+    audioRef.current = a
+    a.play().catch(() => {})
+    setPlaying(song.file)
+  }
+
   function toggle(file: string) {
     if (playing === file) {
       audioRef.current?.pause()
       setPlaying(null)
       return
     }
-    audioRef.current?.pause()
-    const a = new Audio(`/assets/music/${file}`)
-    a.volume = 0.6
-    a.onended = () => { if (audioRef.current === a) setPlaying(null) }
-    audioRef.current = a
-    a.play().catch(() => {})
-    setPlaying(file)
+    playAt(SONGS.findIndex(s => s.file === file))
   }
 
   return (
     <div className="p-4 max-w-2xl mx-auto">
       <h2 className="text-xl font-bold text-sky-300 mb-2">🎵 歌曲欣賞</h2>
       <div className="text-xs text-gray-400 mb-5">
-        點擊曲目即可試聽；切換到他曲會停止前一首。離開此頁將自動恢復背景配樂。
+        點擊曲目即可試聽；一首播完自動接下一首，整個列表循環播放。離開此頁將自動恢復背景配樂。
       </div>
       <div className="space-y-2">
         {SONGS.map(s => {
