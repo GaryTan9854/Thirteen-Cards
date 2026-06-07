@@ -752,13 +752,24 @@ def _ra3_core(handstrs: list, attitude: float):
     """
     inv = analyze_inventory(handstrs)
 
-    # ── C0b: Double 葫蘆 (≥2 trip ranks) ────────────────────────────────────
+    # ── C0b: Double 葫蘆 vs 對·三條·葫蘆 (≥2 trip ranks) ──────────────────────
     # Skip when a quad exists: 鐵支 (×4 bot / ×8 mid bonus) trumps double-葫蘆,
     # so let the pool + C0a monster-priority path handle it instead.
+    # Otherwise build a mini-pool of BOTH 雙葫蘆 (top scatter) and 對·三條·葫蘆
+    # (scatter pair anchors top), then run the standard defense/attack +
+    # attitude selector. This stops 雙葫蘆 from being a hard-coded fast-path
+    # that wastes a strong scatter pair like KK.
     if len(inv['trips']) >= 2 and not inv['quads']:
-        dh = _enum_double_fullhouse(handstrs, inv)
-        if dh:
-            return dh
+        c0b_pool = (_enum_double_fullhouse_all(handstrs, inv)
+                    + _enum_pair_triple_fullhouse(handstrs, inv))
+        if c0b_pool:
+            best_def = max(c0b_pool, key=lambda t: score_defensive(*t))
+            attack_cands = [c for c in c0b_pool if eval_attack(*c)]
+            if not attack_cands:
+                return best_def
+            best_att = max(attack_cands, key=lambda t: score_arrangement(*t))
+            bot_edge = 0.3 if best_def[2].handtype_val > best_att[2].handtype_val else -0.3
+            return best_att if attitude > bot_edge else best_def
 
     pool = _ra3_filtered_pool(handstrs)
     if not pool:
@@ -812,17 +823,17 @@ def best_arrangement_rulealpha4(handstrs: list, attitude: float = 0.0):
 
 # ─── RuleAlpha2 helper: double full-house monster ─────────────────────────────
 
-def _enum_double_fullhouse(handstrs: list, inv: dict):
+def _enum_double_fullhouse_all(handstrs: list, inv: dict):
     """
-    When ≥2 trips exist, enumerate all (bot=葫蘆, mid=葫蘆) combinations and
-    return the best-scoring valid arrangement, or None if none are valid.
+    When ≥2 trips exist, enumerate ALL valid (top=亂, mid=葫蘆, bot=葫蘆) arrangements.
+    Returns a list of (h3, hm, hb) tuples (may be empty).
     """
     by_rank   = inv['by_rank']
     trip_ranks = inv['trips']        # ranks with ≥3 cards, desc
     pair_srcs  = inv['pairs']        # ranks with ≥2 cards (trips included), desc
 
-    best = None
-    best_s = -float('inf')
+    out: list = []
+    seen: set = set()
 
     for bot_tr in trip_ranks:
         # possible pair partners for bot 葫蘆 (any rank ≠ bot_tr with ≥2 cards)
@@ -850,11 +861,65 @@ def _enum_double_fullhouse(handstrs: list, inv: dict):
                     hm = Hand5(mid_cs); hm.score_hand()
                     h3 = Hand3(top_cs); h3.score_hand()
                     if h3.score <= hm.score <= hb.score:
-                        s = score_arrangement(h3, hm, hb)
-                        if s > best_s:
-                            best_s = s
-                            best   = (h3, hm, hb)
-    return best
+                        key = (tuple(sorted(top_cs)),
+                               tuple(sorted(mid_cs)),
+                               tuple(sorted(bot_cs)))
+                        if key not in seen:
+                            seen.add(key)
+                            out.append((h3, hm, hb))
+    return out
+
+
+def _enum_pair_triple_fullhouse(handstrs: list, inv: dict):
+    """
+    Companion to _enum_double_fullhouse_all: when ≥2 trips exist AND ≥1 extra
+    pair-rank is available for the top, enumerate (top=對, mid=三條, bot=葫蘆)
+    arrangements. Keeps a strong scatter pair anchoring the top instead of
+    sacrificing it to a double-葫蘆.
+
+    Returns a list of (h3, hm, hb) tuples (may be empty).
+    """
+    by_rank    = inv['by_rank']
+    trip_ranks = inv['trips']     # ≥3-card ranks, desc
+    pair_ranks = inv['pairs']     # ≥2-card ranks (includes trip ranks), desc
+
+    out: list = []
+    seen: set = set()
+
+    for mid_tr in trip_ranks:
+        for bot_tr in trip_ranks:
+            if bot_tr == mid_tr:
+                continue
+            for bot_pr in pair_ranks:
+                if bot_pr in (mid_tr, bot_tr):
+                    continue
+                for top_pr in pair_ranks:
+                    if top_pr in (mid_tr, bot_tr, bot_pr):
+                        continue
+                    bot_cs      = by_rank[bot_tr][:3] + by_rank[bot_pr][:2]
+                    mid_trip_cs = by_rank[mid_tr][:3]
+                    top_pair_cs = by_rank[top_pr][:2]
+                    used = set(bot_cs) | set(mid_trip_cs) | set(top_pair_cs)
+                    remaining = [c for c in handstrs if c not in used]
+                    if len(remaining) != 3:
+                        continue
+                    # mid scatter takes 2 of the remaining, top kicker takes 1
+                    for top_kicker in remaining:
+                        mid_scatter = [c for c in remaining if c != top_kicker]
+                        top_cs = top_pair_cs + [top_kicker]
+                        mid_cs = mid_trip_cs + mid_scatter
+                        key = (tuple(sorted(top_cs)),
+                               tuple(sorted(mid_cs)),
+                               tuple(sorted(bot_cs)))
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                        h3 = Hand3(top_cs); h3.score_hand()
+                        hm = Hand5(mid_cs); hm.score_hand()
+                        hb = Hand5(bot_cs); hb.score_hand()
+                        if h3.score <= hm.score <= hb.score:
+                            out.append((h3, hm, hb))
+    return out
 
 
 # ─── RuleAlpha2 ───────────────────────────────────────────────────────────────
@@ -900,9 +965,9 @@ def best_arrangement_rulealpha2(handstrs: list, attitude: float = 0.0):
 
     # 中墩葫蘆 monster: ≥2 trip ranks → both mid and bot can be 葫蘆
     if len(inv['trips']) >= 2:
-        dh = _enum_double_fullhouse(handstrs, inv)
-        if dh:
-            return dh
+        dh_list = _enum_double_fullhouse_all(handstrs, inv)
+        if dh_list:
+            return max(dh_list, key=lambda t: score_arrangement(*t))
 
     # ── A: 頭優先 top-20 (所有頭型：TR / P / 散牌) ────────────────────────────
     # 全部 _generate_3card_tops 產生的頭型都跑，爛的自然排後面；不過濾。
