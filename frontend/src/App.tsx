@@ -10,7 +10,7 @@ import StatsPage      from './pages/StatsPage'
 import MusicPage      from './pages/MusicPage'
 import ErrorBoundary  from './components/ErrorBoundary'
 import { useMusicOn, toggleMusic } from './utils/music'
-import { useVoiceOn, toggleVoice, useTaiwanese, toggleTaiwanese } from './utils/voice'
+import { useVoiceOn, toggleVoice } from './utils/voice'
 
 // ─── Sound toggle bar (left of player chip) ───────────────────────────────────
 function SoundToggles() {
@@ -36,20 +36,7 @@ function SoundToggles() {
         title={voiceOn ? '語音開啟（點擊關閉）' : '語音關閉（點擊開啟）'}>
         {voiceOn ? '🔊' : '🔇'}
       </button>
-      <LangToggle />
     </div>
-  )
-}
-
-function LangToggle() {
-  const tw = useTaiwanese()
-  return (
-    <button onClick={() => toggleTaiwanese()}
-      className={`text-xs px-1.5 py-1 rounded hover:bg-slate-700 transition font-bold
-                  ${tw ? 'text-emerald-300' : 'text-gray-400 hover:text-white'}`}
-      title={tw ? '台語語音（點擊切回華語）' : '華語語音（點擊切台語，需 macOS 美嘉 台灣台語）'}>
-      {tw ? '台' : '華'}
-    </button>
   )
 }
 

@@ -574,6 +574,8 @@ export default function OnlinePage() {
   const [cfgStepByStep,   setCfgStepByStep]   = useState(false)
   const [cfgRecordGame,   setCfgRecordGame]   = useState(true)
   const [cfgRecordRounds, setCfgRecordRounds] = useState(false)
+  // Auto-disable per-round logging when rounds > 30 (would generate too much data)
+  useEffect(() => { if (cfgNormal > 30 && cfgRecordRounds) setCfgRecordRounds(false) }, [cfgNormal, cfgRecordRounds])
   const [cfgIsLeague,     setCfgIsLeague]     = useState(false)
   const [cfgLeagueId,     setCfgLeagueId]     = useState('')
   const [leaguesList,     setLeaguesList]     = useState<{league_id:string, name:string, year:number}[]>([])
@@ -1834,13 +1836,18 @@ export default function OnlinePage() {
     const cum = names.map((_: string, i: number) =>
       history.reduce((s: number, r: number[]) => s + (r[i] ?? 0), 0)
     )
-    const winner = names[cum.indexOf(Math.max(...cum))] ?? ''
-    const loser  = names[cum.indexOf(Math.min(...cum))] ?? ''
-    // mid = the players sandwiched between winner and loser (sorted high→low score)
+    // Quips should commentate on REAL human players — strip beauties (AI) from
+    // winner/loser candidates. If fewer than 2 humans, fall back to all names so
+    // the panel still fires (e.g. solo mode with you + 3 beauties).
+    const BEAUTY_SET = new Set(['妲己','妹喜','褒姒','驪姬','西施','王昭君','楊貴妃','貂蟬'])
     const ranked = names
       .map((n: string, i: number) => ({ n, s: cum[i] }))
       .sort((a, b) => b.s - a.s)
-    const mid = ranked.filter(x => x.n !== winner && x.n !== loser).map(x => x.n)
+    const humans = ranked.filter(x => !BEAUTY_SET.has(x.n))
+    const pool   = humans.length >= 2 ? humans : ranked
+    const winner = pool[0]?.n ?? ''
+    const loser  = pool[pool.length - 1]?.n ?? ''
+    const mid    = pool.slice(1, -1).map(x => x.n)
     if (winner && loser) setQuipCtx({ winner, loser, names, mid })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEnded, lastResult])
@@ -2194,7 +2201,7 @@ export default function OnlinePage() {
         {/* 局數設定 */}
         <div className="grid grid-cols-2 gap-4">
           {[
-            { label: '比賽局數', val: cfgNormal, set: setCfgNormal, min: 1, max: 40 },
+            { label: '比賽局數', val: cfgNormal, set: setCfgNormal, min: 1, max: 100 },
             { label: '申訴局數', val: cfgAppeal, set: setCfgAppeal, min: 0, max: 10 },
           ].map(({ label, val, set, min, max }) => (
             <label key={label} className="space-y-1">
@@ -2270,7 +2277,8 @@ export default function OnlinePage() {
           <div className="text-sm text-gray-400">記錄設定</div>
           <div className="flex flex-wrap gap-4">
             <LogToggle label="記錄此場遊戲" value={cfgRecordGame} onChange={setCfgRecordGame} />
-            {cfgRecordGame && <LogToggle label="記錄每局手牌" value={cfgRecordRounds} onChange={setCfgRecordRounds} />}
+            {cfgRecordGame && cfgNormal <= 30 && <LogToggle label="記錄每局手牌" value={cfgRecordRounds} onChange={setCfgRecordRounds} />}
+            {cfgRecordGame && cfgNormal > 30  && <span className="text-xs text-gray-500">（超過 30 局，每局手牌不予紀錄）</span>}
             <LogToggle label="聯盟賽" value={cfgIsLeague} onChange={setCfgIsLeague} />
           </div>
           {cfgIsLeague && (
@@ -2510,7 +2518,7 @@ export default function OnlinePage() {
 
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: '比賽局數', val: cfgNormal,    set: setCfgNormal,    min: 1,  max: 40  },
+            { label: '比賽局數', val: cfgNormal,    set: setCfgNormal,    min: 1,  max: 100 },
             { label: '申訴局數', val: cfgAppeal,    set: setCfgAppeal,    min: 0,  max: 10  },
             { label: '時限（秒）', val: cfgTimeLimit, set: setCfgTimeLimit, min: 10, max: 300 },
           ].map(({ label, val, set, min, max }) => (
@@ -2607,7 +2615,8 @@ export default function OnlinePage() {
         <div className="space-y-2 border-t border-slate-600/40 pt-3">
           <div className="flex flex-wrap gap-4">
             <LogToggle label="記錄此場遊戲" value={cfgRecordGame} onChange={setCfgRecordGame} />
-            {cfgRecordGame && <LogToggle label="記錄每局手牌" value={cfgRecordRounds} onChange={setCfgRecordRounds} />}
+            {cfgRecordGame && cfgNormal <= 30 && <LogToggle label="記錄每局手牌" value={cfgRecordRounds} onChange={setCfgRecordRounds} />}
+            {cfgRecordGame && cfgNormal > 30  && <span className="text-xs text-gray-500">（超過 30 局，每局手牌不予紀錄）</span>}
             <LogToggle label="聯盟賽" value={cfgIsLeague} onChange={setCfgIsLeague} />
           </div>
           {cfgIsLeague && (
