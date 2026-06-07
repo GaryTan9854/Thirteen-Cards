@@ -664,10 +664,10 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
 
-  // 5. 賭博師父 — 輸到脫褲子
+  // 5. 賭博師父 — 輸到脫褲子（限人類玩家為最大輸家時）
   {
     id: 'idiom_master_gambler_pants', weight: 22,
-    match: () => true,
+    match: ctx => !isBeatuy(ctx.loser),
     lines: [
       { speaker: '妹喜', text: '聽過嗎？賭博師父在 2 樓——沒有褲子可以穿下樓來！' },
       { speaker: '楊貴妃', text: '哈哈哈為什麼？' },
