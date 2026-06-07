@@ -179,8 +179,8 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <div className="text-5xl mb-3 select-none">🃏</div>
           <h1 className="text-3xl font-bold tracking-tight">
-            <span className="text-yellow-400">Thirteen</span>
-            <span className="text-white"> Cards</span>
+            <span className="text-orange-500">Thirteen</span>
+            <span className="text-sky-400"> Cards</span>
           </h1>
           <p className="text-sky-400 text-sm mt-1">十三支線上對戰</p>
           {version && <p className="text-sky-400 text-xs mt-1">v{version}</p>}
