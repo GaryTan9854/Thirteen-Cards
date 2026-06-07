@@ -239,7 +239,8 @@ export default function StatsPage() {
             </thead>
             <tbody>
               {rows.map((r, i) => {
-                const medal  = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`
+                // 「你真有兩把刷子」典故：金/銀/銅 → 三/二/一把刷子
+                const medal  = i === 0 ? '🖌️🖌️🖌️' : i === 1 ? '🖌️🖌️' : i === 2 ? '🖌️' : `${i+1}.`
                 const net    = r.wins - r.losses
                 const isMe   = r.player === player
                 return (

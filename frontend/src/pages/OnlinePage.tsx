@@ -2081,8 +2081,8 @@ export default function OnlinePage() {
                         send({ type: 'new_game' })
                       }
                     }}
-                      className="text-sm px-6 py-2 rounded-xl bg-orange-400 text-gray-900 font-bold
-                                 hover:bg-orange-300 active:scale-95 transition whitespace-nowrap animate-pulse">
+                      className="text-lg px-10 py-3 rounded-2xl bg-orange-400 text-gray-900 font-extrabold
+                                 hover:bg-orange-300 active:scale-95 transition whitespace-nowrap animate-pulse shadow-lg">
                       再來一場
                     </button>
                   </>) : isHost ? (
@@ -2090,8 +2090,8 @@ export default function OnlinePage() {
                       if (soloActive) startSoloRound()
                       else send({ type: 'next_round' })
                     }}
-                      className="text-sm px-6 py-2 rounded-xl bg-orange-400 text-gray-900 font-bold
-                                 hover:bg-orange-300 active:scale-95 transition whitespace-nowrap animate-pulse">
+                      className="text-lg px-10 py-3 rounded-2xl bg-orange-400 text-gray-900 font-extrabold
+                                 hover:bg-orange-300 active:scale-95 transition whitespace-nowrap animate-pulse shadow-lg">
                       下一局 →
                     </button>
                   ) : (
