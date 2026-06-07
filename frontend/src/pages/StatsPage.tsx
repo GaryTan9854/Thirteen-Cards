@@ -68,7 +68,7 @@ export default function StatsPage() {
   }
 
   // View mode: 'me' = self only; 'public' = all players (Gary only)
-  const [viewMode,   setViewMode]   = useState<'me' | 'public'>('me')
+  const [viewMode,   setViewMode]   = useState<'me' | 'public'>('public')
   // Gary: view stats as a specific user via dropdown (within public leaderboard)
   const [viewAs,     setViewAs]     = useState('')   // '' = public leaderboard
   const [allPlayers, setAllPlayers] = useState<string[]>([])
