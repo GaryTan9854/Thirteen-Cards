@@ -26,10 +26,12 @@ export interface QuipScript {
 }
 
 export interface QuipContext {
-  loser:  string    // name of lowest-scoring player this game
-  winner: string    // name of highest-scoring player this game
-  names:  string[]  // all 4 seat names (the actual players at the table)
-  mid?:   string[]  // 2nd / 3rd place players (between winner and loser), if known
+  loser:        string    // name of lowest-scoring player this game
+  winner:       string    // name of highest-scoring player this game
+  names:        string[]  // all 4 seat names (the actual players at the table)
+  mid?:         string[]  // 2nd / 3rd place players (between winner and loser), if known
+  winnerScore?: number    // winner's cumulative score this game
+  loserScore?:  number    // loser's cumulative score this game (typically negative)
 }
 
 const BEAUTIES = new Set(['妲己','妹喜','褒姒','驪姬','西施','王昭君','楊貴妃','貂蟬'])
@@ -626,14 +628,26 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
 
-  // 3. 離譜回家 — 輸家氣話
+  // 3a. 離譜回家 (輸家版) — 最輸者分數 < -55 時觸發
   {
-    id: 'idiom_lipu_home', weight: 22,
-    match: () => true,
+    id: 'idiom_lipu_loser', weight: 22,
+    match: ctx => (ctx.loserScore ?? 0) < -55,
     lines: [
       { speaker: '貂蟬', text: '聽說啊，離譜他媽媽今天在開門等離譜放學回家。' },
       { speaker: '妹喜', text: '蛤？為什麼啊？' },
-      { speaker: '貂蟬', text: '因為今晚 {loser} 排牌……（嘆氣）真的太離譜了！離譜～到家了！' },
+      { speaker: '貂蟬', text: '因為今晚 {loser} 排牌輸這麼慘……（嘆氣）真的太離譜了！離譜～到家了！' },
+      { speaker: '驪姬', text: '哈哈哈哈這個梗！太狠了！' },
+    ],
+  },
+
+  // 3b. 離譜回家 (贏家版) — 第一名分數 > 55 時觸發
+  {
+    id: 'idiom_lipu_winner', weight: 22,
+    match: ctx => (ctx.winnerScore ?? 0) > 55,
+    lines: [
+      { speaker: '貂蟬', text: '聽說啊，離譜他媽媽今天在開門等離譜放學回家。' },
+      { speaker: '妹喜', text: '蛤？為什麼啊？' },
+      { speaker: '貂蟬', text: '因為今晚 {winner} 贏這麼多……（嘆氣）真的太離譜了！離譜～到家了！' },
       { speaker: '驪姬', text: '哈哈哈哈這個梗！太狠了！' },
     ],
   },

@@ -644,7 +644,7 @@ export default function OnlinePage() {
   const voiceRef = useRef(_voiceOn)
   useEffect(() => { voiceRef.current = _voiceOn }, [_voiceOn])
   const cardStyle = useCardStyle()
-  const [quipCtx,      setQuipCtx]          = useState<{ loser: string; winner: string; names: string[]; mid: string[] } | null>(null)
+  const [quipCtx,      setQuipCtx]          = useState<{ loser: string; winner: string; names: string[]; mid: string[]; winnerScore: number; loserScore: number } | null>(null)
 
   // Persist player-specific settings to localStorage whenever they change
   useEffect(() => {
@@ -1847,10 +1847,12 @@ export default function OnlinePage() {
       .sort((a, b) => b.s - a.s)
     const humans = ranked.filter(x => !BEAUTY_SET.has(x.n))
     const pool   = humans.length >= 2 ? humans : ranked
-    const winner = pool[0]?.n ?? ''
-    const loser  = pool[pool.length - 1]?.n ?? ''
-    const mid    = pool.slice(1, -1).map(x => x.n)
-    if (winner && loser) setQuipCtx({ winner, loser, names, mid })
+    const winner      = pool[0]?.n ?? ''
+    const loser       = pool[pool.length - 1]?.n ?? ''
+    const winnerScore = pool[0]?.s ?? 0
+    const loserScore  = pool[pool.length - 1]?.s ?? 0
+    const mid         = pool.slice(1, -1).map(x => x.n)
+    if (winner && loser) setQuipCtx({ winner, loser, names, mid, winnerScore, loserScore })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEnded, lastResult])
 
@@ -2126,6 +2128,8 @@ export default function OnlinePage() {
                   winner={quipCtx.winner}
                   names={quipCtx.names}
                   mid={quipCtx.mid}
+                  winnerScore={quipCtx.winnerScore}
+                  loserScore={quipCtx.loserScore}
                   onDone={() => setQuipCtx(null)}
                 />
               )}
