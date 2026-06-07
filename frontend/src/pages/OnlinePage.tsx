@@ -644,7 +644,7 @@ export default function OnlinePage() {
   const voiceRef = useRef(_voiceOn)
   useEffect(() => { voiceRef.current = _voiceOn }, [_voiceOn])
   const cardStyle = useCardStyle()
-  const [quipCtx,      setQuipCtx]          = useState<{ loser: string; winner: string; names: string[]; mid: string[]; winnerScore: number; loserScore: number } | null>(null)
+  const [quipCtx,      setQuipCtx]          = useState<{ loser: string; winner: string; names: string[]; mid: string[]; humanMid: string[]; winnerScore: number; loserScore: number } | null>(null)
 
   // Persist player-specific settings to localStorage whenever they change
   useEffect(() => {
@@ -1852,7 +1852,10 @@ export default function OnlinePage() {
     const winnerScore = pool[0]?.s ?? 0
     const loserScore  = pool[pool.length - 1]?.s ?? 0
     const mid         = pool.slice(1, -1).map(x => x.n)
-    if (winner && loser) setQuipCtx({ winner, loser, names, mid, winnerScore, loserScore })
+    // humanMid = humans who finished 2nd or 3rd in the FULL 4-seat ranking
+    // (independent of how winner/loser were picked) — used by 甲殼蟲 quip
+    const humanMid    = ranked.slice(1, -1).filter(x => !BEAUTY_SET.has(x.n)).map(x => x.n)
+    if (winner && loser) setQuipCtx({ winner, loser, names, mid, humanMid, winnerScore, loserScore })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEnded, lastResult])
 
@@ -2128,6 +2131,7 @@ export default function OnlinePage() {
                   winner={quipCtx.winner}
                   names={quipCtx.names}
                   mid={quipCtx.mid}
+                  humanMid={quipCtx.humanMid}
                   winnerScore={quipCtx.winnerScore}
                   loserScore={quipCtx.loserScore}
                   onDone={() => setQuipCtx(null)}

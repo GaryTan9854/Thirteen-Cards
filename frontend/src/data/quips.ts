@@ -30,6 +30,7 @@ export interface QuipContext {
   winner:       string    // name of highest-scoring player this game
   names:        string[]  // all 4 seat names (the actual players at the table)
   mid?:         string[]  // 2nd / 3rd place players (between winner and loser), if known
+  humanMid?:    string[]  // humans who finished 2nd / 3rd in the FULL 4-seat ranking
   winnerScore?: number    // winner's cumulative score this game
   loserScore?:  number    // loser's cumulative score this game (typically negative)
 }
@@ -41,11 +42,15 @@ export function isBeatuy(name: string) { return BEAUTIES.has(name) }
 export function subLine(line: QuipLine, ctx: QuipContext): QuipLine {
   const mid1 = ctx.mid?.[0] ?? ''
   const mid2 = ctx.mid?.[1] ?? ''
+  const hmid1 = ctx.humanMid?.[0] ?? mid1
+  const hmid2 = ctx.humanMid?.[1] ?? mid2
   const s = (t: string) => t
-    .replace(/\{loser\}/g,  ctx.loser)
-    .replace(/\{winner\}/g, ctx.winner)
-    .replace(/\{mid1\}/g,   mid1)
-    .replace(/\{mid2\}/g,   mid2)
+    .replace(/\{loser\}/g,     ctx.loser)
+    .replace(/\{winner\}/g,    ctx.winner)
+    .replace(/\{humanMid1\}/g, hmid1)
+    .replace(/\{humanMid2\}/g, hmid2)
+    .replace(/\{mid1\}/g,      mid1)
+    .replace(/\{mid2\}/g,      mid2)
   return { speaker: s(line.speaker), text: s(line.text) }
 }
 
@@ -605,14 +610,14 @@ export const QUIP_SCRIPTS: QuipScript[] = [
   // 俏皮話：歇後語 / 諧音梗 (Cross-player, 任何情況可挑用)
   // ══════════════════════════════════════════════════════════════════════════
 
-  // 1. 甲殼蟲爬玻璃 — 落第二、第三名（mid 玩家）的「滑」溜
+  // 1. 甲殼蟲爬玻璃 — 真人落第二、第三名時的「滑」溜
   {
     id: 'idiom_beetle_slippery', weight: 22,
-    match: ctx => (ctx.mid?.length ?? 0) >= 1,
+    match: ctx => (ctx.humanMid?.length ?? 0) >= 1,
     lines: [
       { speaker: '妲己', text: '甲殼蟲爬玻璃……腳滑得很！' },
       { speaker: '貂蟬', text: '哈哈哈姐姐你說誰呀？' },
-      { speaker: '妲己', text: '今晚 {mid1} 排牌啊～滑了一手又一手，差一點就上岸了～（壞笑）' },
+      { speaker: '妲己', text: '今晚 {humanMid1} 排牌啊～滑了一手又一手，差一點就上岸了～（壞笑）' },
       { speaker: '西施', text: '別這樣～下局穩穩地，金牌就是你的！' },
     ],
   },
