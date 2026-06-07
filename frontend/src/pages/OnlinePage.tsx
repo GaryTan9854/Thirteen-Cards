@@ -571,6 +571,7 @@ export default function OnlinePage() {
   const [cfgInvitees,     setCfgInvitees]     = useState<string[]>([])
   const [cfgStrategies,   setCfgStrategies]   = useState<string[]>(_savedSettings.cfgStrategies ?? ['rulealpha3', 'rulealpha3', 'rulealpha3', 'rulealpha3'])
   const [cfgAiNames,      setCfgAiNames]      = useState<string[]>(() => randomBeauties())
+  const [cfgAutoReshuffle, setCfgAutoReshuffle] = useState<boolean>(() => _savedSettings.cfgAutoReshuffle ?? false)
   const [cfgStepByStep,   setCfgStepByStep]   = useState(false)
   const [cfgRecordGame,   setCfgRecordGame]   = useState(true)
   const [cfgRecordRounds, setCfgRecordRounds] = useState(false)
@@ -648,8 +649,8 @@ export default function OnlinePage() {
   // Persist player-specific settings to localStorage whenever they change
   useEffect(() => {
     if (!player) return
-    localStorage.setItem(`tc_settings_${player}`, JSON.stringify({ cfgNormal, cfgAppeal, cfgStrategies }))
-  }, [player, cfgNormal, cfgAppeal, cfgStrategies])
+    localStorage.setItem(`tc_settings_${player}`, JSON.stringify({ cfgNormal, cfgAppeal, cfgStrategies, cfgAutoReshuffle }))
+  }, [player, cfgNormal, cfgAppeal, cfgStrategies, cfgAutoReshuffle])
   const ttsGenRef          = useRef(0)
   const soloPhaseRef       = useRef<string>('lobby')
   const soloAppealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -672,7 +673,8 @@ export default function OnlinePage() {
       // First time or after going home — randomize AI names
       setCfgAiNames(randomBeauties())
     } else {
-      // Game just ended and player wants to rematch — keep same AI names
+      // Game just ended; auto-reshuffle if user opted in
+      if (cfgAutoReshuffle) setCfgAiNames(randomBeauties())
       setSoloGameJustEnded(false)
     }
     setSoloSetupMode(true)
@@ -2217,14 +2219,17 @@ export default function OnlinePage() {
 
         {/* 各座設定 */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div className="text-sm text-gray-400">各座模型設定</div>
-            <button
-              onClick={randomizeAiPlayers}
-              className="text-xs px-3 py-1 rounded-lg bg-slate-700 text-sky-300 hover:bg-slate-600
-                         transition whitespace-nowrap font-semibold">
-              🎲 換人玩
-            </button>
+            <div className="flex items-center gap-2">
+              <LogToggle label="每局換人" value={cfgAutoReshuffle} onChange={setCfgAutoReshuffle} />
+              <button
+                onClick={randomizeAiPlayers}
+                className="text-xs px-3 py-1 rounded-lg bg-slate-700 text-sky-300 hover:bg-slate-600
+                           transition whitespace-nowrap font-semibold">
+                🎲 換人玩
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-4 gap-2">
             {/* 你 */}
