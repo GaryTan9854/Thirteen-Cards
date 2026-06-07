@@ -72,7 +72,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
   // ══════════════════════════════════════════════════════════════════════════
 
   {
-    id: 'gary_loses_1', weight: 10,
+    id: 'gary_loses_1', weight: 4,
     match: ctx => ctx.loser === 'Gary',
     lines: [
       { speaker: '妲己',   text: 'Gary 大爺今晚手氣欠佳，是不是最近太累啦～' },
@@ -82,7 +82,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'gary_loses_2', weight: 9,
+    id: 'gary_loses_2', weight: 4,
     match: ctx => ctx.loser === 'Gary',
     lines: [
       { speaker: '褒姒',   text: '呀，Gary 大爺今晚輸了耶～輸家請客，天經地義！' },
@@ -92,7 +92,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'gary_loses_3', weight: 8,
+    id: 'gary_loses_3', weight: 4,
     match: ctx => ctx.loser === 'Gary',
     lines: [
       { speaker: '貂蟬',   text: '大爺今天的牌，是在睡著排嗎？（偷笑）' },
@@ -102,7 +102,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'gary_loses_4', weight: 8,
+    id: 'gary_loses_4', weight: 4,
     match: ctx => ctx.loser === 'Gary',
     lines: [
       { speaker: '驪姬',   text: 'Gary 大爺，聽說江湖高手都越輸越強的喔～' },
@@ -111,7 +111,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'gary_loses_5', weight: 7,
+    id: 'gary_loses_5', weight: 3,
     match: ctx => ctx.loser === 'Gary',
     lines: [
       { speaker: '西施',   text: '大爺今晚是不是故意讓牌的啊？' },
@@ -157,7 +157,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
   // ══════════════════════════════════════════════════════════════════════════
 
   {
-    id: 'gary_wins_1', weight: 10,
+    id: 'gary_wins_1', weight: 4,
     match: ctx => ctx.winner === 'Gary',
     lines: [
       { speaker: '妲己',   text: 'Gary 大爺今晚英明神武，妹妹好崇拜～' },
@@ -166,7 +166,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'gary_wins_2', weight: 8,
+    id: 'gary_wins_2', weight: 4,
     match: ctx => ctx.winner === 'Gary',
     lines: [
       { speaker: '楊貴妃', text: '大爺今晚牌運旺到爆！' },
@@ -176,7 +176,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'gary_wins_3', weight: 8,
+    id: 'gary_wins_3', weight: 4,
     match: ctx => ctx.winner === 'Gary',
     lines: [
       { speaker: '褒姒',   text: '大爺今晚排牌，每一墩都穩穩的，好帥啊～' },
@@ -186,7 +186,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'gary_wins_4', weight: 7,
+    id: 'gary_wins_4', weight: 3,
     match: ctx => ctx.winner === 'Gary',
     lines: [
       { speaker: '妹喜',   text: '今晚大爺牌運亨通，可見平日積德！' },
@@ -237,7 +237,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
   // ══════════════════════════════════════════════════════════════════════════
 
   {
-    id: 'ian_loses_1', weight: 10,
+    id: 'ian_loses_1', weight: 4,
     match: ctx => ctx.loser === 'Ian',
     lines: [
       { speaker: '西施',   text: 'Ian 哥哥今天輸了，是不是分心了呢？' },
@@ -246,7 +246,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'ian_loses_2', weight: 8,
+    id: 'ian_loses_2', weight: 4,
     match: ctx => ctx.loser === 'Ian',
     lines: [
       { speaker: '貂蟬',   text: 'Ian 今晚輸慘了，要不要來個抱抱？（甜笑）' },
@@ -255,7 +255,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'ian_loses_3', weight: 7,
+    id: 'ian_loses_3', weight: 3,
     match: ctx => ctx.loser === 'Ian',
     lines: [
       { speaker: '妲己',   text: 'Ian 哥哥今晚牌運欠佳，一定是沒吃早餐的關係！' },
@@ -281,7 +281,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
   // ══════════════════════════════════════════════════════════════════════════
 
   {
-    id: 'ian_wins_1', weight: 10,
+    id: 'ian_wins_1', weight: 4,
     match: ctx => ctx.winner === 'Ian',
     lines: [
       { speaker: '西施',   text: 'Ian 哥哥今晚排牌好穩，每一墩都把握得住！' },
@@ -290,7 +290,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'ian_wins_2', weight: 8,
+    id: 'ian_wins_2', weight: 4,
     match: ctx => ctx.winner === 'Ian',
     lines: [
       { speaker: '妲己',   text: 'Ian 哥哥今晚沉穩應戰，完全看不出有任何慌亂！' },
@@ -316,7 +316,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
   // ══════════════════════════════════════════════════════════════════════════
 
   {
-    id: 'glory_loses_1', weight: 10,
+    id: 'glory_loses_1', weight: 4,
     match: ctx => ctx.loser === 'Glory',
     lines: [
       { speaker: '楊貴妃', text: 'Glory 姐姐今天運氣欠佳呢，不怪你的～' },
@@ -325,7 +325,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'glory_loses_2', weight: 8,
+    id: 'glory_loses_2', weight: 4,
     match: ctx => ctx.loser === 'Glory',
     lines: [
       { speaker: '西施',   text: 'Glory 姐今天的牌實在太難排了，真的不怪你！' },
@@ -334,7 +334,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'glory_loses_3', weight: 7,
+    id: 'glory_loses_3', weight: 3,
     match: ctx => ctx.loser === 'Glory',
     lines: [
       { speaker: '妹喜',   text: 'Glory 姐，今晚牌運不好，但姐姐氣場依然最強！' },
@@ -369,7 +369,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
   // ══════════════════════════════════════════════════════════════════════════
 
   {
-    id: 'glory_wins_1', weight: 10,
+    id: 'glory_wins_1', weight: 4,
     match: ctx => ctx.winner === 'Glory',
     lines: [
       { speaker: '妲己',   text: 'Glory 姐姐今晚排牌超精準，小妹甘拜下風！' },
@@ -378,7 +378,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'glory_wins_2', weight: 8,
+    id: 'glory_wins_2', weight: 4,
     match: ctx => ctx.winner === 'Glory',
     lines: [
       { speaker: '王昭君', text: 'Glory 姐今晚每一局都排得很有章法！' },
@@ -387,7 +387,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'glory_wins_3', weight: 8,
+    id: 'glory_wins_3', weight: 4,
     match: ctx => ctx.winner === 'Glory',
     lines: [
       { speaker: '楊貴妃', text: 'Glory 姐今晚是女王降臨，全場都被壓制！' },
@@ -426,7 +426,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
   // ══════════════════════════════════════════════════════════════════════════
 
   {
-    id: 'jack_loses_1', weight: 10,
+    id: 'jack_loses_1', weight: 4,
     match: ctx => ctx.loser === 'Jack',
     lines: [
       { speaker: '褒姒',   text: 'Jack 今晚輸了，是不是剛才偷偷在分心？' },
@@ -435,7 +435,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'jack_loses_2', weight: 8,
+    id: 'jack_loses_2', weight: 4,
     match: ctx => ctx.loser === 'Jack',
     lines: [
       { speaker: '妹喜',   text: 'Jack 今晚墊底，要有點誠意表示一下哦～' },
@@ -445,7 +445,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'jack_loses_3', weight: 8,
+    id: 'jack_loses_3', weight: 4,
     match: ctx => ctx.loser === 'Jack',
     lines: [
       { speaker: '驪姬',   text: 'Jack 啊 Jack，今晚的牌你是用腳排的嗎？（搖頭笑）' },
@@ -455,7 +455,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'jack_loses_4', weight: 7,
+    id: 'jack_loses_4', weight: 3,
     match: ctx => ctx.loser === 'Jack',
     lines: [
       { speaker: '楊貴妃', text: 'Jack 今晚輸了，臉上有點掛不住是嗎？（偷笑）' },
@@ -481,7 +481,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
   // ══════════════════════════════════════════════════════════════════════════
 
   {
-    id: 'jack_wins_1', weight: 10,
+    id: 'jack_wins_1', weight: 4,
     match: ctx => ctx.winner === 'Jack',
     lines: [
       { speaker: '貂蟬',   text: 'Jack 今晚好厲害，全場都壓制住了！' },
@@ -490,7 +490,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'jack_wins_2', weight: 8,
+    id: 'jack_wins_2', weight: 4,
     match: ctx => ctx.winner === 'Jack',
     lines: [
       { speaker: '西施',   text: 'Jack 今晚突然開竅了，每一張牌都放得很準！' },
@@ -499,7 +499,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'jack_wins_3', weight: 7,
+    id: 'jack_wins_3', weight: 3,
     match: ctx => ctx.winner === 'Jack',
     lines: [
       { speaker: '妹喜',   text: 'Jack 今晚勝了，小妹要重新認識你了～' },
@@ -581,7 +581,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
   // ══════════════════════════════════════════════════════════════════════════
 
   {
-    id: 'vip_loser_generic', weight: 4,
+    id: 'vip_loser_generic', weight: 2,
     match: ctx => !BEAUTIES.has(ctx.loser) && !BIG4.includes(ctx.loser),
     lines: [
       { speaker: '妲己',   text: '{loser} 今晚手氣不太好，不過沒關係，下局加油！' },
@@ -590,7 +590,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'vip_winner_generic', weight: 3,
+    id: 'vip_winner_generic', weight: 2,
     match: ctx => !BEAUTIES.has(ctx.winner) && !BIG4.includes(ctx.winner),
     lines: [
       { speaker: '褒姒',   text: '{winner} 今晚排得很出色，大家都要向他學習！' },
@@ -605,7 +605,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
 
   // 1. 甲殼蟲爬玻璃 — 落第二、第三名（mid 玩家）的「滑」溜
   {
-    id: 'idiom_beetle_slippery', weight: 5,
+    id: 'idiom_beetle_slippery', weight: 22,
     match: ctx => (ctx.mid?.length ?? 0) >= 1,
     lines: [
       { speaker: '妲己', text: '甲殼蟲爬玻璃……腳滑得很！' },
@@ -617,7 +617,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
 
   // 2. 老太太下樓梯 — 服氣 (致敬冠軍)
   {
-    id: 'idiom_grandma_stairs', weight: 6,
+    id: 'idiom_grandma_stairs', weight: 22,
     match: () => true,
     lines: [
       { speaker: '楊貴妃', text: '老太太下樓梯……不得不扶（服）啊！' },
@@ -628,7 +628,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
 
   // 3. 離譜回家 — 輸家氣話
   {
-    id: 'idiom_lipu_home', weight: 4,
+    id: 'idiom_lipu_home', weight: 22,
     match: () => true,
     lines: [
       { speaker: '貂蟬', text: '聽說啊，離譜他媽媽今天在開門等離譜放學回家。' },
@@ -640,7 +640,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
 
   // 4. 溪底沒魚 — 冠軍 (酸 winner 沒對手)
   {
-    id: 'idiom_creek_no_fish', weight: 4,
+    id: 'idiom_creek_no_fish', weight: 22,
     match: () => true,
     lines: [
       { speaker: '褒姒', text: '溪底沒魚，三界娘子為王！' },
@@ -652,7 +652,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
 
   // 5. 賭博師父 — 輸到脫褲子
   {
-    id: 'idiom_master_gambler_pants', weight: 4,
+    id: 'idiom_master_gambler_pants', weight: 22,
     match: () => true,
     lines: [
       { speaker: '妹喜', text: '聽過嗎？賭博師父在 2 樓——沒有褲子可以穿下樓來！' },
@@ -664,7 +664,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
 
   // 6. 媽媽有交代 — 勸戒輸家
   {
-    id: 'idiom_mom_warned', weight: 4,
+    id: 'idiom_mom_warned', weight: 22,
     match: () => true,
     lines: [
       { speaker: '王昭君', text: '{loser}，媽媽有交代過喔：出門遊玩，千萬不要去賭博！' },
@@ -675,7 +675,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
 
   // 7. 兵器千萬種，你偏愛用劍（賤）
   {
-    id: 'idiom_sword_jian', weight: 4,
+    id: 'idiom_sword_jian', weight: 22,
     match: () => true,
     lines: [
       { speaker: '驪姬', text: '兵器千萬種，{winner} 你怎麼偏愛用劍呢？' },
@@ -689,7 +689,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
   // ══════════════════════════════════════════════════════════════════════════
 
   {
-    id: 'generic_1', weight: 2,
+    id: 'generic_1', weight: 1,
     match: () => true,
     lines: [
       { speaker: '妲己',   text: '大家今晚都玩得很盡興吧～' },
@@ -698,7 +698,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'generic_2', weight: 2,
+    id: 'generic_2', weight: 1,
     match: () => true,
     lines: [
       { speaker: '王昭君', text: '這局起伏真大，看得心都跳快了～' },
@@ -707,7 +707,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'generic_3', weight: 2,
+    id: 'generic_3', weight: 1,
     match: () => true,
     lines: [
       { speaker: '褒姒',   text: '{loser} 今晚辛苦了，下局一定能翻！' },
@@ -716,7 +716,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'generic_4', weight: 2,
+    id: 'generic_4', weight: 1,
     match: () => true,
     lines: [
       { speaker: '西施',   text: '每局都這麼精彩，玩牌就是這麼有趣嘛～' },

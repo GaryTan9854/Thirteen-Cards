@@ -797,29 +797,28 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
                     ? <div className="text-xs text-orange-400">特殊牌型：{info.special.name}</div>
                     : (
                       <div className="grid grid-cols-2 gap-1.5">
-                        {info.groups.slice(0,10).map((g,gi)=>{
-                          const active     = gi===selGroup
-                          const matched    = gi===matchedGroup && gi!==selGroup
-                          const cnt        = g.variants?.length ?? 0
-                          const dominated  = !!g.dominated
-                          return (
-                            <button key={gi}
-                              onClick={dominated ? undefined : ()=>pickGroup(gi)}
-                              disabled={dominated}
-                              title={dominated ? '此排法被其他排法全面壓制' : undefined}
-                              className={`text-[16px] px-2 py-1.5 rounded-lg border transition-colors text-left
-                                ${dominated
-                                  ? 'bg-red-950/50 border-red-900/60 text-red-300/50 cursor-not-allowed line-through decoration-red-500 decoration-2 opacity-70'
-                                  : active
+                        {info.groups
+                          .map((g, gi) => ({ g, gi }))   // preserve original index for selGroup/matchedGroup matching
+                          .filter(({ g }) => !g.dominated)
+                          .slice(0, 10)
+                          .map(({ g, gi }) => {
+                            const active  = gi === selGroup
+                            const matched = gi === matchedGroup && gi !== selGroup
+                            const cnt     = g.variants?.length ?? 0
+                            return (
+                              <button key={gi}
+                                onClick={() => pickGroup(gi)}
+                                className={`text-[16px] px-2 py-1.5 rounded-lg border transition-colors text-left
+                                  ${active
                                     ? 'bg-sky-800 border-sky-500 text-sky-100 font-bold'
                                     : matched
                                       ? 'bg-gray-700 text-gray-200 border-2 border-orange-400 font-semibold'
                                       : 'bg-gray-700 border-gray-500 text-white hover:border-sky-500'}`}>
-                              {g.label}
-                              {!dominated && active && cnt>1 && <span className="ml-1 opacity-70 text-sm">{varIdx+1}/{cnt}</span>}
-                            </button>
-                          )
-                        })}
+                                {g.label}
+                                {active && cnt > 1 && <span className="ml-1 opacity-70 text-sm">{varIdx+1}/{cnt}</span>}
+                              </button>
+                            )
+                          })}
                       </div>
                     )
               }
