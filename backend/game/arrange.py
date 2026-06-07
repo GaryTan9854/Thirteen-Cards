@@ -1301,6 +1301,10 @@ def enumerate_pure_pair_arrangements(handstrs: list) -> list:
     seen:    set  = set()
 
     def _add(top_v, mid_v, bot_v):
+        # Defensive: any branch producing a wrong-length pile is a code bug;
+        # silently dropping it beats handing the UI a 3+4+4=11-card arrangement.
+        if len(top_v) != 3 or len(mid_v) != 5 or len(bot_v) != 5:
+            return
         h3 = Hand3(top_v); h3.score_hand()
         hm = Hand5(mid_v); hm.score_hand()
         hb = Hand5(bot_v); hb.score_hand()
@@ -1318,7 +1322,20 @@ def enumerate_pure_pair_arrangements(handstrs: list) -> list:
 
     sc = single_cs
 
-    if n_pairs >= 5:
+    if n_pairs >= 6:
+        # 6 pairs + 1 single = 13 cards. The 6th (weakest) pair has to be split
+        # so its two cards can serve as kickers for mid 兩對 and bot 兩對.
+        p = [by_rank[r] for r in pr_desc[:6]]
+        # Variant 1: top = strongest pair + single; mid + bot get split-pair kickers
+        _add(p[0][:2] + sc[:1],
+             p[2][:2] + p[3][:2] + [p[5][0]],
+             p[1][:2] + p[4][:2] + [p[5][1]])
+        # Variant 2: top = weakest pair (anchor lighter top); 2nd-weakest + 6th split
+        _add(p[5][:2] + sc[:1],
+             p[2][:2] + p[3][:2] + [p[4][0]],
+             p[0][:2] + p[1][:2] + [p[4][1]])
+
+    elif n_pairs == 5:
         p = [by_rank[r] for r in pr_desc[:5]]
         _add(p[0][:2] + sc[:1],
              p[2][:2] + p[3][:2] + sc[1:2],
