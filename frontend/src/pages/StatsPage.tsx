@@ -5,6 +5,15 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import Brush from '../components/Brush'
+
+function Brushes({ n }: { n: number }) {
+  return (
+    <span className="inline-flex gap-0.5 align-middle" title={`${n} 把刷子 — 你真有${n === 1 ? '一' : n === 2 ? '兩' : '三'}把刷子`}>
+      {Array.from({ length: n }, (_, k) => <Brush key={k} h={18} />)}
+    </span>
+  )
+}
 
 interface PlayerStat {
   player:  string
@@ -240,7 +249,10 @@ export default function StatsPage() {
             <tbody>
               {rows.map((r, i) => {
                 // 「你真有兩把刷子」典故：金/銀/銅 → 三/二/一把刷子
-                const medal  = i === 0 ? '🖌️🖌️🖌️' : i === 1 ? '🖌️🖌️' : i === 2 ? '🖌️' : `${i+1}.`
+                const medal: React.ReactNode = i === 0 ? <Brushes n={3} />
+                                             : i === 1 ? <Brushes n={2} />
+                                             : i === 2 ? <Brushes n={1} />
+                                             : `${i+1}.`
                 const net    = r.wins - r.losses
                 const isMe   = r.player === player
                 return (

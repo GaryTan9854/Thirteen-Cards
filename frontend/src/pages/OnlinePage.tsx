@@ -641,7 +641,7 @@ export default function OnlinePage() {
   const voiceRef = useRef(_voiceOn)
   useEffect(() => { voiceRef.current = _voiceOn }, [_voiceOn])
   const cardStyle = useCardStyle()
-  const [quipCtx,      setQuipCtx]          = useState<{ loser: string; winner: string; names: string[] } | null>(null)
+  const [quipCtx,      setQuipCtx]          = useState<{ loser: string; winner: string; names: string[]; mid: string[] } | null>(null)
 
   // Persist player-specific settings to localStorage whenever they change
   useEffect(() => {
@@ -1836,7 +1836,12 @@ export default function OnlinePage() {
     )
     const winner = names[cum.indexOf(Math.max(...cum))] ?? ''
     const loser  = names[cum.indexOf(Math.min(...cum))] ?? ''
-    if (winner && loser) setQuipCtx({ winner, loser, names })
+    // mid = the players sandwiched between winner and loser (sorted high→low score)
+    const ranked = names
+      .map((n: string, i: number) => ({ n, s: cum[i] }))
+      .sort((a, b) => b.s - a.s)
+    const mid = ranked.filter(x => x.n !== winner && x.n !== loser).map(x => x.n)
+    if (winner && loser) setQuipCtx({ winner, loser, names, mid })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEnded, lastResult])
 
@@ -2111,6 +2116,7 @@ export default function OnlinePage() {
                   loser={quipCtx.loser}
                   winner={quipCtx.winner}
                   names={quipCtx.names}
+                  mid={quipCtx.mid}
                   onDone={() => setQuipCtx(null)}
                 />
               )}

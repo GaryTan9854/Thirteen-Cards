@@ -29,6 +29,7 @@ export interface QuipContext {
   loser:  string    // name of lowest-scoring player this game
   winner: string    // name of highest-scoring player this game
   names:  string[]  // all 4 seat names (the actual players at the table)
+  mid?:   string[]  // 2nd / 3rd place players (between winner and loser), if known
 }
 
 const BEAUTIES = new Set(['妲己','妹喜','褒姒','驪姬','西施','王昭君','楊貴妃','貂蟬'])
@@ -36,7 +37,13 @@ export function isBeatuy(name: string) { return BEAUTIES.has(name) }
 
 // ── Substitution helper ─────────────────────────────────────────────────────
 export function subLine(line: QuipLine, ctx: QuipContext): QuipLine {
-  const s = (t: string) => t.replace(/\{loser\}/g, ctx.loser).replace(/\{winner\}/g, ctx.winner)
+  const mid1 = ctx.mid?.[0] ?? ''
+  const mid2 = ctx.mid?.[1] ?? ''
+  const s = (t: string) => t
+    .replace(/\{loser\}/g,  ctx.loser)
+    .replace(/\{winner\}/g, ctx.winner)
+    .replace(/\{mid1\}/g,   mid1)
+    .replace(/\{mid2\}/g,   mid2)
   return { speaker: s(line.speaker), text: s(line.text) }
 }
 
@@ -589,6 +596,91 @@ export const QUIP_SCRIPTS: QuipScript[] = [
       { speaker: '褒姒',   text: '{winner} 今晚排得很出色，大家都要向他學習！' },
       { speaker: '妹喜',   text: '是啊，{winner} 今晚穩穩地贏，厲害！' },
       { speaker: '驪姬',   text: '贏家要請客哦～（眨眼）' },
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 俏皮話：歇後語 / 諧音梗 (Cross-player, 任何情況可挑用)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // 1. 甲殼蟲爬玻璃 — 落第二、第三名（mid 玩家）的「滑」溜
+  {
+    id: 'idiom_beetle_slippery', weight: 5,
+    match: ctx => (ctx.mid?.length ?? 0) >= 1,
+    lines: [
+      { speaker: '妲己', text: '甲殼蟲爬玻璃……腳滑得很！' },
+      { speaker: '貂蟬', text: '哈哈哈姐姐你說誰呀？' },
+      { speaker: '妲己', text: '今晚 {mid1} 排牌啊～滑了一手又一手，差一點就上岸了～（壞笑）' },
+      { speaker: '西施', text: '別這樣～下局穩穩地，金牌就是你的！' },
+    ],
+  },
+
+  // 2. 老太太下樓梯 — 服氣 (致敬冠軍)
+  {
+    id: 'idiom_grandma_stairs', weight: 6,
+    match: () => true,
+    lines: [
+      { speaker: '楊貴妃', text: '老太太下樓梯……不得不扶（服）啊！' },
+      { speaker: '王昭君', text: '今晚 {winner} 排牌排得，我們都不得不服！' },
+      { speaker: '妲己',   text: '是啊，這手氣這腦袋，姐妹們都甘拜下風～' },
+    ],
+  },
+
+  // 3. 離譜回家 — 輸家氣話
+  {
+    id: 'idiom_lipu_home', weight: 4,
+    match: () => true,
+    lines: [
+      { speaker: '貂蟬', text: '聽說啊，離譜他媽媽今天在開門等離譜放學回家。' },
+      { speaker: '妹喜', text: '蛤？為什麼啊？' },
+      { speaker: '貂蟬', text: '因為今晚 {loser} 排牌……（嘆氣）真的太離譜了！離譜～到家了！' },
+      { speaker: '驪姬', text: '哈哈哈哈這個梗！太狠了！' },
+    ],
+  },
+
+  // 4. 溪底沒魚 — 冠軍 (酸 winner 沒對手)
+  {
+    id: 'idiom_creek_no_fish', weight: 4,
+    match: () => true,
+    lines: [
+      { speaker: '褒姒', text: '溪底沒魚，三界娘子為王！' },
+      { speaker: '驪姬', text: '姐姐這話什麼意思呀～' },
+      { speaker: '褒姒', text: '我是說 {winner} 今晚贏得太輕鬆啦～是不是對手太弱啊？（甜笑）' },
+      { speaker: '妲己', text: '哈哈哈姐姐你也壞！{winner} 你別生氣，姐妹們鬧著玩的～' },
+    ],
+  },
+
+  // 5. 賭博師父 — 輸到脫褲子
+  {
+    id: 'idiom_master_gambler_pants', weight: 4,
+    match: () => true,
+    lines: [
+      { speaker: '妹喜', text: '聽過嗎？賭博師父在 2 樓——沒有褲子可以穿下樓來！' },
+      { speaker: '楊貴妃', text: '哈哈哈為什麼？' },
+      { speaker: '妹喜', text: '今晚 {loser} 就是這個情況啦～連褲子都輸光了！（捂嘴）' },
+      { speaker: '貂蟬', text: '{loser} 別氣別氣，回頭我們幫你買條新的！（甜笑）' },
+    ],
+  },
+
+  // 6. 媽媽有交代 — 勸戒輸家
+  {
+    id: 'idiom_mom_warned', weight: 4,
+    match: () => true,
+    lines: [
+      { speaker: '王昭君', text: '{loser}，媽媽有交代過喔：出門遊玩，千萬不要去賭博！' },
+      { speaker: '妹喜',   text: '哎呀姐姐你提這個！{loser} 臉都黑了～' },
+      { speaker: '妲己',   text: '哈哈哈下次出門記得帶交代啊！（壞笑）' },
+    ],
+  },
+
+  // 7. 兵器千萬種，你偏愛用劍（賤）
+  {
+    id: 'idiom_sword_jian', weight: 4,
+    match: () => true,
+    lines: [
+      { speaker: '驪姬', text: '兵器千萬種，{winner} 你怎麼偏愛用劍呢？' },
+      { speaker: '妲己', text: '哈哈哈！這把「劍」打人，被打到的人才知道有多……賤！' },
+      { speaker: '貂蟬', text: '說的是 {winner} 啊還是 {loser} 呀？姐妹們各自體會～（眨眼）' },
     ],
   },
 

@@ -4,6 +4,7 @@
  *
  * Pure functions only; no React imports.
  */
+import { isTaiwanese } from './voice'
 
 export interface GunNotif {
   id:     number
@@ -79,7 +80,16 @@ export function buildSpecialTTS(players: any[]): { baodao: string[]; monsters: s
   return { baodao, monsters }
 }
 
-// ── 女聲 TTS（Web Speech API，優先 zh-TW）────────────────────────────────────
+// ── 女聲 TTS（Web Speech API，優先 zh-TW；台語模式優先 nan-TW 美嘉）─────────
+
+/** Pick best Taiwanese Hokkien (nan-TW) voice; returns undefined if unavailable. */
+function pickTaiwaneseVoice(all: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
+  // macOS Sonoma+: Meijia (台灣台語) — `nan-TW` or `nan-Hant-TW`
+  return (
+    all.find(v => /^nan[-_]/i.test(v.lang) && /mei-?jia|美嘉|美佳/i.test(v.name)) ||
+    all.find(v => /^nan[-_]/i.test(v.lang))
+  )
+}
 
 /** Pick best Mandarin (華語) female voice, avoiding Cantonese (zh-HK / Sinji). */
 function pickFemaleZh(zh: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
@@ -108,14 +118,19 @@ export function speak(text: string, rate = 1.05) {
   if (!synth) return
   synth.cancel()
   const utter = new SpeechSynthesisUtterance(text)
-  utter.lang  = 'zh-TW'
   utter.rate  = rate
   utter.pitch = 1.0
   const doSpeak = () => {
     const voices = synth.getVoices()
-    const zh     = voices.filter(v => v.lang.startsWith('zh'))
-    const female = pickFemaleZh(zh)
-    if (female) utter.voice = female
+    let chosen: SpeechSynthesisVoice | undefined
+    if (isTaiwanese()) chosen = pickTaiwaneseVoice(voices)
+    if (!chosen) chosen = pickFemaleZh(voices.filter(v => v.lang.startsWith('zh')))
+    if (chosen) {
+      utter.voice = chosen
+      utter.lang  = chosen.lang
+    } else {
+      utter.lang  = 'zh-TW'
+    }
     synth.speak(utter)
   }
   if (synth.getVoices().length > 0) doSpeak()
@@ -129,14 +144,16 @@ export function speakSequence(lines: string[], onDone?: () => void, rate = 1.05)
   const synth = window.speechSynthesis
   if (!synth) { onDone?.(); return }
   const voices = synth.getVoices()
-  const zh     = voices.filter(v => v.lang.startsWith('zh'))
-  const female = pickFemaleZh(zh)
+  let chosen: SpeechSynthesisVoice | undefined
+  if (isTaiwanese()) chosen = pickTaiwaneseVoice(voices)
+  if (!chosen) chosen = pickFemaleZh(voices.filter(v => v.lang.startsWith('zh')))
   let idx = 0
   const playNext = () => {
     if (idx >= lines.length) { onDone?.(); return }
     const utter = new SpeechSynthesisUtterance(lines[idx++])
-    utter.lang = 'zh-TW'; utter.rate = rate; utter.pitch = 1.0
-    if (female) utter.voice = female
+    utter.rate = rate; utter.pitch = 1.0
+    if (chosen) { utter.voice = chosen; utter.lang = chosen.lang }
+    else        { utter.lang  = 'zh-TW' }
     utter.onend = playNext
     synth.speak(utter)
   }
