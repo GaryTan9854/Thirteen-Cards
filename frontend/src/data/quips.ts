@@ -54,14 +54,25 @@ export function subLine(line: QuipLine, ctx: QuipContext): QuipLine {
   return { speaker: s(line.speaker), text: s(line.text) }
 }
 
-// ── Random weighted pick ────────────────────────────────────────────────────
+// ── Random weighted pick (with short-term anti-repeat) ──────────────────────
+// Track the last N picks so the same script doesn't fire two games in a row,
+// even when the player keeps placing in the same rank slot (e.g. always mid).
+// Falls back to including recent picks if no fresh eligible script remains.
+const RECENT: string[] = []
+const RECENT_MAX = 5
+
 export function pickScript(ctx: QuipContext): QuipScript {
   const eligible = QUIP_SCRIPTS.filter(s => s.match(ctx))
   if (!eligible.length) return QUIP_SCRIPTS[QUIP_SCRIPTS.length - 1]
-  const totalW = eligible.reduce((s, x) => s + x.weight, 0)
+  const fresh = eligible.filter(s => !RECENT.includes(s.id))
+  const pool  = fresh.length > 0 ? fresh : eligible
+  const totalW = pool.reduce((s, x) => s + x.weight, 0)
   let r = Math.random() * totalW
-  for (const s of eligible) { r -= s.weight; if (r <= 0) return s }
-  return eligible[eligible.length - 1]
+  let chosen = pool[pool.length - 1]
+  for (const s of pool) { r -= s.weight; if (r <= 0) { chosen = s; break } }
+  RECENT.push(chosen.id)
+  if (RECENT.length > RECENT_MAX) RECENT.shift()
+  return chosen
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
