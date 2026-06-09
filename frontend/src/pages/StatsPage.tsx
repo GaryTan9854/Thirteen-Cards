@@ -30,13 +30,17 @@ function pct(n: number, d: number) {
   return (n / d * 100).toFixed(0) + '%'
 }
 
-// 系統排行：以四人局期望值校準（勝率期望25%、不敗率期望75%）
-// w=1.0 / u=1.0 代表剛好平均；1.5倍平均水準 = 滿分100%
+// 系統排行：期望值校準 + 場次可信度衰減
+// K=10 → 30場(一個月)可信度75%，場次少時拉回平均值67%
+const SYS_BASELINE = (1 * 2 + 1) / 4.5   // 純平均玩家的原始分 ≈ 0.667
+const SYS_K = 10
 function sysScore(r: PlayerStat): number {
   if (!r.games) return 0
-  const w = (r.wins / r.games) / 0.25
-  const u = ((r.games - r.losses) / r.games) / 0.75
-  return Math.min((w * 2 + u) / 4.5, 1)
+  const w    = (r.wins / r.games) / 0.25
+  const u    = ((r.games - r.losses) / r.games) / 0.75
+  const raw  = Math.min((w * 2 + u) / 4.5, 1)
+  const conf = r.games / (r.games + SYS_K)
+  return conf * raw + (1 - conf) * SYS_BASELINE
 }
 
 function fmtDate(iso: string) {
