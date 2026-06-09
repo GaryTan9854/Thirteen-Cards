@@ -33,7 +33,7 @@ function pct(n: number, d: number) {
 // 系統排行：期望值校準 + 場次可信度衰減
 // K=10 → 30場(一個月)可信度75%，場次少時拉回平均值67%
 const SYS_BASELINE = (1 * 2 + 1) / 4.5   // 純平均玩家的原始分 ≈ 0.667
-const SYS_K = 10
+const SYS_K = 20
 function sysScore(r: PlayerStat): number {
   if (!r.games) return 0
   const w    = (r.wins / r.games) / 0.25
