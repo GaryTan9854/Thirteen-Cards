@@ -715,6 +715,325 @@ export const QUIP_SCRIPTS: QuipScript[] = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
+  // 牌桌俏皮話、垃圾話、歇後語 (Gary's collection)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ─── 輸牌篇 ──────────────────────────────────────────────────────────────
+  {
+    id: 'idiom_pants_elastic', weight: 18,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '妲己',   text: '哎呀～今晚 {loser} 的褲子……' },
+      { speaker: '貂蟬',   text: '怎麼了？' },
+      { speaker: '妲己',   text: '輸到只剩鬆緊帶啦！（捂嘴笑）' },
+      { speaker: '妹喜',   text: '哈哈哈這個比喻太傳神！' },
+    ],
+  },
+  {
+    id: 'idiom_charity', weight: 18,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '西施',   text: '我看 {loser} 今晚不是來打牌的喔～' },
+      { speaker: '楊貴妃', text: '不然是來幹嘛？' },
+      { speaker: '西施',   text: '是來做慈善的啦！輸這麼大方～（甜笑）' },
+    ],
+  },
+  {
+    id: 'idiom_wallet_slim', weight: 18,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '貂蟬',   text: '{loser} 今晚的錢包啊……瘦身效果顯著！' },
+      { speaker: '妹喜',   text: '哈哈哈！減重比我們姐妹們還成功！' },
+      { speaker: '妲己',   text: '下次別再「瘦身」啦～會破產的（壞笑）' },
+    ],
+  },
+  {
+    id: 'idiom_donation', weight: 18,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '驪姬',   text: '{loser}，你今晚本來想來賺錢吧？' },
+      { speaker: '妲己',   text: '結果……是來捐款的耶！（嘆氣）' },
+      { speaker: '貂蟬',   text: '感謝大爺贊助今晚的歡樂時光～（甜笑）' },
+    ],
+  },
+  {
+    id: 'idiom_collect_money_mood', weight: 18,
+    match: () => true,
+    lines: [
+      { speaker: '楊貴妃', text: '今晚啊，贏家在收錢～' },
+      { speaker: '妹喜',   text: '輸家在……？' },
+      { speaker: '楊貴妃', text: '收心情啦！（捂嘴笑）' },
+      { speaker: '妲己',   text: '{loser}，下局調整好心情再戰！' },
+    ],
+  },
+  {
+    id: 'idiom_ancestors', weight: 20,
+    match: ctx => !isBeatuy(ctx.loser) && (ctx.loserScore ?? 0) < -40,
+    lines: [
+      { speaker: '驪姬',   text: '今晚 {loser} 的牌技……' },
+      { speaker: '貂蟬',   text: '怎樣？' },
+      { speaker: '驪姬',   text: '輸到連祖先都認不出來啦！（嘆）' },
+      { speaker: '妲己',   text: '{loser}，趕快去祠堂上柱香吧～（壞笑）' },
+    ],
+  },
+  {
+    id: 'idiom_weather_forecast', weight: 18,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '西施',   text: '{loser} 今晚的手氣……' },
+      { speaker: '王昭君', text: '怎麼形容呢～' },
+      { speaker: '西施',   text: '比天氣預報還不準啦！說會贏結果輸！' },
+      { speaker: '妹喜',   text: '哈哈哈這個比喻精準！' },
+    ],
+  },
+  {
+    id: 'idiom_tiger_to_loss', weight: 20,
+    match: ctx => !isBeatuy(ctx.loser) && (ctx.loserScore ?? 0) < -25,
+    lines: [
+      { speaker: '貂蟬',   text: '今晚 {loser} 一頓操作猛如虎～' },
+      { speaker: '妲己',   text: '結果呢？' },
+      { speaker: '貂蟬',   text: '一看……輸了兩百五！（捂嘴笑）' },
+      { speaker: '妹喜',   text: '哈哈哈這個梗台味十足！' },
+    ],
+  },
+
+  // ─── 爛牌篇 ──────────────────────────────────────────────────────────────
+  {
+    id: 'idiom_god_cannot_save', weight: 18,
+    match: ctx => !isBeatuy(ctx.loser) && (ctx.loserScore ?? 0) < -30,
+    lines: [
+      { speaker: '王昭君', text: '俗話說，神仙難救無命牌。' },
+      { speaker: '楊貴妃', text: '{loser} 今晚就是這個情況嗎？' },
+      { speaker: '王昭君', text: '看牌看了一晚就知道～（嘆氣）' },
+      { speaker: '妹喜',   text: '{loser} 別怪自己，怪牌就好！' },
+    ],
+  },
+  {
+    id: 'idiom_no_rice', weight: 16,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '褒姒',   text: '巧婦難為無米之炊。' },
+      { speaker: '妲己',   text: '今晚 {loser} 沒拿到好牌，怪不得他～' },
+      { speaker: '驪姬',   text: '對啦對啦，下局祝你拿好牌！' },
+    ],
+  },
+  {
+    id: 'idiom_tofu_knife', weight: 16,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '貂蟬',   text: '今晚 {loser} 的牌啊……像豆腐做的刀！' },
+      { speaker: '妹喜',   text: '蛤？' },
+      { speaker: '貂蟬',   text: '切不動啦～怎麼出都軟趴趴的（笑）' },
+    ],
+  },
+  {
+    id: 'idiom_bad_cards_masterpiece', weight: 18,
+    match: ctx => !isBeatuy(ctx.winner) && (ctx.winnerScore ?? 0) > 20,
+    lines: [
+      { speaker: '妲己',   text: '人生如戲，全靠演技！' },
+      { speaker: '貂蟬',   text: '今晚 {winner} 啊～' },
+      { speaker: '妲己',   text: '手上一把爛牌，演成世界名作！佩服佩服！' },
+    ],
+  },
+  {
+    id: 'idiom_missing_seven_luck', weight: 16,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '褒姒',   text: '打牌啊，三分技術，七分命～' },
+      { speaker: '妲己',   text: '今晚 {loser}……' },
+      { speaker: '褒姒',   text: '剛好缺那七分啦！（同情）' },
+    ],
+  },
+
+  // ─── 運氣篇 ──────────────────────────────────────────────────────────────
+  {
+    id: 'idiom_luck_iron_gold', weight: 16,
+    match: () => true,
+    lines: [
+      { speaker: '楊貴妃', text: '運來鐵成金，運去金成鐵！' },
+      { speaker: '王昭君', text: '今晚 {winner} 鐵都變金啊～' },
+      { speaker: '西施',   text: '{loser} 嘛……金都變鐵了！（同情）' },
+    ],
+  },
+  {
+    id: 'idiom_fengshui_rotate', weight: 14,
+    match: () => true,
+    lines: [
+      { speaker: '妲己',   text: '風水輪流轉，今晚轉到 {winner} 家啦！' },
+      { speaker: '妹喜',   text: '對啊對啊！明晚說不定就輪到 {loser}！' },
+      { speaker: '貂蟬',   text: '{loser} 撐住～時來運轉就是你！' },
+    ],
+  },
+  {
+    id: 'idiom_pumpkin', weight: 20,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '驪姬',   text: '人若衰啊～種瓠仔，生菜瓜！' },
+      { speaker: '妲己',   text: '今晚 {loser} 就是這個情況嗎？' },
+      { speaker: '驪姬',   text: '看他排牌就知道～想要的偏偏拿不到！' },
+      { speaker: '貂蟬',   text: '{loser} 別氣，下局換個風水～' },
+    ],
+  },
+  {
+    id: 'idiom_noble_blood', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '西施',   text: '{loser} 啊，你是不是血統很高貴？' },
+      { speaker: '妹喜',   text: '為什麼這樣問？' },
+      { speaker: '西施',   text: '因為手氣很……低賤啊！（捂嘴笑）' },
+      { speaker: '妲己',   text: '姐姐妳這舌頭也太利了～哈哈哈！' },
+    ],
+  },
+
+  // ─── 酸人篇 ──────────────────────────────────────────────────────────────
+  {
+    id: 'idiom_no_skill_temper', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '貂蟬',   text: '今晚有一個 player～' },
+      { speaker: '妹喜',   text: '誰呀？' },
+      { speaker: '貂蟬',   text: '牌技沒有，脾氣不少！（眨眼）' },
+      { speaker: '妲己',   text: '{loser} 別生氣，姐姐鬧著玩的～' },
+    ],
+  },
+  {
+    id: 'idiom_bad_but_addicted', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '驪姬',   text: '我發現 {loser} 有個特點～' },
+      { speaker: '楊貴妃', text: '什麼特點？' },
+      { speaker: '驪姬',   text: '人菜癮又大！輸了還要再戰！' },
+      { speaker: '妹喜',   text: '哈哈哈下局還是會來的吧～' },
+    ],
+  },
+  {
+    id: 'idiom_conan', weight: 18,
+    match: ctx => (ctx.humanMid?.length ?? 0) >= 1,
+    lines: [
+      { speaker: '妲己',   text: '我們 {humanMid1} 啊，牌桌柯南！' },
+      { speaker: '西施',   text: '怎麼說？' },
+      { speaker: '妲己',   text: '事後推理第一名！「早知道就不那樣排！」（學）' },
+      { speaker: '貂蟬',   text: '哈哈哈太貼切了！' },
+    ],
+  },
+  {
+    id: 'idiom_zhuge_adou', weight: 16,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '褒姒',   text: '{loser} 打之前是諸葛亮～' },
+      { speaker: '妲己',   text: '打之後呢？' },
+      { speaker: '褒姒',   text: '劉阿斗啦！「我這樣排有道理！」「結果還不是輸……」' },
+      { speaker: '驪姬',   text: '哈哈哈這個梗太狠了！' },
+    ],
+  },
+  {
+    id: 'idiom_mouth_king_table_bronze', weight: 16,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '貂蟬',   text: '{loser} 啊～' },
+      { speaker: '妹喜',   text: '怎麼了？' },
+      { speaker: '貂蟬',   text: '嘴巴王者，牌桌青銅！（壞笑）' },
+      { speaker: '妲己',   text: '下局拿出王者表現嘛！我們等著看～' },
+    ],
+  },
+
+  // ─── 自嘲篇 (loser 為人類玩家) ───────────────────────────────────────────
+  {
+    id: 'idiom_cards_no_face', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '楊貴妃', text: '我看 {loser} 不是不會打喔～' },
+      { speaker: '王昭君', text: '那是？' },
+      { speaker: '楊貴妃', text: '是牌不給他面子啦！（同情）' },
+      { speaker: '妹喜',   text: '對對對！是牌的錯，不是 {loser} 的錯！' },
+    ],
+  },
+  {
+    id: 'idiom_offend_gods', weight: 18,
+    match: ctx => !isBeatuy(ctx.loser) && (ctx.loserScore ?? 0) < -30,
+    lines: [
+      { speaker: '妲己',   text: '{loser} 啊，我嚴重懷疑～' },
+      { speaker: '貂蟬',   text: '懷疑什麼？' },
+      { speaker: '妲己',   text: '你洗牌的時候得罪神明了！（嘆）' },
+      { speaker: '妹喜',   text: '哈哈哈下次洗牌前要先拜拜～' },
+    ],
+  },
+  {
+    id: 'idiom_destiny_play', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '驪姬',   text: '{loser} 替自己辯解啊～' },
+      { speaker: '楊貴妃', text: '怎樣辯解？' },
+      { speaker: '驪姬',   text: '「這把不是我打的，是命運打的！」（學）' },
+      { speaker: '妲己',   text: '哈哈哈這個藉口太經典！' },
+    ],
+  },
+  {
+    id: 'idiom_theory_vs_reality', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '西施',   text: '{loser} 的策略其實很成功喔～' },
+      { speaker: '妹喜',   text: '真的？' },
+      { speaker: '西施',   text: '理論上能贏！只是實際上……全輸！（甜笑）' },
+      { speaker: '貂蟬',   text: '哈哈哈姐姐嘴巴太利！' },
+    ],
+  },
+
+  // ─── 台味篇 ──────────────────────────────────────────────────────────────
+  {
+    id: 'idiom_east_wind_north_wind', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '驪姬',   text: '今晚 {loser} 在等東風～' },
+      { speaker: '妲己',   text: '結果？' },
+      { speaker: '驪姬',   text: '東風沒來，西北風先到！（吹涼涼）' },
+      { speaker: '楊貴妃', text: '吹得褲袋都翻起來了～（笑）' },
+    ],
+  },
+  {
+    id: 'idiom_soul_at_atm', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '妹喜',   text: '{loser} 人在牌桌坐～' },
+      { speaker: '王昭君', text: '魂呢？' },
+      { speaker: '妹喜',   text: '在提款機啦！輸到要去領錢！（捂嘴）' },
+      { speaker: '妲己',   text: '哈哈哈下次帶夠提款卡再來！' },
+    ],
+  },
+  {
+    id: 'idiom_luck_mask', weight: 14,
+    match: ctx => (ctx.winnerScore ?? 0) > 30,
+    lines: [
+      { speaker: '楊貴妃', text: '今晚 {winner} 手氣這麼旺啊！' },
+      { speaker: '妲己',   text: '對啊對啊！' },
+      { speaker: '楊貴妃', text: '手氣若會傳染，姐妹們一定戴口罩！' },
+      { speaker: '貂蟬',   text: '哈哈哈姐姐怕被傳染嗎？' },
+    ],
+  },
+  {
+    id: 'idiom_grab_cards_pudu', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '驪姬',   text: '別人摸牌啊，像過年～' },
+      { speaker: '妹喜',   text: '那 {loser} 呢？' },
+      { speaker: '驪姬',   text: '像普渡！（拜）' },
+      { speaker: '妲己',   text: '哈哈哈摸到的牌都用來祭祖了～' },
+    ],
+  },
+
+  // ─── 賭博篇 ──────────────────────────────────────────────────────────────
+  {
+    id: 'idiom_gambling_no_wealth', weight: 16,
+    match: ctx => (ctx.loserScore ?? 0) < -25,
+    lines: [
+      { speaker: '王昭君', text: '俗話說啊，賭博若會發財～' },
+      { speaker: '楊貴妃', text: '怎樣？' },
+      { speaker: '王昭君', text: '田園早就賣無人栽啦！' },
+      { speaker: '妹喜',   text: '{loser} 別灰心～打牌就是娛樂嘛～' },
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
   // 純通用（任何情況，兜底）
   // ══════════════════════════════════════════════════════════════════════════
 
