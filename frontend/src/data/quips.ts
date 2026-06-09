@@ -67,9 +67,9 @@ export function pickScript(ctx: QuipContext): QuipScript {
   const eligible = QUIP_SCRIPTS.filter(s => s.match(ctx))
   if (!eligible.length) return QUIP_SCRIPTS[QUIP_SCRIPTS.length - 1]
 
-  // Player self-quips (priority:true) get 70% probability when available
+  // Player self-quips (priority:true) get 40% probability when available
   const priority = eligible.filter(s => s.priority)
-  const base = (priority.length > 0 && Math.random() < 0.70) ? priority : eligible
+  const base = (priority.length > 0 && Math.random() < 0.40) ? priority : eligible
 
   const fresh = base.filter(s => !RECENT.includes(s.id))
   const pool  = fresh.length > 0 ? fresh : base
