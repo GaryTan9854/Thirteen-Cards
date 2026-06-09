@@ -38,12 +38,13 @@ interface Props {
   winnerScore?: number
   loserScore?:  number
   humanPlayer?: string
+  players?:     { name: string; isHuman: boolean; score: number; rank: number }[]
   onDone:       () => void
 }
 
-export default function QuipPanel({ loser, winner, names, mid, humanMid, winnerScore, loserScore, humanPlayer, onDone }: Props) {
+export default function QuipPanel({ loser, winner, names, mid, humanMid, winnerScore, loserScore, humanPlayer, players, onDone }: Props) {
   const [lineIdx, setLineIdx] = useState(-1)      // -1 = waiting for initial delay
-  const scriptRef = useRef(pickScript({ loser, winner, names, mid, humanMid, winnerScore, loserScore, humanPlayer } as QuipContext))
+  const scriptRef = useRef(pickScript({ loser, winner, names, mid, humanMid, winnerScore, loserScore, humanPlayer, players } as QuipContext))
   const onDoneRef = useRef(onDone)
   useEffect(() => { onDoneRef.current = onDone }, [onDone])
 
@@ -68,7 +69,7 @@ export default function QuipPanel({ loser, winner, names, mid, humanMid, winnerS
   const lines = scriptRef.current.lines
   if (lineIdx >= lines.length) return null
 
-  const ctx   = { loser, winner, names, mid, humanMid, winnerScore, loserScore, humanPlayer } as QuipContext
+  const ctx   = { loser, winner, names, mid, humanMid, winnerScore, loserScore, humanPlayer, players } as QuipContext
   const line  = subLine(lines[lineIdx], ctx)
   const isB   = isBeatuy(line.speaker)
   const color = isB ? '#f472b6' : '#38bdf8'

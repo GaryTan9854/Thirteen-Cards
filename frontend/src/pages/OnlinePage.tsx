@@ -644,7 +644,7 @@ export default function OnlinePage() {
   const voiceRef = useRef(_voiceOn)
   useEffect(() => { voiceRef.current = _voiceOn }, [_voiceOn])
   const cardStyle = useCardStyle()
-  const [quipCtx,      setQuipCtx]          = useState<{ loser: string; winner: string; names: string[]; mid: string[]; humanMid: string[]; winnerScore: number; loserScore: number; humanPlayer?: string } | null>(null)
+  const [quipCtx,      setQuipCtx]          = useState<{ loser: string; winner: string; names: string[]; mid: string[]; humanMid: string[]; winnerScore: number; loserScore: number; humanPlayer?: string; players?: { name: string; isHuman: boolean; score: number; rank: number }[] } | null>(null)
 
   // Persist player-specific settings to localStorage whenever they change
   useEffect(() => {
@@ -1857,7 +1857,13 @@ export default function OnlinePage() {
     const humanMid    = ranked.slice(1, -1).filter(x => !BEAUTY_SET.has(x.n)).map(x => x.n)
     // humanPlayer = sole human when playing vs AI beauties; forces priority self-quips to fire regardless of rank
     const humanPlayer = humans.length === 1 ? humans[0].n : undefined
-    if (winner && loser) setQuipCtx({ winner, loser, names, mid, humanMid, winnerScore, loserScore, humanPlayer })
+    const players = ranked.map((x, i) => ({
+      name: x.n,
+      isHuman: !BEAUTY_SET.has(x.n),
+      score: x.s,
+      rank: i + 1,
+    }))
+    if (winner && loser) setQuipCtx({ winner, loser, names, mid, humanMid, winnerScore, loserScore, humanPlayer, players })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEnded, lastResult])
 
@@ -2137,6 +2143,7 @@ export default function OnlinePage() {
                   winnerScore={quipCtx.winnerScore}
                   loserScore={quipCtx.loserScore}
                   humanPlayer={quipCtx.humanPlayer}
+                  players={quipCtx.players}
                   onDone={() => setQuipCtx(null)}
                 />
               )}

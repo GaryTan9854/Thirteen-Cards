@@ -1,16 +1,16 @@
 /**
  * End-game quip scripts — RPG-style dialogue shown after a game ends.
  *
- * Speaker: beauty name, '{loser}', or '{winner}' placeholder.
- * Text: may contain {loser} / {winner} (substituted at render).
+ * Speaker: beauty name, '{loser}', '{winner}', or player name.
+ * Text: may contain {loser} / {winner} / {mid1} / {mid2} / {humanMid1}.
  *
- * match() receives the full QuipContext so scripts can be precise:
- *   - ctx.loser / ctx.winner  — the specific player who lost / won
- *   - ctx.names               — ALL 4 players in this game (use .includes() for cross-player scripts)
- *
- * Beauties are always observers/commentators; they are never in ctx.names.
- * The match() function must correctly guard cross-player scripts so a joke
- * about Gary AND Glory only fires when both are actually seated at the table.
+ * ── 設計原則 ──
+ * 1. 調侃真人是樂趣：美女評論、特殊 player 自說最有趣
+ * 2. 特殊player篇 (priority:true): Glory/Gary/Jack，40% 觸發
+ *    - Ian 台詞歸入跨情境篇（比較跨情境通用）
+ * 3. 輸牌/爛牌/自嘲/台味篇：{loser} 自己開口說
+ * 4. 酸人篇：只在 AI（美女）輸時觸發（isBeatuy(ctx.loser)）
+ * 5. 跨情境篇：依場景說明使用
  */
 
 export interface QuipLine {
@@ -23,18 +23,26 @@ export interface QuipScript {
   match: (ctx: QuipContext) => boolean
   weight: number
   lines: QuipLine[]
-  priority?: boolean   // player self-quip; pickScript gives these 70% priority
+  priority?: boolean   // 特殊player篇; pickScript gives 40% priority when BIG4 in game
+}
+
+export interface PlayerResult {
+  name: string
+  isHuman: boolean
+  score: number
+  rank: number   // 1 = winner … 4 = loser
 }
 
 export interface QuipContext {
-  loser:        string    // name of lowest-scoring player this game
-  winner:       string    // name of highest-scoring player this game
-  names:        string[]  // all 4 seat names (the actual players at the table)
-  mid?:         string[]  // 2nd / 3rd place players (between winner and loser), if known
-  humanMid?:    string[]  // humans who finished 2nd / 3rd in the FULL 4-seat ranking
-  winnerScore?: number    // winner's cumulative score this game
-  loserScore?:  number    // loser's cumulative score this game (typically negative)
-  humanPlayer?: string    // set when exactly 1 human plays vs AI beauties — forces priority self-quips
+  loser:        string    // lowest-score player this game (from human pool, or all if solo)
+  winner:       string    // highest-score player this game
+  names:        string[]  // all 4 seat names
+  mid?:         string[]  // 2nd/3rd place players
+  humanMid?:    string[]  // humans who finished 2nd/3rd in full 4-seat ranking
+  winnerScore?: number
+  loserScore?:  number
+  humanPlayer?: string    // solo: sole human player; forces all their priority self-quips to match
+  players?:     PlayerResult[]
 }
 
 const BEAUTIES = new Set(['妲己','妹喜','褒姒','驪姬','西施','王昭君','楊貴妃','貂蟬'])
@@ -42,8 +50,8 @@ export function isBeatuy(name: string) { return BEAUTIES.has(name) }
 
 // ── Substitution helper ─────────────────────────────────────────────────────
 export function subLine(line: QuipLine, ctx: QuipContext): QuipLine {
-  const mid1 = ctx.mid?.[0] ?? ''
-  const mid2 = ctx.mid?.[1] ?? ''
+  const mid1  = ctx.mid?.[0] ?? ''
+  const mid2  = ctx.mid?.[1] ?? ''
   const hmid1 = ctx.humanMid?.[0] ?? mid1
   const hmid2 = ctx.humanMid?.[1] ?? mid2
   const s = (t: string) => t
@@ -56,23 +64,24 @@ export function subLine(line: QuipLine, ctx: QuipContext): QuipLine {
   return { speaker: s(line.speaker), text: s(line.text) }
 }
 
-// ── Random weighted pick (with short-term anti-repeat) ──────────────────────
-// Track the last N picks so the same script doesn't fire two games in a row,
-// even when the player keeps placing in the same rank slot (e.g. always mid).
-// Falls back to including recent picks if no fresh eligible script remains.
+// ── Anti-repeat + weighted pick ─────────────────────────────────────────────
 const RECENT: string[] = []
 const RECENT_MAX = 5
+
+const BIG4 = ['Gary', 'Glory', 'Ian', 'Jack']
+const inGame = (name: string, ctx: QuipContext) => ctx.names.includes(name)
 
 export function pickScript(ctx: QuipContext): QuipScript {
   const eligible = QUIP_SCRIPTS.filter(s => s.match(ctx))
   if (!eligible.length) return QUIP_SCRIPTS[QUIP_SCRIPTS.length - 1]
 
-  // Player self-quips (priority:true) get 40% probability when available
-  const priority = eligible.filter(s => s.priority)
-  const base = (priority.length > 0 && Math.random() < 0.40) ? priority : eligible
+  // 特殊player篇: 40% 觸發當 BIG4 任一人在場
+  const priority  = eligible.filter(s => s.priority)
+  const hasBig4   = BIG4.some(n => ctx.names.includes(n))
+  const base      = (priority.length > 0 && hasBig4 && Math.random() < 0.40) ? priority : eligible
 
-  const fresh = base.filter(s => !RECENT.includes(s.id))
-  const pool  = fresh.length > 0 ? fresh : base
+  const fresh  = base.filter(s => !RECENT.includes(s.id))
+  const pool   = fresh.length > 0 ? fresh : base
   const totalW = pool.reduce((s, x) => s + x.weight, 0)
   let r = Math.random() * totalW
   let chosen = pool[pool.length - 1]
@@ -82,10 +91,6 @@ export function pickScript(ctx: QuipContext): QuipScript {
   return chosen
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-const inGame = (name: string, ctx: QuipContext) => ctx.names.includes(name)
-const BIG4 = ['Gary', 'Glory', 'Ian', 'Jack']
-
 // ══════════════════════════════════════════════════════════════════════════════
 // QUIP SCRIPTS
 // ══════════════════════════════════════════════════════════════════════════════
@@ -93,7 +98,7 @@ const BIG4 = ['Gary', 'Glory', 'Ian', 'Jack']
 export const QUIP_SCRIPTS: QuipScript[] = [
 
   // ══════════════════════════════════════════════════════════════════════════
-  // GARY 輸
+  // GARY 輸 (美女評論)
   // ══════════════════════════════════════════════════════════════════════════
 
   {
@@ -145,8 +150,6 @@ export const QUIP_SCRIPTS: QuipScript[] = [
       { speaker: '妲己',   text: '大爺你下局認真點，不然我們都沒好戲看了～' },
     ],
   },
-
-  // Gary 輸 × Glory 也在場
   {
     id: 'gary_loses_glory_in_game', weight: 14,
     match: ctx => ctx.loser === 'Gary' && inGame('Glory', ctx),
@@ -178,7 +181,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // GARY 贏
+  // GARY 贏 (美女評論)
   // ══════════════════════════════════════════════════════════════════════════
 
   {
@@ -220,21 +223,17 @@ export const QUIP_SCRIPTS: QuipScript[] = [
       { speaker: '楊貴妃', text: '大爺快謙虛一下，輸家心情不太好哦！（偷笑）' },
     ],
   },
-
-  // Gary 贏 × Glory 也在場（且 Glory 是輸家）
   {
     id: 'gary_wins_glory_loses', weight: 16,
     match: ctx => ctx.winner === 'Gary' && ctx.loser === 'Glory',
     lines: [
       { speaker: '妲己',   text: 'Gary 大爺贏了，Glory 姐姐輸了……這下好玩了！' },
       { speaker: '貂蟬',   text: '大爺你要怎麼安慰姐姐啊？（壞笑）' },
-      { speaker: '楊貴妃', text: 'Glory 姐，要不要讓大爺幫你分析一下剛才哪裡出了問題？' },
+      { speaker: '楊貴妃', text: 'Glory 姐，要不要讓大爺幫你分析一下哪裡出了問題？' },
       { speaker: '西施',   text: '哈哈哈姐姐剛才瞪大爺的眼神好厲害！' },
       { speaker: '妹喜',   text: '大爺贏了還不快去倒杯茶給姐姐賠罪～（起鬨）' },
     ],
   },
-
-  // Gary 贏 × Jack 輸
   {
     id: 'gary_wins_jack_loses', weight: 14,
     match: ctx => ctx.winner === 'Gary' && ctx.loser === 'Jack',
@@ -245,8 +244,6 @@ export const QUIP_SCRIPTS: QuipScript[] = [
       { speaker: '妲己',   text: '大爺威武！Jack 下次加油哦！（甜笑）' },
     ],
   },
-
-  // Gary 贏 × Ian 輸
   {
     id: 'gary_wins_ian_loses', weight: 14,
     match: ctx => ctx.winner === 'Gary' && ctx.loser === 'Ian',
@@ -258,7 +255,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // IAN 輸
+  // IAN 輸/贏 (美女評論)
   // ══════════════════════════════════════════════════════════════════════════
 
   {
@@ -288,8 +285,6 @@ export const QUIP_SCRIPTS: QuipScript[] = [
       { speaker: '王昭君', text: 'Ian 哥，下局之前先補充一下元氣，今晚還有機會～' },
     ],
   },
-
-  // Ian 輸 × Gary 也在場
   {
     id: 'ian_loses_gary_in_game', weight: 12,
     match: ctx => ctx.loser === 'Ian' && inGame('Gary', ctx),
@@ -300,11 +295,6 @@ export const QUIP_SCRIPTS: QuipScript[] = [
       { speaker: '驪姬',   text: 'Ian 哥，去請教一下大爺嘛，說不定有秘訣！（起鬨）' },
     ],
   },
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // IAN 贏
-  // ══════════════════════════════════════════════════════════════════════════
-
   {
     id: 'ian_wins_1', weight: 4,
     match: ctx => ctx.winner === 'Ian',
@@ -323,8 +313,6 @@ export const QUIP_SCRIPTS: QuipScript[] = [
       { speaker: '貂蟬',   text: 'Ian 哥，今晚贏了，要不要請我們喝個飲料呀～（眨眼）' },
     ],
   },
-
-  // Ian 贏 × Gary 輸（同場）
   {
     id: 'ian_wins_gary_loses', weight: 14,
     match: ctx => ctx.winner === 'Ian' && ctx.loser === 'Gary',
@@ -337,7 +325,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // GLORY 輸
+  // GLORY 輸/贏 (美女評論)
   // ══════════════════════════════════════════════════════════════════════════
 
   {
@@ -367,8 +355,6 @@ export const QUIP_SCRIPTS: QuipScript[] = [
       { speaker: '妲己',   text: '下局姐姐要認真了哦，我們等你復仇大戲！' },
     ],
   },
-
-  // Glory 輸 × Gary 也在場
   {
     id: 'glory_loses_gary_in_game', weight: 14,
     match: ctx => ctx.loser === 'Glory' && inGame('Gary', ctx),
@@ -388,11 +374,6 @@ export const QUIP_SCRIPTS: QuipScript[] = [
       { speaker: '妲己',   text: 'Glory 姐，下局把 Jack 打回去，我們幫你加油！（比拳）' },
     ],
   },
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // GLORY 贏
-  // ══════════════════════════════════════════════════════════════════════════
-
   {
     id: 'glory_wins_1', weight: 4,
     match: ctx => ctx.winner === 'Glory',
@@ -421,8 +402,6 @@ export const QUIP_SCRIPTS: QuipScript[] = [
       { speaker: '妲己',   text: '這才是真正的高手！（膜拜）' },
     ],
   },
-
-  // Glory 贏 × Gary 輸（同場）
   {
     id: 'glory_wins_gary_loses', weight: 16,
     match: ctx => ctx.winner === 'Glory' && ctx.loser === 'Gary',
@@ -434,8 +413,6 @@ export const QUIP_SCRIPTS: QuipScript[] = [
       { speaker: '妹喜',   text: '哈哈哈大爺，認輸的樣子也挺可愛的！（捂嘴）' },
     ],
   },
-
-  // Glory 贏 × Jack 輸
   {
     id: 'glory_wins_jack_loses', weight: 14,
     match: ctx => ctx.winner === 'Glory' && ctx.loser === 'Jack',
@@ -447,7 +424,7 @@ export const QUIP_SCRIPTS: QuipScript[] = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // JACK 輸
+  // JACK 輸/贏 (美女評論)
   // ══════════════════════════════════════════════════════════════════════════
 
   {
@@ -488,8 +465,6 @@ export const QUIP_SCRIPTS: QuipScript[] = [
       { speaker: '妲己',   text: '下局加油！今晚我們幫你分析分析哪裡出錯了～' },
     ],
   },
-
-  // Jack 輸 × Gary 也在場
   {
     id: 'jack_loses_gary_in_game', weight: 12,
     match: ctx => ctx.loser === 'Jack' && inGame('Gary', ctx),
@@ -500,11 +475,6 @@ export const QUIP_SCRIPTS: QuipScript[] = [
       { speaker: '妲己',   text: 'Jack 下局認真，今晚你讓大爺太開心了！（壞笑）' },
     ],
   },
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // JACK 贏
-  // ══════════════════════════════════════════════════════════════════════════
-
   {
     id: 'jack_wins_1', weight: 4,
     match: ctx => ctx.winner === 'Jack',
@@ -533,8 +503,6 @@ export const QUIP_SCRIPTS: QuipScript[] = [
       { speaker: '貂蟬',   text: '管他！反正今晚贏家請客！Jack 大方一點哦！（眨眼）' },
     ],
   },
-
-  // Jack 贏 × Gary 輸（同場）
   {
     id: 'jack_wins_gary_loses', weight: 14,
     match: ctx => ctx.winner === 'Jack' && ctx.loser === 'Gary',
@@ -602,46 +570,37 @@ export const QUIP_SCRIPTS: QuipScript[] = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // PLAYER SELF-QUIPS — priority:true → 70% 機率觸發（玩家本人說話）
+  // 通用：有 VIP 但非四大玩家（Shawn / Dan / Eugene 等）
   // ══════════════════════════════════════════════════════════════════════════
 
-  // ─── IAN 贏 ──────────────────────────────────────────────────────────────
   {
-    id: 'ian_self_wins_1', weight: 10, priority: true,
-    match: ctx => ctx.winner === 'Ian' || ctx.humanPlayer === 'Ian',
+    id: 'vip_loser_generic', weight: 2,
+    match: ctx => !isBeatuy(ctx.loser) && !BIG4.includes(ctx.loser),
     lines: [
-      { speaker: 'Ian',   text: '早就告訴過你們，13支我小學四年級就會了。' },
-      { speaker: '妲己',  text: '哈哈哈 Ian 哥！那我們算什麼，幼稚園的嗎～' },
-      { speaker: '貂蟬',  text: '（嘟嘴）那你怎麼不每局都贏……（小聲）' },
-      { speaker: 'Ian',   text: '……今晚就有啊。' },
+      { speaker: '妲己',   text: '{loser} 今晚手氣不太好，不過沒關係，下局加油！' },
+      { speaker: '西施',   text: '勝敗乃兵家常事，{loser} 下次一定能扳回！' },
+      { speaker: '楊貴妃', text: '對啦，我們陪你一起再戰！' },
     ],
   },
   {
-    id: 'ian_self_wins_2', weight: 10, priority: true,
-    match: ctx => ctx.winner === 'Ian' || ctx.humanPlayer === 'Ian',
+    id: 'vip_winner_generic', weight: 2,
+    match: ctx => !isBeatuy(ctx.winner) && !BIG4.includes(ctx.winner),
     lines: [
-      { speaker: 'Ian',   text: '13支，13秒。' },
-      { speaker: '西施',  text: 'Ian 哥今晚排完牌，大家還在看……確實快！' },
-      { speaker: '妹喜',  text: '快有什麼用～不過今晚是真的贏了，服！（笑）' },
-      { speaker: '驪姬',  text: 'Ian 哥，下局 12 秒挑戰看看？' },
+      { speaker: '褒姒',   text: '{winner} 今晚排得很出色，大家都要向他學習！' },
+      { speaker: '妹喜',   text: '是啊，{winner} 今晚穩穩地贏，厲害！' },
+      { speaker: '驪姬',   text: '贏家要請客哦～（眨眼）' },
     ],
   },
 
-  // ─── IAN 最輸 ─────────────────────────────────────────────────────────────
-  {
-    id: 'ian_self_loses_1', weight: 10, priority: true,
-    match: ctx => ctx.loser === 'Ian' || ctx.humanPlayer === 'Ian',
-    lines: [
-      { speaker: 'Ian',   text: '曾幾何時？尼姑做滿月。' },
-      { speaker: '妲己',  text: 'Ian 哥今晚輸到說起台語了！（捂嘴）' },
-      { speaker: '西施',  text: '「曾幾何時」——Ian 哥，你排牌那一刻就注定了吧～（壞笑）' },
-      { speaker: '貂蟬',  text: '下局加油！讓你的「滿月」重新開始！（甜笑）' },
-    ],
-  },
+  // ══════════════════════════════════════════════════════════════════════════
+  // 特殊 player 篇 — priority:true → 40% 觸發（BIG4 在場時）
+  // Glory / Gary / Jack；Ian 台詞歸入跨情境篇
+  // ══════════════════════════════════════════════════════════════════════════
 
-  // ─── GLORY 贏 ─────────────────────────────────────────────────────────────
+  // ─── GLORY 最贏 ───────────────────────────────────────────────────────────
+
   {
-    id: 'glory_self_wins_1', weight: 10, priority: true,
+    id: 'glory_sp_wins_1', weight: 10, priority: true,
     match: ctx => ctx.winner === 'Glory' || ctx.humanPlayer === 'Glory',
     lines: [
       { speaker: 'Glory', text: '溪底沒魚，三界娘子為王！' },
@@ -651,29 +610,33 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'glory_self_wins_2', weight: 10, priority: true,
+    id: 'glory_sp_wins_2', weight: 10, priority: true,
     match: ctx => ctx.winner === 'Glory' || ctx.humanPlayer === 'Glory',
     lines: [
-      { speaker: 'Glory', text: '兵器千萬種，我偏愛用劍！' },
-      { speaker: '妲己',  text: '哈哈哈姐姐！「劍」諧音「賤」啊！' },
+      { speaker: '妲己',  text: '兵器千萬種，Glory 姐你偏愛用劍！' },
+      { speaker: 'Glory', text: '「劍」嘛——（笑而不答）' },
       { speaker: '驪姬',  text: '姐姐今晚就是用這把「劍」把大家砍翻了～（笑）' },
       { speaker: '西施',  text: '被砍到的人才知道多……賤！Glory 姐好狠！' },
     ],
   },
+
+  // ─── GLORY 中間名次（非最輸、非最贏）────────────────────────────────────
   {
-    id: 'glory_self_wins_3', weight: 10, priority: true,
-    match: ctx => ctx.winner === 'Glory' || ctx.humanPlayer === 'Glory',
+    id: 'glory_sp_mid_1', weight: 10, priority: true,
+    match: ctx =>
+      (ctx.mid?.includes('Glory') || ctx.humanPlayer === 'Glory') &&
+      ctx.winner !== 'Glory' && ctx.loser !== 'Glory',
     lines: [
-      { speaker: 'Glory', text: '甲殼蟲爬玻璃……腳滑得很哦！' },
-      { speaker: '妲己',  text: 'Glory 姐姐在說誰呀？（假裝不知道）' },
-      { speaker: '楊貴妃',text: '今晚那幾個輸的，滑了一手又一手，就是上不去！（笑）' },
-      { speaker: '西施',  text: 'Glory 姐穩穩站上去了～佩服佩服！（鼓掌）' },
+      { speaker: '妲己',  text: 'Glory 姐今晚……' },
+      { speaker: '貂蟬',  text: '怎麼了？' },
+      { speaker: '妲己',  text: '甲殼蟲爬玻璃，腳滑得很！差一點就上去了！（壞笑）' },
+      { speaker: 'Glory', text: '下局……你等著看。' },
     ],
   },
 
   // ─── GLORY 最輸 ───────────────────────────────────────────────────────────
   {
-    id: 'glory_self_loses_1', weight: 10, priority: true,
+    id: 'glory_sp_loses_1', weight: 10, priority: true,
     match: ctx => ctx.loser === 'Glory' || ctx.humanPlayer === 'Glory',
     lines: [
       { speaker: 'Glory', text: '願賭服輸，請客就請客，機率問題啦。' },
@@ -683,9 +646,9 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
 
-  // ─── GARY 贏 ──────────────────────────────────────────────────────────────
+  // ─── GARY 最贏 ────────────────────────────────────────────────────────────
   {
-    id: 'gary_self_wins_1', weight: 10, priority: true,
+    id: 'gary_sp_wins_1', weight: 10, priority: true,
     match: ctx => ctx.winner === 'Gary' || ctx.humanPlayer === 'Gary',
     lines: [
       { speaker: 'Gary',  text: '感覺……抓到訣竅了。' },
@@ -694,20 +657,30 @@ export const QUIP_SCRIPTS: QuipScript[] = [
       { speaker: '貂蟬',  text: '不管啦！今晚大爺確實贏了，訣竅就算找到了！（甜笑）' },
     ],
   },
+
+  // ─── GARY 最輸（三條！讓五千塊不會一直出現）────────────────────────────
   {
-    id: 'gary_self_wins_2', weight: 10, priority: true,
-    match: ctx => ctx.winner === 'Gary' || ctx.humanPlayer === 'Gary',
+    id: 'gary_sp_loses_1', weight: 10, priority: true,
+    match: ctx => ctx.loser === 'Gary' || ctx.humanPlayer === 'Gary',
     lines: [
-      { speaker: 'Gary',  text: '已經練了三年的功夫，還是打不贏你們這幾位老千。' },
-      { speaker: '妲己',  text: '大爺！今晚是贏了耶！' },
-      { speaker: '楊貴妃',text: '哈哈哈大爺說「打不贏」，結果今晚打贏了～（偷笑）' },
-      { speaker: '西施',  text: '三年功夫今晚終於用上了，下局繼續！（比拳）' },
+      { speaker: 'Gary',  text: '感覺來了……感覺又走了。' },
+      { speaker: '妲己',  text: '哈哈哈！大爺今晚「感覺」來了又去了！' },
+      { speaker: '貂蟬',  text: '「感覺」很配合，就是手氣沒跟上～' },
+      { speaker: '西施',  text: '下局感覺請留久一點哦！（甜笑）' },
     ],
   },
-
-  // ─── GARY 最輸 ────────────────────────────────────────────────────────────
   {
-    id: 'gary_self_loses_1', weight: 10, priority: true,
+    id: 'gary_sp_loses_2', weight: 10, priority: true,
+    match: ctx => ctx.loser === 'Gary' || ctx.humanPlayer === 'Gary',
+    lines: [
+      { speaker: 'Gary',  text: '已經練了三年的功夫……還是打不贏你們這幾位老千。' },
+      { speaker: '妲己',  text: '哈哈哈大爺！這句話也太謙虛了！' },
+      { speaker: '楊貴妃',text: '三年功夫輸給「老千」，大爺是說大家都在出老千嗎？（起疑）' },
+      { speaker: '西施',  text: '再練三年？下局我們繼續看！（壞笑）' },
+    ],
+  },
+  {
+    id: 'gary_sp_loses_3', weight: 10, priority: true,
     match: ctx => ctx.loser === 'Gary' || ctx.humanPlayer === 'Gary',
     lines: [
       { speaker: 'Gary',  text: '我老婆只有給我五千塊預算哦……' },
@@ -717,19 +690,19 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
 
-  // ─── JACK 贏 ──────────────────────────────────────────────────────────────
+  // ─── JACK 最贏 ────────────────────────────────────────────────────────────
   {
-    id: 'jack_self_wins_1', weight: 10, priority: true,
+    id: 'jack_sp_wins_1', weight: 10, priority: true,
     match: ctx => ctx.winner === 'Jack' || ctx.humanPlayer === 'Jack',
     lines: [
-      { speaker: 'Jack',  text: '老太太下樓梯，不得不扶（服）啊！' },
-      { speaker: '妲己',  text: 'Jack 今晚自己說自己的歇後語，哈哈哈！' },
-      { speaker: '驪姬',  text: '「不得不服」——Jack 今晚確實值得被服！（笑）' },
-      { speaker: '貂蟬',  text: '大家都服了，Jack 今晚排牌厲害！（拍手）' },
+      { speaker: '妲己',  text: 'Jack 今晚——老太太下樓梯！' },
+      { speaker: '貂蟬',  text: '不得不……扶（服）啊！' },
+      { speaker: 'Jack',  text: '（謙虛地點頭）' },
+      { speaker: '驪姬',  text: 'Jack 今晚確實值得被服！（笑）' },
     ],
   },
   {
-    id: 'jack_self_wins_2', weight: 10, priority: true,
+    id: 'jack_sp_wins_2', weight: 10, priority: true,
     match: ctx => ctx.winner === 'Jack' || ctx.humanPlayer === 'Jack',
     lines: [
       { speaker: 'Jack',  text: '字跡潦草，還請見諒。' },
@@ -739,19 +712,19 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
   {
-    id: 'jack_self_wins_3', weight: 10, priority: true,
+    id: 'jack_sp_wins_3', weight: 10, priority: true,
     match: ctx => ctx.winner === 'Jack' || ctx.humanPlayer === 'Jack',
     lines: [
-      { speaker: 'Jack',  text: '媽媽有交代：出門遊玩，千萬不要去賭博！' },
-      { speaker: '妲己',  text: 'Jack 你媽的交代，今晚好像沒聽進去～（壞笑）' },
-      { speaker: '貂蟬',  text: '媽媽說不要賭，結果 Jack 賭贏了！媽媽說的對嗎？（笑）' },
-      { speaker: '王昭君',text: 'Jack，回去要跟你媽坦白哦，就說今晚是來學習的～（甜笑）' },
+      { speaker: '妲己',  text: '媽媽有交代：出門遊玩，千萬不要去賭博！' },
+      { speaker: '貂蟬',  text: '……Jack 你媽的交代，今晚沒聽進去～（壞笑）' },
+      { speaker: 'Jack',  text: '我是來「遊玩」的嘛……剛好贏了而已。' },
+      { speaker: '王昭君',text: 'Jack，回去要跟你媽坦白哦～（甜笑）' },
     ],
   },
 
   // ─── JACK 最輸 ────────────────────────────────────────────────────────────
   {
-    id: 'jack_self_loses_1', weight: 10, priority: true,
+    id: 'jack_sp_loses_1', weight: 10, priority: true,
     match: ctx => ctx.loser === 'Jack' || ctx.humanPlayer === 'Jack',
     lines: [
       { speaker: 'Jack',  text: '賭博師父在 2 樓——沒有褲子可以穿下樓來！' },
@@ -762,47 +735,72 @@ export const QUIP_SCRIPTS: QuipScript[] = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // 通用：有 VIP 但非四大玩家（Shawn / Dan / Eugene 等）
+  // IAN 跨情境台詞（非 priority，weight 較高）
   // ══════════════════════════════════════════════════════════════════════════
 
   {
-    id: 'vip_loser_generic', weight: 2,
-    match: ctx => !BEAUTIES.has(ctx.loser) && !BIG4.includes(ctx.loser),
+    id: 'ian_cross_wins_1', weight: 18,
+    match: ctx => ctx.winner === 'Ian' || ctx.humanPlayer === 'Ian',
     lines: [
-      { speaker: '妲己',   text: '{loser} 今晚手氣不太好，不過沒關係，下局加油！' },
-      { speaker: '西施',   text: '勝敗乃兵家常事，{loser} 下次一定能扳回！' },
-      { speaker: '楊貴妃', text: '對啦，我們陪你一起再戰！' },
+      { speaker: 'Ian',   text: '早就告訴過你們，13支我小學四年級就會了。' },
+      { speaker: '妲己',  text: '哈哈哈 Ian 哥！那我們算什麼，幼稚園的嗎～' },
+      { speaker: '貂蟬',  text: '（嘟嘴）那你怎麼不每局都贏……（小聲）' },
+      { speaker: 'Ian',   text: '……今晚就有啊。' },
     ],
   },
   {
-    id: 'vip_winner_generic', weight: 2,
-    match: ctx => !BEAUTIES.has(ctx.winner) && !BIG4.includes(ctx.winner),
+    id: 'ian_cross_wins_2', weight: 18,
+    match: ctx => ctx.winner === 'Ian' || ctx.humanPlayer === 'Ian',
     lines: [
-      { speaker: '褒姒',   text: '{winner} 今晚排得很出色，大家都要向他學習！' },
-      { speaker: '妹喜',   text: '是啊，{winner} 今晚穩穩地贏，厲害！' },
-      { speaker: '驪姬',   text: '贏家要請客哦～（眨眼）' },
+      { speaker: 'Ian',   text: '13支，13秒。' },
+      { speaker: '西施',  text: 'Ian 哥今晚排完牌，大家還在看……確實快！' },
+      { speaker: '妹喜',  text: '快有什麼用～不過今晚是真的贏了，服！（笑）' },
+      { speaker: '驪姬',  text: 'Ian 哥，下局 12 秒挑戰看看？' },
+    ],
+  },
+  // Ian 輸 or 他人最輸時別人嘲弄
+  {
+    id: 'ian_cross_loses_1', weight: 16,
+    match: ctx => ctx.loser === 'Ian' || ctx.humanPlayer === 'Ian',
+    lines: [
+      { speaker: '妲己',  text: '曾幾何時？尼姑做滿月。（台語）' },
+      { speaker: '西施',  text: 'Ian 哥今晚輸到說起台語了！（捂嘴）' },
+      { speaker: '貂蟬',  text: '「曾幾何時」——Ian 哥，你排牌那一刻就注定了吧～（壞笑）' },
+      { speaker: '妹喜',  text: '下局讓你的「滿月」重新開始！（甜笑）' },
     ],
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // 俏皮話：歇後語 / 諧音梗 (Cross-player, 任何情況可挑用)
+  // 跨情境篇 — 依情境使用（美女講）
   // ══════════════════════════════════════════════════════════════════════════
 
-  // 1. 甲殼蟲爬玻璃 — 真人落第二、第三名時的「滑」溜
+  // 尼姑做滿月 — 其他人調侃最輸者
   {
-    id: 'idiom_beetle_slippery', weight: 22,
+    id: 'cross_nun_moon', weight: 18,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '妲己',   text: '曾幾何時？尼姑做滿月。' },
+      { speaker: '貂蟬',   text: '蛤？姐姐說什麼？' },
+      { speaker: '妲己',   text: '今晚 {loser} 這情況……曾幾何時，尼姑做滿月！（台語嘆）' },
+      { speaker: '西施',   text: '就是說啊……難得啊！哈哈哈！' },
+    ],
+  },
+
+  // 甲殼蟲爬玻璃 — 真人落中間名次，或申訴成功者（腳很滑）
+  {
+    id: 'cross_beetle_slippery', weight: 20,
     match: ctx => (ctx.humanMid?.length ?? 0) >= 1,
     lines: [
       { speaker: '妲己', text: '甲殼蟲爬玻璃……腳滑得很！' },
       { speaker: '貂蟬', text: '哈哈哈姐姐你說誰呀？' },
-      { speaker: '妲己', text: '今晚 {humanMid1} 排牌啊～滑了一手又一手，差一點就上岸了～（壞笑）' },
+      { speaker: '妲己', text: '{humanMid1} 今晚排牌啊～滑了一手又一手，差一點就上岸了～（壞笑）' },
       { speaker: '西施', text: '別這樣～下局穩穩地，金牌就是你的！' },
     ],
   },
 
-  // 2. 老太太下樓梯 — 服氣 (致敬冠軍)
+  // 老太太下樓梯 — 服氣最勝者（或申訴成功者）
   {
-    id: 'idiom_grandma_stairs', weight: 22,
+    id: 'cross_grandma_stairs', weight: 20,
     match: () => true,
     lines: [
       { speaker: '楊貴妃', text: '老太太下樓梯……不得不扶（服）啊！' },
@@ -811,21 +809,21 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
 
-  // 3a. 離譜回家 (輸家版) — 最輸者分數 < -55 時觸發
+  // 離譜到家（輸家版）— 最輸分數 < -55
   {
-    id: 'idiom_lipu_loser', weight: 22,
+    id: 'cross_lipu_loser', weight: 22,
     match: ctx => (ctx.loserScore ?? 0) < -55,
     lines: [
       { speaker: '貂蟬', text: '聽說啊，離譜他媽媽今天在開門等離譜放學回家。' },
       { speaker: '妹喜', text: '蛤？為什麼啊？' },
-      { speaker: '貂蟬', text: '因為今晚 {loser} 排牌輸這麼慘……（嘆氣）真的太離譜了！離譜～到家了！' },
+      { speaker: '貂蟬', text: '因為今晚 {loser} 輸這麼慘……（嘆氣）真的太離譜了！離譜～到家了！' },
       { speaker: '驪姬', text: '哈哈哈哈這個梗！太狠了！' },
     ],
   },
 
-  // 3b. 離譜回家 (贏家版) — 第一名分數 > 55 時觸發
+  // 離譜到家（贏家版）— 最贏分數 > 55
   {
-    id: 'idiom_lipu_winner', weight: 22,
+    id: 'cross_lipu_winner', weight: 22,
     match: ctx => (ctx.winnerScore ?? 0) > 55,
     lines: [
       { speaker: '貂蟬', text: '聽說啊，離譜他媽媽今天在開門等離譜放學回家。' },
@@ -835,44 +833,21 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
 
-  // 4. 溪底沒魚 — 冠軍 (酸 winner 沒對手)
+  // 溪底無魚 — 其他人不服贏家（或調侃贏太輕鬆）
   {
-    id: 'idiom_creek_no_fish', weight: 22,
+    id: 'cross_creek_no_fish', weight: 20,
     match: () => true,
     lines: [
-      { speaker: '褒姒', text: '溪底沒魚，三界娘子為王！' },
+      { speaker: '褒姒', text: '溪底無魚，蝦仔做大王！' },
       { speaker: '驪姬', text: '姐姐這話什麼意思呀～' },
       { speaker: '褒姒', text: '我是說 {winner} 今晚贏得太輕鬆啦～是不是對手太弱啊？（甜笑）' },
       { speaker: '妲己', text: '哈哈哈姐姐你也壞！{winner} 你別生氣，姐妹們鬧著玩的～' },
     ],
   },
 
-  // 5. 賭博師父 — 輸到脫褲子（限人類玩家為最大輸家時）
+  // 兵器千萬種 — 調侃贏家怎麼贏得這麼「賤」
   {
-    id: 'idiom_master_gambler_pants', weight: 22,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '妹喜', text: '聽過嗎？賭博師父在 2 樓——沒有褲子可以穿下樓來！' },
-      { speaker: '楊貴妃', text: '哈哈哈為什麼？' },
-      { speaker: '妹喜', text: '今晚 {loser} 就是這個情況啦～連褲子都輸光了！（捂嘴）' },
-      { speaker: '貂蟬', text: '{loser} 別氣別氣，回頭我們幫你買條新的！（甜笑）' },
-    ],
-  },
-
-  // 6. 媽媽有交代 — 勸戒輸家
-  {
-    id: 'idiom_mom_warned', weight: 22,
-    match: () => true,
-    lines: [
-      { speaker: '王昭君', text: '{loser}，媽媽有交代過喔：出門遊玩，千萬不要去賭博！' },
-      { speaker: '妹喜',   text: '哎呀姐姐你提這個！{loser} 臉都黑了～' },
-      { speaker: '妲己',   text: '哈哈哈下次出門記得帶交代啊！（壞笑）' },
-    ],
-  },
-
-  // 7. 兵器千萬種，你偏愛用劍（賤）
-  {
-    id: 'idiom_sword_jian', weight: 22,
+    id: 'cross_sword_jian', weight: 20,
     match: () => true,
     lines: [
       { speaker: '驪姬', text: '兵器千萬種，{winner} 你怎麼偏愛用劍呢？' },
@@ -881,316 +856,21 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // 牌桌俏皮話、垃圾話、歇後語 (Gary's collection)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  // ─── 輸牌篇 ──────────────────────────────────────────────────────────────
+  // 賭博師父 — 輸家脫褲（任何真人輸家可用）
   {
-    id: 'idiom_pants_elastic', weight: 18,
+    id: 'cross_gambler_pants', weight: 20,
     match: ctx => !isBeatuy(ctx.loser),
     lines: [
-      { speaker: '妲己',   text: '哎呀～今晚 {loser} 的褲子……' },
-      { speaker: '貂蟬',   text: '怎麼了？' },
-      { speaker: '妲己',   text: '輸到只剩鬆緊帶啦！（捂嘴笑）' },
-      { speaker: '妹喜',   text: '哈哈哈這個比喻太傳神！' },
-    ],
-  },
-  {
-    id: 'idiom_charity', weight: 18,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '西施',   text: '我看 {loser} 今晚不是來打牌的喔～' },
-      { speaker: '楊貴妃', text: '不然是來幹嘛？' },
-      { speaker: '西施',   text: '是來做慈善的啦！輸這麼大方～（甜笑）' },
-    ],
-  },
-  {
-    id: 'idiom_wallet_slim', weight: 18,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '貂蟬',   text: '{loser} 今晚的錢包啊……瘦身效果顯著！' },
-      { speaker: '妹喜',   text: '哈哈哈！減重比我們姐妹們還成功！' },
-      { speaker: '妲己',   text: '下次別再「瘦身」啦～會破產的（壞笑）' },
-    ],
-  },
-  {
-    id: 'idiom_donation', weight: 18,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '驪姬',   text: '{loser}，你今晚本來想來賺錢吧？' },
-      { speaker: '妲己',   text: '結果……是來捐款的耶！（嘆氣）' },
-      { speaker: '貂蟬',   text: '感謝大爺贊助今晚的歡樂時光～（甜笑）' },
-    ],
-  },
-  {
-    id: 'idiom_collect_money_mood', weight: 18,
-    match: () => true,
-    lines: [
-      { speaker: '楊貴妃', text: '今晚啊，贏家在收錢～' },
-      { speaker: '妹喜',   text: '輸家在……？' },
-      { speaker: '楊貴妃', text: '收心情啦！（捂嘴笑）' },
-      { speaker: '妲己',   text: '{loser}，下局調整好心情再戰！' },
-    ],
-  },
-  {
-    id: 'idiom_ancestors', weight: 20,
-    match: ctx => !isBeatuy(ctx.loser) && (ctx.loserScore ?? 0) < -40,
-    lines: [
-      { speaker: '驪姬',   text: '今晚 {loser} 的牌技……' },
-      { speaker: '貂蟬',   text: '怎樣？' },
-      { speaker: '驪姬',   text: '輸到連祖先都認不出來啦！（嘆）' },
-      { speaker: '妲己',   text: '{loser}，趕快去祠堂上柱香吧～（壞笑）' },
-    ],
-  },
-  {
-    id: 'idiom_weather_forecast', weight: 18,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '西施',   text: '{loser} 今晚的手氣……' },
-      { speaker: '王昭君', text: '怎麼形容呢～' },
-      { speaker: '西施',   text: '比天氣預報還不準啦！說會贏結果輸！' },
-      { speaker: '妹喜',   text: '哈哈哈這個比喻精準！' },
-    ],
-  },
-  {
-    id: 'idiom_tiger_to_loss', weight: 20,
-    match: ctx => !isBeatuy(ctx.loser) && (ctx.loserScore ?? 0) < -25,
-    lines: [
-      { speaker: '貂蟬',   text: '今晚 {loser} 一頓操作猛如虎～' },
-      { speaker: '妲己',   text: '結果呢？' },
-      { speaker: '貂蟬',   text: '一看……輸了兩百五！（捂嘴笑）' },
-      { speaker: '妹喜',   text: '哈哈哈這個梗台味十足！' },
+      { speaker: '妹喜',   text: '聽過嗎？賭博師父在 2 樓——沒有褲子可以穿下樓來！' },
+      { speaker: '楊貴妃', text: '哈哈哈為什麼？' },
+      { speaker: '妹喜',   text: '今晚 {loser} 就是這個情況啦～連褲子都輸光了！（捂嘴）' },
+      { speaker: '貂蟬',   text: '{loser} 別氣別氣，回頭我們幫你買條新的！（甜笑）' },
     ],
   },
 
-  // ─── 爛牌篇 ──────────────────────────────────────────────────────────────
+  // 賭博若會發財 — 勸戒（輸家，score < -25）
   {
-    id: 'idiom_god_cannot_save', weight: 18,
-    match: ctx => !isBeatuy(ctx.loser) && (ctx.loserScore ?? 0) < -30,
-    lines: [
-      { speaker: '王昭君', text: '俗話說，神仙難救無命牌。' },
-      { speaker: '楊貴妃', text: '{loser} 今晚就是這個情況嗎？' },
-      { speaker: '王昭君', text: '看牌看了一晚就知道～（嘆氣）' },
-      { speaker: '妹喜',   text: '{loser} 別怪自己，怪牌就好！' },
-    ],
-  },
-  {
-    id: 'idiom_no_rice', weight: 16,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '褒姒',   text: '巧婦難為無米之炊。' },
-      { speaker: '妲己',   text: '今晚 {loser} 沒拿到好牌，怪不得他～' },
-      { speaker: '驪姬',   text: '對啦對啦，下局祝你拿好牌！' },
-    ],
-  },
-  {
-    id: 'idiom_tofu_knife', weight: 16,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '貂蟬',   text: '今晚 {loser} 的牌啊……像豆腐做的刀！' },
-      { speaker: '妹喜',   text: '蛤？' },
-      { speaker: '貂蟬',   text: '切不動啦～怎麼出都軟趴趴的（笑）' },
-    ],
-  },
-  {
-    id: 'idiom_bad_cards_masterpiece', weight: 18,
-    match: ctx => !isBeatuy(ctx.winner) && (ctx.winnerScore ?? 0) > 20,
-    lines: [
-      { speaker: '妲己',   text: '人生如戲，全靠演技！' },
-      { speaker: '貂蟬',   text: '今晚 {winner} 啊～' },
-      { speaker: '妲己',   text: '手上一把爛牌，演成世界名作！佩服佩服！' },
-    ],
-  },
-  {
-    id: 'idiom_missing_seven_luck', weight: 16,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '褒姒',   text: '打牌啊，三分技術，七分命～' },
-      { speaker: '妲己',   text: '今晚 {loser}……' },
-      { speaker: '褒姒',   text: '剛好缺那七分啦！（同情）' },
-    ],
-  },
-
-  // ─── 運氣篇 ──────────────────────────────────────────────────────────────
-  {
-    id: 'idiom_luck_iron_gold', weight: 16,
-    match: () => true,
-    lines: [
-      { speaker: '楊貴妃', text: '運來鐵成金，運去金成鐵！' },
-      { speaker: '王昭君', text: '今晚 {winner} 鐵都變金啊～' },
-      { speaker: '西施',   text: '{loser} 嘛……金都變鐵了！（同情）' },
-    ],
-  },
-  {
-    id: 'idiom_fengshui_rotate', weight: 14,
-    match: () => true,
-    lines: [
-      { speaker: '妲己',   text: '風水輪流轉，今晚轉到 {winner} 家啦！' },
-      { speaker: '妹喜',   text: '對啊對啊！明晚說不定就輪到 {loser}！' },
-      { speaker: '貂蟬',   text: '{loser} 撐住～時來運轉就是你！' },
-    ],
-  },
-  {
-    id: 'idiom_pumpkin', weight: 20,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '驪姬',   text: '人若衰啊～種瓠仔，生菜瓜！' },
-      { speaker: '妲己',   text: '今晚 {loser} 就是這個情況嗎？' },
-      { speaker: '驪姬',   text: '看他排牌就知道～想要的偏偏拿不到！' },
-      { speaker: '貂蟬',   text: '{loser} 別氣，下局換個風水～' },
-    ],
-  },
-  {
-    id: 'idiom_noble_blood', weight: 14,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '西施',   text: '{loser} 啊，你是不是血統很高貴？' },
-      { speaker: '妹喜',   text: '為什麼這樣問？' },
-      { speaker: '西施',   text: '因為手氣很……低賤啊！（捂嘴笑）' },
-      { speaker: '妲己',   text: '姐姐妳這舌頭也太利了～哈哈哈！' },
-    ],
-  },
-
-  // ─── 酸人篇 ──────────────────────────────────────────────────────────────
-  {
-    id: 'idiom_no_skill_temper', weight: 14,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '貂蟬',   text: '今晚有一個 player～' },
-      { speaker: '妹喜',   text: '誰呀？' },
-      { speaker: '貂蟬',   text: '牌技沒有，脾氣不少！（眨眼）' },
-      { speaker: '妲己',   text: '{loser} 別生氣，姐姐鬧著玩的～' },
-    ],
-  },
-  {
-    id: 'idiom_bad_but_addicted', weight: 14,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '驪姬',   text: '我發現 {loser} 有個特點～' },
-      { speaker: '楊貴妃', text: '什麼特點？' },
-      { speaker: '驪姬',   text: '人菜癮又大！輸了還要再戰！' },
-      { speaker: '妹喜',   text: '哈哈哈下局還是會來的吧～' },
-    ],
-  },
-  {
-    id: 'idiom_conan', weight: 18,
-    match: ctx => (ctx.humanMid?.length ?? 0) >= 1,
-    lines: [
-      { speaker: '妲己',   text: '我們 {humanMid1} 啊，牌桌柯南！' },
-      { speaker: '西施',   text: '怎麼說？' },
-      { speaker: '妲己',   text: '事後推理第一名！「早知道就不那樣排！」（學）' },
-      { speaker: '貂蟬',   text: '哈哈哈太貼切了！' },
-    ],
-  },
-  {
-    id: 'idiom_zhuge_adou', weight: 16,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '褒姒',   text: '{loser} 打之前是諸葛亮～' },
-      { speaker: '妲己',   text: '打之後呢？' },
-      { speaker: '褒姒',   text: '劉阿斗啦！「我這樣排有道理！」「結果還不是輸……」' },
-      { speaker: '驪姬',   text: '哈哈哈這個梗太狠了！' },
-    ],
-  },
-  {
-    id: 'idiom_mouth_king_table_bronze', weight: 16,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '貂蟬',   text: '{loser} 啊～' },
-      { speaker: '妹喜',   text: '怎麼了？' },
-      { speaker: '貂蟬',   text: '嘴巴王者，牌桌青銅！（壞笑）' },
-      { speaker: '妲己',   text: '下局拿出王者表現嘛！我們等著看～' },
-    ],
-  },
-
-  // ─── 自嘲篇 (loser 為人類玩家) ───────────────────────────────────────────
-  {
-    id: 'idiom_cards_no_face', weight: 14,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '楊貴妃', text: '我看 {loser} 不是不會打喔～' },
-      { speaker: '王昭君', text: '那是？' },
-      { speaker: '楊貴妃', text: '是牌不給他面子啦！（同情）' },
-      { speaker: '妹喜',   text: '對對對！是牌的錯，不是 {loser} 的錯！' },
-    ],
-  },
-  {
-    id: 'idiom_offend_gods', weight: 18,
-    match: ctx => !isBeatuy(ctx.loser) && (ctx.loserScore ?? 0) < -30,
-    lines: [
-      { speaker: '妲己',   text: '{loser} 啊，我嚴重懷疑～' },
-      { speaker: '貂蟬',   text: '懷疑什麼？' },
-      { speaker: '妲己',   text: '你洗牌的時候得罪神明了！（嘆）' },
-      { speaker: '妹喜',   text: '哈哈哈下次洗牌前要先拜拜～' },
-    ],
-  },
-  {
-    id: 'idiom_destiny_play', weight: 14,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '驪姬',   text: '{loser} 替自己辯解啊～' },
-      { speaker: '楊貴妃', text: '怎樣辯解？' },
-      { speaker: '驪姬',   text: '「這把不是我打的，是命運打的！」（學）' },
-      { speaker: '妲己',   text: '哈哈哈這個藉口太經典！' },
-    ],
-  },
-  {
-    id: 'idiom_theory_vs_reality', weight: 14,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '西施',   text: '{loser} 的策略其實很成功喔～' },
-      { speaker: '妹喜',   text: '真的？' },
-      { speaker: '西施',   text: '理論上能贏！只是實際上……全輸！（甜笑）' },
-      { speaker: '貂蟬',   text: '哈哈哈姐姐嘴巴太利！' },
-    ],
-  },
-
-  // ─── 台味篇 ──────────────────────────────────────────────────────────────
-  {
-    id: 'idiom_east_wind_north_wind', weight: 14,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '驪姬',   text: '今晚 {loser} 在等東風～' },
-      { speaker: '妲己',   text: '結果？' },
-      { speaker: '驪姬',   text: '東風沒來，西北風先到！（吹涼涼）' },
-      { speaker: '楊貴妃', text: '吹得褲袋都翻起來了～（笑）' },
-    ],
-  },
-  {
-    id: 'idiom_soul_at_atm', weight: 14,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '妹喜',   text: '{loser} 人在牌桌坐～' },
-      { speaker: '王昭君', text: '魂呢？' },
-      { speaker: '妹喜',   text: '在提款機啦！輸到要去領錢！（捂嘴）' },
-      { speaker: '妲己',   text: '哈哈哈下次帶夠提款卡再來！' },
-    ],
-  },
-  {
-    id: 'idiom_luck_mask', weight: 14,
-    match: ctx => (ctx.winnerScore ?? 0) > 30,
-    lines: [
-      { speaker: '楊貴妃', text: '今晚 {winner} 手氣這麼旺啊！' },
-      { speaker: '妲己',   text: '對啊對啊！' },
-      { speaker: '楊貴妃', text: '手氣若會傳染，姐妹們一定戴口罩！' },
-      { speaker: '貂蟬',   text: '哈哈哈姐姐怕被傳染嗎？' },
-    ],
-  },
-  {
-    id: 'idiom_grab_cards_pudu', weight: 14,
-    match: ctx => !isBeatuy(ctx.loser),
-    lines: [
-      { speaker: '驪姬',   text: '別人摸牌啊，像過年～' },
-      { speaker: '妹喜',   text: '那 {loser} 呢？' },
-      { speaker: '驪姬',   text: '像普渡！（拜）' },
-      { speaker: '妲己',   text: '哈哈哈摸到的牌都用來祭祖了～' },
-    ],
-  },
-
-  // ─── 賭博篇 ──────────────────────────────────────────────────────────────
-  {
-    id: 'idiom_gambling_no_wealth', weight: 16,
+    id: 'cross_gambling_no_wealth', weight: 18,
     match: ctx => (ctx.loserScore ?? 0) < -25,
     lines: [
       { speaker: '王昭君', text: '俗話說啊，賭博若會發財～' },
@@ -1200,8 +880,400 @@ export const QUIP_SCRIPTS: QuipScript[] = [
     ],
   },
 
+  // 人生如戲 — 贏家靠演技（winnerScore > 20）
+  {
+    id: 'cross_life_drama', weight: 18,
+    match: ctx => !isBeatuy(ctx.winner) && (ctx.winnerScore ?? 0) > 20,
+    lines: [
+      { speaker: '妲己',   text: '人生如戲，全靠演技！' },
+      { speaker: '貂蟬',   text: '今晚 {winner} 啊～' },
+      { speaker: '妲己',   text: '手上一把爛牌，演成世界名作！佩服佩服！' },
+      { speaker: '西施',   text: '這手演技，奧斯卡欠你一座獎盃！（笑）' },
+    ],
+  },
+
+  // 媽媽有交代 — 調侃輸家（通用）
+  {
+    id: 'cross_mom_warned', weight: 18,
+    match: () => true,
+    lines: [
+      { speaker: '王昭君', text: '{loser}，媽媽有交代過喔：出門遊玩，千萬不要去賭博！' },
+      { speaker: '妹喜',   text: '哎呀姐姐你提這個！{loser} 臉都黑了～' },
+      { speaker: '妲己',   text: '哈哈哈下次出門記得帶交代啊！（壞笑）' },
+    ],
+  },
+
   // ══════════════════════════════════════════════════════════════════════════
-  // 純通用（任何情況，兜底）
+  // 輸牌篇 — 輸家自嘲（{loser} 開口）
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    id: 'loser_pants', weight: 16,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '{loser}', text: '今晚……褲子輸到只剩鬆緊帶。' },
+      { speaker: '妲己',    text: '哈哈哈！這個比喻太傳神了！' },
+      { speaker: '貂蟬',    text: '{loser} 自嘲最狠～（捂嘴笑）' },
+    ],
+  },
+  {
+    id: 'loser_charity', weight: 16,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '{loser}', text: '我今晚不是來打牌的……是來做慈善的。' },
+      { speaker: '西施',    text: '哈哈哈！大善人！' },
+      { speaker: '楊貴妃',  text: '輸這麼大方，謝謝 {loser} 今晚的贊助！（甜笑）' },
+    ],
+  },
+  {
+    id: 'loser_wallet', weight: 16,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '{loser}', text: '今晚錢包的瘦身效果……非常顯著。' },
+      { speaker: '貂蟬',    text: '哈哈哈！減重比我們姐妹們還成功！' },
+      { speaker: '妲己',    text: '下次別再「瘦身」啦～會破產的（壞笑）' },
+    ],
+  },
+  {
+    id: 'loser_collect_mood', weight: 16,
+    match: () => true,
+    lines: [
+      { speaker: '楊貴妃',  text: '今晚啊，{winner} 在收錢～' },
+      { speaker: '妹喜',    text: '{loser} 在……？' },
+      { speaker: '楊貴妃',  text: '收心情啦！（捂嘴笑）' },
+      { speaker: '{loser}', text: '……心情比錢難收。' },
+    ],
+  },
+  {
+    id: 'loser_donation', weight: 16,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '{loser}', text: '本來想來賺錢，結果……來捐款的。' },
+      { speaker: '驪姬',    text: '感謝 {loser} 今晚的贊助！（甜笑）' },
+      { speaker: '妲己',    text: '錢進得快，出去得更快——這就是今晚的故事。（嘆）' },
+    ],
+  },
+  {
+    id: 'loser_fast_out', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '{loser}', text: '錢進得快，出去得更快……' },
+      { speaker: '西施',    text: '……{loser} 你今晚進了多少？出去了多少？' },
+      { speaker: '{loser}', text: '（沉默）' },
+      { speaker: '妲己',    text: '哈哈哈不問不問，不問最好！（壞笑）' },
+    ],
+  },
+  {
+    id: 'loser_ancestors', weight: 20,
+    match: ctx => !isBeatuy(ctx.loser) && (ctx.loserScore ?? 0) < -40,
+    lines: [
+      { speaker: '{loser}', text: '輸到連祖先都認不出我來了……' },
+      { speaker: '驪姬',    text: '今晚 {loser} 的牌技，祖先看了也要搖頭～（嘆）' },
+      { speaker: '妲己',    text: '{loser}，趕快回去祠堂上柱香吧～（壞笑）' },
+    ],
+  },
+  {
+    id: 'loser_weather', weight: 16,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '{loser}', text: '今天手氣比天氣預報還不準……說會贏，結果輸。' },
+      { speaker: '西施',    text: '哈哈哈這個比喻精準！' },
+      { speaker: '妹喜',    text: '下局天氣預報換一個，說不定就準了！（甜笑）' },
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 爛牌篇 — 牌差（{loser} 開口）
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    id: 'bad_cards_god', weight: 18,
+    match: ctx => !isBeatuy(ctx.loser) && (ctx.loserScore ?? 0) < -30,
+    lines: [
+      { speaker: '{loser}', text: '神仙難救無命牌。' },
+      { speaker: '王昭君',  text: '……{loser} 今晚就是這個情況嗎？' },
+      { speaker: '{loser}', text: '（點頭）連我自己都救不了自己。' },
+      { speaker: '妹喜',    text: '{loser} 別怪自己，怪牌就好！' },
+    ],
+  },
+  {
+    id: 'bad_cards_no_rice', weight: 16,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '{loser}', text: '巧婦難為無米之炊……我今晚就是那個巧婦。' },
+      { speaker: '妲己',    text: '今晚 {loser} 沒拿到好牌，怪不得他～' },
+      { speaker: '驪姬',    text: '對啦對啦，下局祝你拿好牌！' },
+    ],
+  },
+  {
+    id: 'bad_cards_tofu', weight: 16,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '{loser}', text: '今晚的牌……像豆腐做的刀，切不動。' },
+      { speaker: '貂蟬',    text: '蛤？' },
+      { speaker: '妹喜',    text: '就是怎麼出都軟趴趴的，沒辦法啦！（笑）' },
+    ],
+  },
+  {
+    id: 'bad_cards_no_path', weight: 16,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '{loser}', text: '有牌不成牌，有路走不通……今晚就是這樣。' },
+      { speaker: '妲己',    text: '看 {loser} 今晚排牌就能感覺到那種無力感～（同情）' },
+      { speaker: '西施',    text: '下局換個角度排，說不定柳暗花明！' },
+    ],
+  },
+  {
+    id: 'bad_cards_not_ancestors', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '{loser}', text: '牌差不能怪祖宗……但我很想怪。' },
+      { speaker: '楊貴妃',  text: '哈哈哈哈！{loser} 說話好誠實！' },
+      { speaker: '妲己',    text: '下次在洗牌前先拜一下，說不定有效！（壞笑）' },
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 運氣篇 — 美女感嘆（通用）
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    id: 'luck_iron_gold', weight: 16,
+    match: () => true,
+    lines: [
+      { speaker: '楊貴妃', text: '運來鐵成金，運去金成鐵！' },
+      { speaker: '王昭君', text: '今晚 {winner} 鐵都變金啊～' },
+      { speaker: '西施',   text: '{loser} 嘛……金都變鐵了！（同情）' },
+    ],
+  },
+  {
+    id: 'luck_fengshui', weight: 14,
+    match: () => true,
+    lines: [
+      { speaker: '妲己',   text: '風水輪流轉，今晚轉到 {winner} 家啦！' },
+      { speaker: '妹喜',   text: '對啊對啊！明晚說不定就輪到 {loser}！' },
+      { speaker: '貂蟬',   text: '{loser} 撐住～時來運轉就是你！' },
+    ],
+  },
+  {
+    id: 'luck_good_unstoppable', weight: 16,
+    match: () => true,
+    lines: [
+      { speaker: '驪姬',   text: '好運來時擋不住，衰運來時躲不開！' },
+      { speaker: '楊貴妃', text: '今晚 {winner} 好運來擋都擋不住！' },
+      { speaker: '妲己',   text: '{loser} 的衰運嘛……躲也沒用！下局再看！（苦笑）' },
+    ],
+  },
+  {
+    id: 'luck_pumpkin', weight: 20,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '驪姬',   text: '人若衰啊～種瓠仔，生菜瓜！' },
+      { speaker: '妲己',   text: '今晚 {loser} 就是這個情況嗎？' },
+      { speaker: '驪姬',   text: '看他排牌就知道～想要的偏偏拿不到！' },
+      { speaker: '貂蟬',   text: '{loser} 別氣，下局換個風水～' },
+    ],
+  },
+  {
+    id: 'luck_noble_blood', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '西施',   text: '{loser} 啊，你是不是血統很高貴？' },
+      { speaker: '妹喜',   text: '為什麼這樣問？' },
+      { speaker: '西施',   text: '因為手氣很……低賤啊！（捂嘴笑）' },
+      { speaker: '妲己',   text: '姐姐妳這舌頭也太利了～哈哈哈！' },
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 酸人篇 — 只在 AI（美女）輸時觸發
+  // 其他美女調侃她們「輸掉」的姐妹
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    id: 'acid_no_skill', weight: 14,
+    match: ctx => isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '妲己',   text: '今晚有一個 player～' },
+      { speaker: '妹喜',   text: '誰呀？' },
+      { speaker: '妲己',   text: '牌技沒有，脾氣不少！（眨眼）' },
+      { speaker: '西施',   text: '（小聲）是 {loser} 姐姐嗎……（偷笑）' },
+    ],
+  },
+  {
+    id: 'acid_volume', weight: 14,
+    match: ctx => isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '楊貴妃', text: '技術不足……' },
+      { speaker: '貂蟬',   text: '音量來補！（笑）' },
+      { speaker: '妲己',   text: '{loser} 姐今晚這樣——輸了更大聲！（哈哈）' },
+    ],
+  },
+  {
+    id: 'acid_addicted', weight: 14,
+    match: ctx => isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '驪姬',   text: '我發現 {loser} 有個特點～' },
+      { speaker: '楊貴妃', text: '什麼特點？' },
+      { speaker: '驪姬',   text: '人菜癮又大！輸了還要再戰！' },
+      { speaker: '妹喜',   text: '哈哈哈下局還是會來的吧～' },
+    ],
+  },
+  {
+    id: 'acid_much_opinion', weight: 14,
+    match: ctx => isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '貂蟬',   text: '{loser} 今晚……' },
+      { speaker: '妹喜',   text: '怎麼了？' },
+      { speaker: '貂蟬',   text: '牌打得普通，意見特別多！（壞笑）' },
+      { speaker: '妲己',   text: '哈哈哈下局拿出實力嘛，少說多做！' },
+    ],
+  },
+  {
+    id: 'acid_conan', weight: 18,
+    match: ctx => isBeatuy(ctx.loser) && (ctx.humanMid?.length ?? 0) >= 1,
+    lines: [
+      { speaker: '妲己',   text: '{loser} 姐今晚——牌桌柯南！' },
+      { speaker: '西施',   text: '怎麼說？' },
+      { speaker: '妲己',   text: '事後推理第一名！「早知道就不那樣排！」（學）' },
+      { speaker: '貂蟬',   text: '哈哈哈太貼切了！' },
+    ],
+  },
+  {
+    id: 'acid_zhuge_adou', weight: 16,
+    match: ctx => isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '褒姒',   text: '{loser} 打之前是諸葛亮～' },
+      { speaker: '妲己',   text: '打之後呢？' },
+      { speaker: '褒姒',   text: '劉阿斗啦！「我這樣排有道理！」「結果還不是輸……」' },
+      { speaker: '驪姬',   text: '哈哈哈這個梗太狠了！' },
+    ],
+  },
+  {
+    id: 'acid_mouth_king', weight: 16,
+    match: ctx => isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '貂蟬',   text: '{loser} 啊～' },
+      { speaker: '妹喜',   text: '怎麼了？' },
+      { speaker: '貂蟬',   text: '嘴巴王者，牌桌青銅！（壞笑）' },
+      { speaker: '妲己',   text: '下局拿出王者表現嘛！我們等著看～' },
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 自嘲篇 — 輸家自己說（{loser} 開口）
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    id: 'self_no_face', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '{loser}', text: '我不是不會打……是牌不給我面子。' },
+      { speaker: '楊貴妃',  text: '哈哈哈！對啦，是牌的錯！不是 {loser} 的錯！' },
+      { speaker: '妹喜',    text: '下局牌會反省的，好好給你面子！（甜笑）' },
+    ],
+  },
+  {
+    id: 'self_enemy_cards', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '{loser}', text: '今天的牌跟我有仇……一定有仇。' },
+      { speaker: '妲己',    text: '哈哈哈！{loser} 跟牌結仇了！' },
+      { speaker: '貂蟬',    text: '下次洗牌前先和好，說不定牌就乖了？（壞笑）' },
+    ],
+  },
+  {
+    id: 'self_offend_god', weight: 18,
+    match: ctx => !isBeatuy(ctx.loser) && (ctx.loserScore ?? 0) < -30,
+    lines: [
+      { speaker: '{loser}', text: '我嚴重懷疑……洗牌的時候得罪神明了。' },
+      { speaker: '妲己',    text: '{loser} 啊！（嘆氣）' },
+      { speaker: '妹喜',    text: '哈哈哈下次洗牌前要先拜拜～' },
+    ],
+  },
+  {
+    id: 'self_destiny', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '{loser}', text: '這把……不是我打的，是命運打的。' },
+      { speaker: '驪姬',    text: '哈哈哈這個藉口太經典！' },
+      { speaker: '妲己',    text: '那命運打輸了，怪命運就好～（甜笑）' },
+    ],
+  },
+  {
+    id: 'self_strategy_fail', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '{loser}', text: '我的策略其實很成功……只是結果失敗了。' },
+      { speaker: '西施',    text: '理論上能贏！只是實際上……全輸！（笑）' },
+      { speaker: '楊貴妃',  text: '哈哈哈姐姐嘴巴太利！' },
+      { speaker: '{loser}', text: '……下局繼續驗證我的理論。' },
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 台味篇 — 輸家開口，台語精神
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    id: 'tai_tiger_loss', weight: 20,
+    match: ctx => !isBeatuy(ctx.loser) && (ctx.loserScore ?? 0) < -25,
+    lines: [
+      { speaker: '{loser}', text: '一頓操作猛如虎……一看，輸了兩百五。' },
+      { speaker: '貂蟬',    text: '哈哈哈哈！這個梗台味十足！' },
+      { speaker: '妹喜',    text: '{loser} 說的是自己嗎？（假裝不知道）' },
+      { speaker: '{loser}', text: '（沉默點頭）' },
+    ],
+  },
+  {
+    id: 'tai_east_wind', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '{loser}', text: '今晚等東風……東風沒來，西北風先到。' },
+      { speaker: '驪姬',    text: '吹得褲袋都翻起來了～（笑）' },
+      { speaker: '妲己',    text: '下局等等看，也許東風明天才來～' },
+    ],
+  },
+  {
+    id: 'tai_soul_atm', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '{loser}', text: '我人在牌桌坐……魂在提款機。' },
+      { speaker: '妹喜',    text: '哈哈哈！{loser} 說得太真實了！' },
+      { speaker: '妲己',    text: '下次帶夠提款卡再來！（壞笑）' },
+    ],
+  },
+  {
+    id: 'tai_luck_mask', weight: 14,
+    match: ctx => (ctx.winnerScore ?? 0) > 30,
+    lines: [
+      { speaker: '楊貴妃', text: '{winner} 今晚手氣這麼旺！' },
+      { speaker: '妲己',   text: '對啊對啊！手氣若會傳染，姐妹們一定戴口罩！' },
+      { speaker: '貂蟬',   text: '哈哈哈！{loser} 要不要也戴一個，隔絕衰氣？（壞笑）' },
+    ],
+  },
+  {
+    id: 'tai_three_seven_luck', weight: 16,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '{loser}', text: '打牌靠三分技術，七分命……我剛好缺那七分。' },
+      { speaker: '褒姒',    text: '哈哈哈！{loser} 說話好誠實！' },
+      { speaker: '驪姬',    text: '三分技術有沒有？（小聲問）' },
+      { speaker: '妲己',    text: '……噓！（捂嘴）' },
+    ],
+  },
+  {
+    id: 'tai_pudu', weight: 14,
+    match: ctx => !isBeatuy(ctx.loser),
+    lines: [
+      { speaker: '{loser}', text: '別人摸牌像過年……我摸牌像普渡。' },
+      { speaker: '驪姬',    text: '哈哈哈！摸到的牌都用來祭祖了～' },
+      { speaker: '妲己',    text: '下局換個時辰摸牌，說不定就過年了！（笑）' },
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 純通用兜底（任何情況）
   // ══════════════════════════════════════════════════════════════════════════
 
   {
