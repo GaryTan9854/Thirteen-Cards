@@ -30,12 +30,13 @@ function pct(n: number, d: number) {
   return (n / d * 100).toFixed(0) + '%'
 }
 
-// 系統排行分數：(勝率×2 + 不敗率) / 3，normalize 到 100%
+// 系統排行：以四人局期望值校準（勝率期望25%、不敗率期望75%）
+// w=1.0 / u=1.0 代表剛好平均；1.5倍平均水準 = 滿分100%
 function sysScore(r: PlayerStat): number {
   if (!r.games) return 0
-  const winRate    = r.wins / r.games
-  const undefeated = (r.games - r.losses) / r.games
-  return (winRate * 2 + undefeated) / 3
+  const w = (r.wins / r.games) / 0.25
+  const u = ((r.games - r.losses) / r.games) / 0.75
+  return Math.min((w * 2 + u) / 4.5, 1)
 }
 
 function fmtDate(iso: string) {
