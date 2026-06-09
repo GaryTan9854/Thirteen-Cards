@@ -5,15 +5,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import Brush from '../components/Brush'
-
-function Brushes({ n }: { n: number }) {
-  return (
-    <span className="inline-flex gap-0.5 align-middle" title={`${n} 把刷子 — 你真有${n === 1 ? '一' : n === 2 ? '兩' : '三'}把刷子`}>
-      {Array.from({ length: n }, (_, k) => <Brush key={k} h={18} />)}
-    </span>
-  )
-}
 
 interface PlayerStat {
   player:  string
@@ -39,6 +30,14 @@ function pct(n: number, d: number) {
   return (n / d * 100).toFixed(0) + '%'
 }
 
+// 系統排行分數：(勝率×2 + 不敗率) / 3，normalize 到 100%
+function sysScore(r: PlayerStat): number {
+  if (!r.games) return 0
+  const winRate    = r.wins / r.games
+  const undefeated = (r.games - r.losses) / r.games
+  return (winRate * 2 + undefeated) / 3
+}
+
 function fmtDate(iso: string) {
   try {
     return new Date(iso).toLocaleDateString('zh-TW', {
@@ -47,7 +46,7 @@ function fmtDate(iso: string) {
   } catch { return iso.slice(0, 10) }
 }
 
-type SortCol = 'player' | 'games' | 'wins' | 'losses' | 'winRate' | 'undefeated'
+type SortCol = 'player' | 'games' | 'wins' | 'losses' | 'winRate' | 'undefeated' | 'system'
 
 export default function StatsPage() {
   const { player } = useAuth()
@@ -60,7 +59,7 @@ export default function StatsPage() {
   const [error,   setError]   = useState<string | null>(null)
 
   // Sortable columns
-  const [sortCol, setSortCol] = useState<SortCol>('undefeated')
+  const [sortCol, setSortCol] = useState<SortCol>('system')
   const [sortDir, setSortDir] = useState<'desc'|'asc'>('desc')
   function toggleSort(col: SortCol) {
     if (sortCol === col) setSortDir(d => d === 'desc' ? 'asc' : 'desc')
@@ -128,6 +127,7 @@ export default function StatsPage() {
     else if (sortCol === 'losses')     { va = a.losses;  vb = b.losses }
     else if (sortCol === 'winRate')    { va = a.games ? a.wins/a.games : 0; vb = b.games ? b.wins/b.games : 0 }
     else if (sortCol === 'undefeated') { va = a.games ? (a.games-a.losses)/a.games : 0; vb = b.games ? (b.games-b.losses)/b.games : 0 }
+    else if (sortCol === 'system')     { va = sysScore(a); vb = sysScore(b) }
     if (sortCol === 'player') return sortDir === 'asc' ? va : -va
     return sortDir === 'asc' ? va - vb : vb - va
   })
@@ -233,7 +233,8 @@ export default function StatsPage() {
                   ['wins',       '勝',     'text-right px-2 text-yellow-300', ''],
                   ['losses',     '負',     'text-right px-2 text-red-400', ''],
                   ['winRate',    '最勝率', 'text-right px-2',  ''],
-                  ['undefeated', '不敗率', 'text-right pl-2',  ''],
+                  ['undefeated', '不敗率', 'text-right px-2',  ''],
+                  ['system',     '系統排行', 'text-right pl-2 text-sky-300', ''],
                 ] as [SortCol, string, string, string][])
                 .filter(([col]) => !(col === 'games' && viewMode === 'public' && !isGary))
                 .map(([col, label, cls]) => (
@@ -248,11 +249,7 @@ export default function StatsPage() {
             </thead>
             <tbody>
               {rows.map((r, i) => {
-                // 「你真有兩把刷子」典故：金/銀/銅 → 三/二/一把刷子
-                const medal: React.ReactNode = i === 0 ? <Brushes n={3} />
-                                             : i === 1 ? <Brushes n={2} />
-                                             : i === 2 ? <Brushes n={1} />
-                                             : `${i+1}.`
+                const medal = i === 0 ? '🪠🪠🪠' : i === 1 ? '🪠🪠' : i === 2 ? '🪠' : `${i+1}.`
                 const net    = r.wins - r.losses
                 const isMe   = r.player === player
                 return (
@@ -275,13 +272,18 @@ export default function StatsPage() {
                         {pct(r.wins, r.games)}
                       </span>
                     </td>
-                    <td className="py-2 pl-2 text-right tabular-nums">
+                    <td className="py-2 px-2 text-right tabular-nums">
                       <span className={r.losses === 0
                         ? 'text-green-400 font-semibold'
                         : (r.games - r.losses) / r.games >= 0.7
                           ? 'text-sky-300'
                           : 'text-gray-400'}>
                         {pct(r.games - r.losses, r.games)}
+                      </span>
+                    </td>
+                    <td className="py-2 pl-2 text-right tabular-nums">
+                      <span className={sortCol === 'system' ? 'text-sky-300 font-semibold' : 'text-gray-300'}>
+                        {r.games ? (sysScore(r) * 100).toFixed(0) + '%' : '—'}
                       </span>
                     </td>
                   </tr>

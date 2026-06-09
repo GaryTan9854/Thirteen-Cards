@@ -1,6 +1,6 @@
 # ThirteenCards — CLAUDE.md
 
-十三支 (Chinese Poker / Big Two Variant) 平台。**當前版本 v13.8**。
+十三支 (Chinese Poker / Big Two Variant) 平台。**當前版本 v14.14**。
 
 > Recent session 詳情 → `SESSION_HANDOFF.md`
 
@@ -203,4 +203,4 @@ RA4 honors attitude；RA3 永遠傳 0；前端 `_attSupports()` 限制只有 RA 
 
 ## 版本規則
 - bump +0.1 每次 deploy；minor=20 時升 major
-- **目前 v13.8**
+- **目前 v14.14**

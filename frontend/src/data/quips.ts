@@ -23,6 +23,7 @@ export interface QuipScript {
   match: (ctx: QuipContext) => boolean
   weight: number
   lines: QuipLine[]
+  priority?: boolean   // player self-quip; pickScript gives these 70% priority
 }
 
 export interface QuipContext {
@@ -33,6 +34,7 @@ export interface QuipContext {
   humanMid?:    string[]  // humans who finished 2nd / 3rd in the FULL 4-seat ranking
   winnerScore?: number    // winner's cumulative score this game
   loserScore?:  number    // loser's cumulative score this game (typically negative)
+  humanPlayer?: string    // set when exactly 1 human plays vs AI beauties — forces priority self-quips
 }
 
 const BEAUTIES = new Set(['妲己','妹喜','褒姒','驪姬','西施','王昭君','楊貴妃','貂蟬'])
@@ -64,8 +66,13 @@ const RECENT_MAX = 5
 export function pickScript(ctx: QuipContext): QuipScript {
   const eligible = QUIP_SCRIPTS.filter(s => s.match(ctx))
   if (!eligible.length) return QUIP_SCRIPTS[QUIP_SCRIPTS.length - 1]
-  const fresh = eligible.filter(s => !RECENT.includes(s.id))
-  const pool  = fresh.length > 0 ? fresh : eligible
+
+  // Player self-quips (priority:true) get 70% probability when available
+  const priority = eligible.filter(s => s.priority)
+  const base = (priority.length > 0 && Math.random() < 0.70) ? priority : eligible
+
+  const fresh = base.filter(s => !RECENT.includes(s.id))
+  const pool  = fresh.length > 0 ? fresh : base
   const totalW = pool.reduce((s, x) => s + x.weight, 0)
   let r = Math.random() * totalW
   let chosen = pool[pool.length - 1]
@@ -591,6 +598,166 @@ export const QUIP_SCRIPTS: QuipScript[] = [
       { speaker: '褒姒',   text: 'Gary 大爺和 Glory 姐今晚都成了 Ian 哥的墊腳石！（起鬨）' },
       { speaker: '王昭君', text: '哈哈哈說得太直接了，不過沒有錯！Ian 哥厲害！' },
       { speaker: '妹喜',   text: 'Ian 哥，今晚你要不要請大家喝個飲料慶祝？（甜笑）' },
+    ],
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PLAYER SELF-QUIPS — priority:true → 70% 機率觸發（玩家本人說話）
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ─── IAN 贏 ──────────────────────────────────────────────────────────────
+  {
+    id: 'ian_self_wins_1', weight: 10, priority: true,
+    match: ctx => ctx.winner === 'Ian' || ctx.humanPlayer === 'Ian',
+    lines: [
+      { speaker: 'Ian',   text: '早就告訴過你們，13支我小學四年級就會了。' },
+      { speaker: '妲己',  text: '哈哈哈 Ian 哥！那我們算什麼，幼稚園的嗎～' },
+      { speaker: '貂蟬',  text: '（嘟嘴）那你怎麼不每局都贏……（小聲）' },
+      { speaker: 'Ian',   text: '……今晚就有啊。' },
+    ],
+  },
+  {
+    id: 'ian_self_wins_2', weight: 10, priority: true,
+    match: ctx => ctx.winner === 'Ian' || ctx.humanPlayer === 'Ian',
+    lines: [
+      { speaker: 'Ian',   text: '13支，13秒。' },
+      { speaker: '西施',  text: 'Ian 哥今晚排完牌，大家還在看……確實快！' },
+      { speaker: '妹喜',  text: '快有什麼用～不過今晚是真的贏了，服！（笑）' },
+      { speaker: '驪姬',  text: 'Ian 哥，下局 12 秒挑戰看看？' },
+    ],
+  },
+
+  // ─── IAN 最輸 ─────────────────────────────────────────────────────────────
+  {
+    id: 'ian_self_loses_1', weight: 10, priority: true,
+    match: ctx => ctx.loser === 'Ian' || ctx.humanPlayer === 'Ian',
+    lines: [
+      { speaker: 'Ian',   text: '曾幾何時？尼姑做滿月。' },
+      { speaker: '妲己',  text: 'Ian 哥今晚輸到說起台語了！（捂嘴）' },
+      { speaker: '西施',  text: '「曾幾何時」——Ian 哥，你排牌那一刻就注定了吧～（壞笑）' },
+      { speaker: '貂蟬',  text: '下局加油！讓你的「滿月」重新開始！（甜笑）' },
+    ],
+  },
+
+  // ─── GLORY 贏 ─────────────────────────────────────────────────────────────
+  {
+    id: 'glory_self_wins_1', weight: 10, priority: true,
+    match: ctx => ctx.winner === 'Glory' || ctx.humanPlayer === 'Glory',
+    lines: [
+      { speaker: 'Glory', text: '溪底沒魚，三界娘子為王！' },
+      { speaker: '妲己',  text: 'Glory 姐姐說得好！今晚就是姐姐稱王！' },
+      { speaker: '楊貴妃',text: '那溪底那些魚是誰呀～（壞笑）' },
+      { speaker: '貂蟬',  text: '今晚輸的各位……你們就是溪底的魚哦～（偷笑）' },
+    ],
+  },
+  {
+    id: 'glory_self_wins_2', weight: 10, priority: true,
+    match: ctx => ctx.winner === 'Glory' || ctx.humanPlayer === 'Glory',
+    lines: [
+      { speaker: 'Glory', text: '兵器千萬種，我偏愛用劍！' },
+      { speaker: '妲己',  text: '哈哈哈姐姐！「劍」諧音「賤」啊！' },
+      { speaker: '驪姬',  text: '姐姐今晚就是用這把「劍」把大家砍翻了～（笑）' },
+      { speaker: '西施',  text: '被砍到的人才知道多……賤！Glory 姐好狠！' },
+    ],
+  },
+  {
+    id: 'glory_self_wins_3', weight: 10, priority: true,
+    match: ctx => ctx.winner === 'Glory' || ctx.humanPlayer === 'Glory',
+    lines: [
+      { speaker: 'Glory', text: '甲殼蟲爬玻璃……腳滑得很哦！' },
+      { speaker: '妲己',  text: 'Glory 姐姐在說誰呀？（假裝不知道）' },
+      { speaker: '楊貴妃',text: '今晚那幾個輸的，滑了一手又一手，就是上不去！（笑）' },
+      { speaker: '西施',  text: 'Glory 姐穩穩站上去了～佩服佩服！（鼓掌）' },
+    ],
+  },
+
+  // ─── GLORY 最輸 ───────────────────────────────────────────────────────────
+  {
+    id: 'glory_self_loses_1', weight: 10, priority: true,
+    match: ctx => ctx.loser === 'Glory' || ctx.humanPlayer === 'Glory',
+    lines: [
+      { speaker: 'Glory', text: '願賭服輸，請客就請客，機率問題啦。' },
+      { speaker: '妲己',  text: 'Glory 姐今晚輸得好大方！佩服佩服！' },
+      { speaker: '貂蟬',  text: '姐姐說「機率問題」——那下局機率就換過來了！（期待）' },
+      { speaker: '楊貴妃',text: '姐姐請客，我要炸雞加珍奶！（舉手）' },
+    ],
+  },
+
+  // ─── GARY 贏 ──────────────────────────────────────────────────────────────
+  {
+    id: 'gary_self_wins_1', weight: 10, priority: true,
+    match: ctx => ctx.winner === 'Gary' || ctx.humanPlayer === 'Gary',
+    lines: [
+      { speaker: 'Gary',  text: '感覺……抓到訣竅了。' },
+      { speaker: '妲己',  text: '大爺！等了多久終於說出這句話！（笑）' },
+      { speaker: '西施',  text: '每次贏都說「感覺抓到訣竅」，下局馬上忘光～（壞笑）' },
+      { speaker: '貂蟬',  text: '不管啦！今晚大爺確實贏了，訣竅就算找到了！（甜笑）' },
+    ],
+  },
+  {
+    id: 'gary_self_wins_2', weight: 10, priority: true,
+    match: ctx => ctx.winner === 'Gary' || ctx.humanPlayer === 'Gary',
+    lines: [
+      { speaker: 'Gary',  text: '已經練了三年的功夫，還是打不贏你們這幾位老千。' },
+      { speaker: '妲己',  text: '大爺！今晚是贏了耶！' },
+      { speaker: '楊貴妃',text: '哈哈哈大爺說「打不贏」，結果今晚打贏了～（偷笑）' },
+      { speaker: '西施',  text: '三年功夫今晚終於用上了，下局繼續！（比拳）' },
+    ],
+  },
+
+  // ─── GARY 最輸 ────────────────────────────────────────────────────────────
+  {
+    id: 'gary_self_loses_1', weight: 10, priority: true,
+    match: ctx => ctx.loser === 'Gary' || ctx.humanPlayer === 'Gary',
+    lines: [
+      { speaker: 'Gary',  text: '我老婆只有給我五千塊預算哦……' },
+      { speaker: '妲己',  text: '大爺！！！（驚呼）' },
+      { speaker: '貂蟬',  text: '哈哈哈五千塊！大爺是怕回家交代嗎？（笑）' },
+      { speaker: '西施',  text: '超出預算的部分……小妹幫你想藉口，不過要收費的哦～（壞笑）' },
+    ],
+  },
+
+  // ─── JACK 贏 ──────────────────────────────────────────────────────────────
+  {
+    id: 'jack_self_wins_1', weight: 10, priority: true,
+    match: ctx => ctx.winner === 'Jack' || ctx.humanPlayer === 'Jack',
+    lines: [
+      { speaker: 'Jack',  text: '老太太下樓梯，不得不扶（服）啊！' },
+      { speaker: '妲己',  text: 'Jack 今晚自己說自己的歇後語，哈哈哈！' },
+      { speaker: '驪姬',  text: '「不得不服」——Jack 今晚確實值得被服！（笑）' },
+      { speaker: '貂蟬',  text: '大家都服了，Jack 今晚排牌厲害！（拍手）' },
+    ],
+  },
+  {
+    id: 'jack_self_wins_2', weight: 10, priority: true,
+    match: ctx => ctx.winner === 'Jack' || ctx.humanPlayer === 'Jack',
+    lines: [
+      { speaker: 'Jack',  text: '字跡潦草，還請見諒。' },
+      { speaker: '妲己',  text: '哈哈哈 Jack 這話什麼意思啊？' },
+      { speaker: '西施',  text: '就是……贏得太潦草，讓大家來不及反應的意思吧？（笑）' },
+      { speaker: '楊貴妃',text: 'Jack 說得一本正經，壞死了！（捂嘴）' },
+    ],
+  },
+  {
+    id: 'jack_self_wins_3', weight: 10, priority: true,
+    match: ctx => ctx.winner === 'Jack' || ctx.humanPlayer === 'Jack',
+    lines: [
+      { speaker: 'Jack',  text: '媽媽有交代：出門遊玩，千萬不要去賭博！' },
+      { speaker: '妲己',  text: 'Jack 你媽的交代，今晚好像沒聽進去～（壞笑）' },
+      { speaker: '貂蟬',  text: '媽媽說不要賭，結果 Jack 賭贏了！媽媽說的對嗎？（笑）' },
+      { speaker: '王昭君',text: 'Jack，回去要跟你媽坦白哦，就說今晚是來學習的～（甜笑）' },
+    ],
+  },
+
+  // ─── JACK 最輸 ────────────────────────────────────────────────────────────
+  {
+    id: 'jack_self_loses_1', weight: 10, priority: true,
+    match: ctx => ctx.loser === 'Jack' || ctx.humanPlayer === 'Jack',
+    lines: [
+      { speaker: 'Jack',  text: '賭博師父在 2 樓——沒有褲子可以穿下樓來！' },
+      { speaker: '妲己',  text: '哈哈哈哈 Jack 你今晚就是這個師父嗎！！' },
+      { speaker: '貂蟬',  text: '輸到褲子都沒了還能說出這麼精彩的話，佩服佩服！（笑）' },
+      { speaker: '妹喜',  text: 'Jack，我們幫你去樓下買條新褲子，你先躲在樓上等啊～' },
     ],
   },
 

@@ -3,7 +3,7 @@
  *
  * Three scenes:
  *   lobby   → 我對緣份小心翼翼(伴奏)  — single track, loop
- *   playing → fixed queue: 一念 → 清清如我 → 木已成舟 → 眾裡尋他千百度; loop.
+ *   playing → random shuffle of 4 tracks, re-shuffled each loop.
  *   ended   → 我對緣份小心翼翼        — single track, loop
  *
  * Also exposes pauseScene()/resumeScene() so the 歌曲欣賞 page can temporarily
@@ -25,7 +25,15 @@ const PLAYING_QUEUE: string[] = [
   M('zhongli.mp3'),
 ]
 
-function buildPlayingQueue(): string[] { return [...PLAYING_QUEUE] }
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+function buildPlayingQueue(): string[] { return shuffle(PLAYING_QUEUE) }
 
 let audio: HTMLAudioElement | null = null
 let _scene = ''
