@@ -644,7 +644,7 @@ export default function OnlinePage() {
   const voiceRef = useRef(_voiceOn)
   useEffect(() => { voiceRef.current = _voiceOn }, [_voiceOn])
   const cardStyle = useCardStyle()
-  const [quipCtx,      setQuipCtx]          = useState<{ loser: string; winner: string; names: string[]; mid: string[]; humanMid: string[]; winnerScore: number; loserScore: number; humanPlayer?: string; players?: { name: string; isHuman: boolean; score: number; rank: number }[] } | null>(null)
+  const [quipCtx,      setQuipCtx]          = useState<{ loser: string; winner: string; names: string[]; mid: string[]; humanMid: string[]; winnerScore: number; loserScore: number; humanPlayer?: string; players?: { name: string; isHuman: boolean; score: number; rank: number }[]; appeals?: { player: string; success: boolean }[] } | null>(null)
 
   // Persist player-specific settings to localStorage whenever they change
   useEffect(() => {
@@ -1863,7 +1863,28 @@ export default function OnlinePage() {
       score: x.s,
       rank: i + 1,
     }))
-    if (winner && loser) setQuipCtx({ winner, loser, names, mid, humanMid, winnerScore, loserScore, humanPlayer, players })
+    // Reconstruct appeal results from per-round history:
+    // rounds beyond roundsNormal are appeal rounds. Appeal #1 succeeds when
+    // the pre-appeal loser is no longer lowest after the first appeal block.
+    const appeals: { player: string; success: boolean }[] = []
+    const rn = effRoundsNormal
+    const ra = effAppealRounds
+    if (history.length > rn) {
+      const lowAt = (k: number) => {
+        const c = names.map((_: string, i: number) =>
+          history.slice(0, k).reduce((s: number, r: number[]) => s + (r[i] ?? 0), 0))
+        return c.indexOf(Math.min(...c))
+      }
+      const ap1    = lowAt(rn)
+      const after1 = Math.min(rn + ra, history.length)
+      const low1   = lowAt(after1)
+      appeals.push({ player: names[ap1], success: low1 !== ap1 })
+      if (low1 !== ap1 && history.length > after1) {
+        const low2 = lowAt(history.length)
+        appeals.push({ player: names[low1], success: low2 !== low1 })
+      }
+    }
+    if (winner && loser) setQuipCtx({ winner, loser, names, mid, humanMid, winnerScore, loserScore, humanPlayer, players, appeals })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEnded, lastResult])
 
@@ -2144,6 +2165,7 @@ export default function OnlinePage() {
                   loserScore={quipCtx.loserScore}
                   humanPlayer={quipCtx.humanPlayer}
                   players={quipCtx.players}
+                  appeals={quipCtx.appeals}
                   onDone={() => setQuipCtx(null)}
                 />
               )}

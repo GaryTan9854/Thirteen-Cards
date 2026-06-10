@@ -4,7 +4,8 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { QuipContext, isBeatuy, subLine, pickScript } from '../data/quips'
+import { QuipContext, QuipLine, isBeatuy, subLine, pickScript } from '../data/quips'
+import { generateScript, GamePlayer, AppealResult } from '../data/quipgen'
 
 // ── Avatar helpers ──────────────────────────────────────────────────────────
 
@@ -38,13 +39,26 @@ interface Props {
   winnerScore?: number
   loserScore?:  number
   humanPlayer?: string
-  players?:     { name: string; isHuman: boolean; score: number; rank: number }[]
+  players?:     GamePlayer[]
+  appeals?:     AppealResult[]
   onDone:       () => void
 }
 
-export default function QuipPanel({ loser, winner, names, mid, humanMid, winnerScore, loserScore, humanPlayer, players, onDone }: Props) {
+// v15: structured generator (quipgen) when full player info is available;
+// falls back to the legacy script library otherwise.
+function buildLines(props: Props): QuipLine[] {
+  const { loser, winner, names, mid, humanMid, winnerScore, loserScore, humanPlayer, players, appeals } = props
+  if (players && players.length === 4) {
+    return generateScript({ players, appeals: appeals ?? [] }).lines
+  }
+  const ctx = { loser, winner, names, mid, humanMid, winnerScore, loserScore, humanPlayer } as QuipContext
+  return pickScript(ctx).lines.map(l => subLine(l, ctx))
+}
+
+export default function QuipPanel(props: Props) {
+  const { onDone } = props
   const [lineIdx, setLineIdx] = useState(-1)      // -1 = waiting for initial delay
-  const scriptRef = useRef(pickScript({ loser, winner, names, mid, humanMid, winnerScore, loserScore, humanPlayer, players } as QuipContext))
+  const linesRef = useRef<QuipLine[]>(buildLines(props))
   const onDoneRef = useRef(onDone)
   useEffect(() => { onDoneRef.current = onDone }, [onDone])
 
@@ -57,7 +71,7 @@ export default function QuipPanel({ loser, winner, names, mid, humanMid, winnerS
   // Auto-advance
   useEffect(() => {
     if (lineIdx < 0) return
-    const total = scriptRef.current.lines.length
+    const total = linesRef.current.length
     const t = setTimeout(() => {
       if (lineIdx >= total - 1) onDoneRef.current()
       else setLineIdx(i => i + 1)
@@ -66,11 +80,10 @@ export default function QuipPanel({ loser, winner, names, mid, humanMid, winnerS
   }, [lineIdx])
 
   if (lineIdx < 0) return null
-  const lines = scriptRef.current.lines
+  const lines = linesRef.current
   if (lineIdx >= lines.length) return null
 
-  const ctx   = { loser, winner, names, mid, humanMid, winnerScore, loserScore, humanPlayer, players } as QuipContext
-  const line  = subLine(lines[lineIdx], ctx)
+  const line  = lines[lineIdx]
   const isB   = isBeatuy(line.speaker)
   const color = isB ? '#f472b6' : '#38bdf8'
 
