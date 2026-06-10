@@ -91,7 +91,13 @@ export function appealComments(appeals: AppealResult[], loser: string): string[]
   const [a1, a2] = appeals
   const out: string[] = []
   if (!a1.success) {
-    out.push(`哎呀，${a1.player} 沒申訴成功，功虧一簣！`)
+    // 申訴失敗不必每局都講（60% 提及），講法也有變化
+    if (chance(0.60)) out.push(pick([
+      `哎呀，${a1.player} 沒申訴成功，功虧一簣！`,
+      `${a1.player} 申訴了個寂寞，越申越輸……`,
+      `${a1.player} 想翻盤結果翻車，這就是人生啊。`,
+      `申訴無效！${a1.player} 還倒貼了一筆。`,
+    ]))
     return out
   }
   out.push(`哇！${a1.player} 逆轉成功耶！太猛了！`)
@@ -164,12 +170,13 @@ const TRASH: TrashLine[] = [
 
 // ── 4. 特殊 player 專屬台詞（在場時 40% 取代一般垃圾話）────────────────────
 
-type SpecialLine = { who: string; when: 'win' | 'lose'; text: string }
+// byOther: true = 這句由別的玩家講（調侃 who），否則 who 自己講
+type SpecialLine = { who: string; when: 'win' | 'lose'; text: string; byOther?: boolean }
 
 const SPECIAL: SpecialLine[] = [
   { who: 'Ian',   when: 'win',  text: '早就告訴過你們，13支我小學四年級就會了。' },
   { who: 'Ian',   when: 'win',  text: '13支，13秒。' },
-  { who: 'Ian',   when: 'lose', text: '曾幾何時？尼姑做滿月……' },
+  { who: 'Ian',   when: 'lose', text: '曾幾何時？尼姑做滿月——Ian 今晚居然輸了！', byOther: true },
   { who: 'Glory', when: 'win',  text: '溪底沒魚，三界娘子為王！' },
   { who: 'Glory', when: 'win',  text: '兵器千萬種，我偏愛用劍！' },
   { who: 'Glory', when: 'lose', text: '願賭服輸，請客就請客，機率問題啦。' },
@@ -234,6 +241,10 @@ export function generateScript(summary: GameSummary): GeneratedScript {
 
   const sub = (t: string) => t.replace(/\{winner\}/g, winner.name).replace(/\{loser\}/g, loser.name)
   const commentator = () => pick([...others, winner]).name   // 評論的人：中間兩位或贏家
+  // 調侃別人的話，講的人不能是被調侃的對象本人
+  const teaser = (target: string) => pick(ps.filter(p => p.name !== target && p.name !== loser.name).length
+    ? ps.filter(p => p.name !== target && p.name !== loser.name)
+    : ps.filter(p => p.name !== target)).name
 
   // a. 局勢/申訴評論 block
   const aLines: QuipLine[] = []
@@ -254,13 +265,15 @@ export function generateScript(summary: GameSummary): GeneratedScript {
       (s.when === 'lose' && s.who === loser.name))
     if (cands.length) {
       const s = pick(cands)
-      bLines.push({ speaker: s.who, text: s.text })
+      bLines.push({ speaker: s.byOther ? teaser(s.who) : s.who, text: s.text })
     }
   }
   if (bLines.length === 0) {
     const cands = TRASH.filter(t => !t.need || t.need(scores))
     const t = pick(cands)
-    const speaker = t.by === 'loser' ? loser.name : t.by === 'winner' ? winner.name : commentator()
+    const speaker = t.by === 'loser' ? loser.name
+      : t.by === 'winner' ? winner.name
+      : teaser(t.at === 'winner' ? winner.name : loser.name)
     bLines.push({ speaker, text: sub(t.text) })
   }
   // 40% 補一句回應（別人調侃 loser 自嘲後 / loser 自嘲後別人補刀）
@@ -271,7 +284,8 @@ export function generateScript(summary: GameSummary): GeneratedScript {
       .filter(t => (first.speaker === loser.name ? t.by === 'other' : t.by === 'loser'))
     if (cands.length) {
       const t = pick(cands)
-      const speaker = t.by === 'loser' ? loser.name : commentator()
+      const speaker = t.by === 'loser' ? loser.name
+        : teaser(t.at === 'winner' ? winner.name : loser.name)
       if (speaker !== first.speaker) bLines.push({ speaker, text: sub(t.text) })
     }
   }
