@@ -338,15 +338,36 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
 
   useEffect(()=>{
     setApiError(null)
-    // Fetch arrange_info AND rule_base_as arrangement in parallel
+    setInfo(null)
+    let cancelled = false
+    // Fetch with 8s timeout + 1 retry — covers tunnel blips that would otherwise
+    // leave the panel stuck on 分析中… forever (no native fetch timeout).
+    async function fetchJson(url: string, body: any, tries = 2, timeoutMs = 8000): Promise<any> {
+      for (let i = 0; i < tries; i++) {
+        const ctrl = new AbortController()
+        const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+        try {
+          const r = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: ctrl.signal,
+          })
+          clearTimeout(timer)
+          if (!r.ok) throw new Error(`HTTP ${r.status}`)
+          return await r.json()
+        } catch (e) {
+          clearTimeout(timer)
+          if (i === tries - 1) throw e
+        }
+      }
+    }
     Promise.all([
-      fetch('/api/manual/arrange_info',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hand})})
-        .then(r=>{ if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() }),
-      fetch('/api/game/arrange',{method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({hand, strategy: strategy ?? 'rulealpha'})})
-        .then(r=>r.json()).catch(()=>null),
+      fetchJson('/api/manual/arrange_info', { hand }),
+      fetchJson('/api/game/arrange', { hand, strategy: strategy ?? 'rulealpha' }).catch(() => null),
     ])
     .then(([data, rbData]:[ArrangeInfo, any])=>{
+      if (cancelled) return
       setInfo(data)
       // Apply player's configured strategy as default arrangement
       const rbv = rbData ? applyModelData(rbData, hand) : null
@@ -360,7 +381,8 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
         setArr({top:v.top,mid:v.mid,bot:v.bot})
       }
     })
-    .catch(e=>setApiError(String(e)))
+    .catch(e=>{ if (!cancelled) setApiError(String(e)) })
+    return () => { cancelled = true }
   },[hand])
 
   function pickGroup(gi:number){
