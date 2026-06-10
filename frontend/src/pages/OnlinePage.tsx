@@ -16,7 +16,7 @@ import ManualArrange from '../components/ManualArrange'
 import GameResultDisplay from '../components/GameResultDisplay'
 import TournamentPanel from '../components/TournamentPanel'
 import {
-  GunNotif, GUN_NOTIF_MS,
+  GunNotif, gunNotifMs,
   detectGrandSlam, buildGunNotifs, buildSpecialTTS,
   speak, speakSequence,
 } from '../utils/gameEffects'
@@ -721,14 +721,27 @@ export default function OnlinePage() {
         ? `${next.winner} 打槍兩人！${next.losers[0]} 和 ${next.losers[1]}`
         : `${next.winner} 打槍 ${next.losers[0]}`)
     }
-    setTimeout(processNextGun, GUN_NOTIF_MS)
+    // Voice-off: cycle gun toasts quickly; voice-on: wait for the announcement.
+    setTimeout(processNextGun, gunNotifMs(voiceRef.current))
   }, [])
 
-  // 全壘打：顯示 5 s 後自動關閉，並念出
+  // Stop all in-flight effects (TTS + gun queue + slam banner) — called when the
+  // player advances to the next screen so nothing carries over or blocks. Cutting
+  // speechSynthesis mid-utterance is fine; bumping ttsGenRef invalidates any
+  // pending speakSequence callbacks scheduled by fireRoundEffects.
+  const stopEffects = useCallback(() => {
+    window.speechSynthesis?.cancel()
+    ttsGenRef.current++
+    gunQueueRef.current = []
+    setCurrentGun(null)
+    setGrandSlammer(null)
+  }, [])
+
+  // 全壘打：voice-on 顯示 5 s（配合念出）；voice-off 顯示 2.8 s 即關閉
   useEffect(() => {
     if (!grandSlammer) return
     if (voiceRef.current) speak(`${grandSlammer}，全壘打！打爆三家！`, 0.88)
-    const t = setTimeout(() => setGrandSlammer(null), 5000)
+    const t = setTimeout(() => setGrandSlammer(null), voiceRef.current ? 5000 : 2800)
     return () => clearTimeout(t)
   }, [grandSlammer])
 
@@ -1039,8 +1052,10 @@ export default function OnlinePage() {
     }
   }
 
-  // Schedule end-game voice after round effects settle
+  // Schedule end-game voice after round effects settle.
+  // Voice-off: nothing to announce — skip entirely so no timer lingers.
   function scheduleEndGameVoice(msg: any) {
+    if (!voiceRef.current) return
     const seatNames: string[] = msg.seat_names ?? []
     const history: number[][] = msg.history ?? []
     if (!seatNames.length || !history.length) return
@@ -1090,7 +1105,7 @@ export default function OnlinePage() {
           setTimeout(() => {
             if (ttsGenRef.current !== myGen || !voiceRef.current) return
             speakSequence(monsterLines)
-          }, gunNotifs.length * GUN_NOTIF_MS + 800)
+          }, gunNotifs.length * gunNotifMs(voiceRef.current) + 800)
         }
       } else if (monsterLines.length > 0 && voiceRef.current) {
         speakSequence(monsterLines)
@@ -2112,6 +2127,7 @@ export default function OnlinePage() {
                   )}
                   {isEnded ? (<>
                     <button ref={playAgainBtnRef} onClick={() => {
+                      stopEffects()
                       if (soloActive) {
                         // Reset game state → go to solo setup screen (not lobby)
                         setSoloActive(false)
@@ -2135,6 +2151,7 @@ export default function OnlinePage() {
                     </button>
                   </>) : isHost ? (
                     <button ref={nextRoundBtnRef} onClick={() => {
+                      stopEffects()
                       if (soloActive) startSoloRound()
                       else send({ type: 'next_round' })
                     }}

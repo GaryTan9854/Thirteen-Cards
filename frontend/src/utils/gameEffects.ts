@@ -13,8 +13,12 @@ export interface GunNotif {
   count:  1 | 2
 }
 
-/** How long each 打槍 toast stays on screen (ms) */
-export const GUN_NOTIF_MS = 3200
+/** How long each 打槍 toast stays on screen (ms).
+ *  Voice-on: long enough for the「X 打槍 Y」announcement to finish.
+ *  Voice-off: short — just enough to register the toast, no need to wait on TTS. */
+export const GUN_NOTIF_MS        = 3200   // voice-on duration
+export const GUN_NOTIF_MS_SILENT = 1500   // voice-off duration
+export const gunNotifMs = (voiceOn: boolean) => voiceOn ? GUN_NOTIF_MS : GUN_NOTIF_MS_SILENT
 
 // ── Grand Slam detection ──────────────────────────────────────────────────────
 
