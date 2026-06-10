@@ -86,28 +86,30 @@ export function analyzeSituation(playersIn: GamePlayer[]): Situation {
 
 // ── 2. 申訴評論 ─────────────────────────────────────────────────────────────
 
-export function appealComments(appeals: AppealResult[], loser: string): string[] {
+export interface IdText { id: string; text: string }
+
+export function appealComments(appeals: AppealResult[], loser: string): IdText[] {
   if (!appeals.length) return []
   const [a1, a2] = appeals
-  const out: string[] = []
+  const out: IdText[] = []
   if (!a1.success) {
     // 申訴失敗不必每局都講（60% 提及），講法也有變化
     if (chance(0.60)) out.push(pick([
-      `哎呀，${a1.player} 沒申訴成功，功虧一簣！`,
-      `${a1.player} 申訴了個寂寞，越申越輸……`,
-      `${a1.player} 想翻盤結果翻車，這就是人生啊。`,
-      `申訴無效！${a1.player} 還倒貼了一筆。`,
+      { id: '申訴失敗-1', text: `哎呀，${a1.player} 沒申訴成功，功虧一簣！` },
+      { id: '申訴失敗-2', text: `${a1.player} 申訴了個寂寞，越申越輸……` },
+      { id: '申訴失敗-3', text: `${a1.player} 想翻盤結果翻車，這就是人生啊。` },
+      { id: '申訴失敗-4', text: `申訴無效！${a1.player} 還倒貼了一筆。` },
     ]))
     return out
   }
-  out.push(`哇！${a1.player} 逆轉成功耶！太猛了！`)
+  out.push({ id: '申訴成功-1', text: `哇！${a1.player} 逆轉成功耶！太猛了！` })
   if (a2) {
     if (!a2.success) {
-      out.push(`${a2.player} 真倒楣，替 ${a1.player} 請客了！`)
+      out.push({ id: '申訴二-代請客', text: `${a2.player} 真倒楣，替 ${a1.player} 請客了！` })
     } else if (loser === a1.player) {
-      out.push(`哎，${a1.player} 還是沒能逃出命運的手掌！`)
+      out.push({ id: '申訴二-逃不過', text: `哎，${a1.player} 還是沒能逃出命運的手掌！` })
     } else {
-      out.push(`哇！${a2.player} 也逆轉成功，這場比賽像雲霄飛車！`)
+      out.push({ id: '申訴二-雲霄飛車', text: `哇！${a2.player} 也逆轉成功，這場比賽像雲霄飛車！` })
     }
   }
   return out
@@ -118,109 +120,125 @@ export function appealComments(appeals: AppealResult[], loser: string): string[]
 // at: 調侃對象（'loser' | 'winner'），other 專用
 // need: 額外條件
 
+// by: 誰開口  loser=輸家自嘲  winner=贏家自誇  other=別人調侃  any=任何人（跨情境）
 type TrashLine = {
+  id: string                            // 穩定編號，用於使用統計
   text: string                          // 可含 {loser} {winner}
-  by: 'loser' | 'winner' | 'other'
+  by: 'loser' | 'winner' | 'other' | 'any'
   at?: 'loser' | 'winner'
   need?: (s: { winnerScore: number; loserScore: number }) => boolean
 }
 
 const TRASH: TrashLine[] = [
-  // 輸家自嘲
-  { by: 'loser', text: '褲子輸到剩鬆緊帶……' },
-  { by: 'loser', text: '今天不是來打牌的，是來做慈善的。' },
-  { by: 'loser', text: '錢包瘦身效果顯著。' },
-  { by: 'loser', text: '本來想來賺錢，結果來捐款。' },
-  { by: 'loser', text: '錢進得快，出去得更快……' },
-  { by: 'loser', text: '輸到連祖先都認不出來了。', need: s => s.loserScore <= -40 },
-  { by: 'loser', text: '今天手氣比天氣預報還不準。' },
-  { by: 'loser', text: '神仙難救無命牌啊。', need: s => s.loserScore <= -30 },
-  { by: 'loser', text: '巧婦難為無米之炊，牌太爛了啦。' },
-  { by: 'loser', text: '我的牌像豆腐做的刀，切不動。' },
-  { by: 'loser', text: '我不是不會打，是牌不給面子。' },
-  { by: 'loser', text: '今天的牌跟我有仇。' },
-  { by: 'loser', text: '我懷疑洗牌的時候得罪神明了。', need: s => s.loserScore <= -30 },
-  { by: 'loser', text: '這把不是我打的，是命運打的。' },
-  { by: 'loser', text: '我的策略很成功，只是結果失敗。' },
-  { by: 'loser', text: '理論上能贏，實際上全輸……' },
-  { by: 'loser', text: '一頓操作猛如虎，一看輸了兩百五。', need: s => s.loserScore <= -25 },
-  { by: 'loser', text: '東風沒來，西北風先到。' },
-  { by: 'loser', text: '人在牌桌坐，魂在提款機。' },
-  { by: 'loser', text: '打牌靠三分技術七分命，我剛好缺那七分。' },
-  { by: 'loser', text: '別人摸牌像過年，我摸牌像普渡。' },
-  { by: 'loser', text: '賭博師父在 2 樓——沒有褲子可以穿下樓來啦！' },
+  // ── 自嘲篇（輸家自己講）──
+  { id: '自嘲-1',  by: 'loser', text: '褲子輸到剩鬆緊帶……' },
+  { id: '自嘲-2',  by: 'loser', text: '今天不是來打牌的，是來做慈善的。' },
+  { id: '自嘲-3',  by: 'loser', text: '錢包瘦身效果顯著。' },
+  { id: '自嘲-4',  by: 'loser', text: '本來想來賺錢，結果來捐款。' },
+  { id: '自嘲-5',  by: 'loser', text: '錢進得快，出去得更快……' },
+  { id: '自嘲-6',  by: 'loser', text: '輸到連祖先都認不出來了。', need: s => s.loserScore <= -40 },
+  { id: '運氣-1',  by: 'loser', text: '今天手氣比天氣預報還不準。' },
+  { id: '運氣-2',  by: 'loser', text: '神仙難救無命牌啊。', need: s => s.loserScore <= -30 },
+  { id: '爛牌-1',  by: 'loser', text: '巧婦難為無米之炊，牌太爛了啦。' },
+  { id: '爛牌-2',  by: 'loser', text: '我的牌像豆腐做的刀，切不動。' },
+  { id: '爛牌-3',  by: 'loser', text: '我不是不會打，是牌不給面子。' },
+  { id: '爛牌-4',  by: 'loser', text: '今天的牌跟我有仇。' },
+  { id: '運氣-3',  by: 'loser', text: '我懷疑洗牌的時候得罪神明了。', need: s => s.loserScore <= -30 },
+  { id: '輸牌-1',  by: 'loser', text: '這把不是我打的，是命運打的。' },
+  { id: '輸牌-2',  by: 'loser', text: '我的策略很成功，只是結果失敗。' },
+  { id: '輸牌-3',  by: 'loser', text: '理論上能贏，實際上全輸……' },
+  { id: '輸牌-4',  by: 'loser', text: '一頓操作猛如虎，一看輸了兩百五。', need: s => s.loserScore <= -25 },
+  { id: '輸牌-5',  by: 'loser', text: '東風沒來，西北風先到。' },
+  { id: '輸牌-6',  by: 'loser', text: '人在牌桌坐，魂在提款機。' },
+  { id: '運氣-4',  by: 'loser', text: '打牌靠三分技術七分命，我剛好缺那七分。' },
+  { id: '台味-1',  by: 'loser', text: '別人摸牌像過年，我摸牌像普渡。' },
+  { id: '台味-2',  by: 'loser', text: '賭博師父在 2 樓——沒有褲子可以穿下樓來啦！' },
 
-  // 別人調侃輸家
-  { by: 'other', at: 'loser', text: '{loser}，媽媽有交代：出門遊玩，千萬不要去賭博！' },
-  { by: 'other', at: 'loser', text: '賭博若會發財，田園早就賣無人栽——{loser} 你說是不是？', need: s => s.loserScore <= -25 },
-  { by: 'other', at: 'loser', text: '人若衰，種瓠仔生菜瓜。{loser} 今晚就是這樣！' },
-  { by: 'other', at: 'loser', text: '{loser} 血統高貴，手氣低賤！' },
-  { by: 'other', at: 'loser', text: '曾幾何時？尼姑做滿月——{loser} 今晚難得輸成這樣！' },
-  { by: 'other', at: 'loser', text: '今晚 {winner} 在收錢，{loser} 在收心情。' },
-  { by: 'other', at: 'loser', text: '{loser} 輸到沒褲子穿下樓囉～賭博師父住二樓！' },
+  // ── 酸輸家篇（別人調侃輸家）──
+  { id: '酸輸家-1', by: 'other', at: 'loser', text: '{loser}，媽媽有交代：出門遊玩，千萬不要去賭博！' },
+  { id: '酸輸家-2', by: 'other', at: 'loser', text: '賭博若會發財，田園早就賣無人栽——{loser} 你說是不是？', need: s => s.loserScore <= -25 },
+  { id: '酸輸家-3', by: 'other', at: 'loser', text: '人若衰，種瓠仔生菜瓜。{loser} 今晚就是這樣！' },
+  { id: '酸輸家-4', by: 'other', at: 'loser', text: '{loser} 血統高貴，手氣低賤！' },
+  { id: '酸輸家-5', by: 'other', at: 'loser', text: '曾幾何時？尼姑做滿月——{loser} 今晚難得輸成這樣！' },
+  { id: '酸輸家-6', by: 'other', at: 'loser', text: '今晚 {winner} 在收錢，{loser} 在收心情。' },
+  { id: '酸輸家-7', by: 'other', at: 'loser', text: '{loser} 輸到沒褲子穿下樓囉～賭博師父住二樓！' },
 
-  // 別人調侃贏家
-  { by: 'other', at: 'winner', text: '溪底無魚，蝦仔做大王——{winner} 你只是對手太弱啦！' },
-  { by: 'other', at: 'winner', text: '兵器千萬種，{winner} 你偏愛用劍（賤）哦！' },
-  { by: 'other', at: 'winner', text: '老太太下樓梯——{winner} 今晚讓人不得不服！' },
-  { by: 'other', at: 'winner', text: '人生如戲全靠演技，{winner} 一把爛牌演成世界名作！', need: s => s.winnerScore >= 20 },
-  { by: 'other', at: 'winner', text: '{winner} 手氣若會傳染，我一定戴口罩！', need: s => s.winnerScore >= 30 },
-  { by: 'other', at: 'winner', text: '運來鐵成金——{winner} 今晚摸什麼都是金！' },
+  // ── 酸贏家篇（別人調侃贏家）──
+  { id: '酸贏家-1', by: 'other', at: 'winner', text: '溪底無魚，蝦仔做大王——{winner} 你只是對手太弱啦！' },
+  { id: '酸贏家-2', by: 'other', at: 'winner', text: '兵器千萬種，{winner} 你偏愛用劍（賤）哦！' },
+  { id: '酸贏家-3', by: 'other', at: 'winner', text: '老太太下樓梯——{winner} 今晚讓人不得不服！' },
+  { id: '酸贏家-4', by: 'other', at: 'winner', text: '人生如戲全靠演技，{winner} 一把爛牌演成世界名作！', need: s => s.winnerScore >= 20 },
+  { id: '酸贏家-5', by: 'other', at: 'winner', text: '{winner} 手氣若會傳染，我一定戴口罩！', need: s => s.winnerScore >= 30 },
+  { id: '酸贏家-6', by: 'other', at: 'winner', text: '運來鐵成金——{winner} 今晚摸什麼都是金！' },
+
+  // ── 跨情境篇（任何人都能講，不限特殊 player）──
+  { id: '跨情境-1', by: 'any', text: '十三支，三分靠技術，七分靠心臟！' },
+  { id: '跨情境-2', by: 'any', text: '牌桌見真章，這局有夠精彩！' },
+  { id: '跨情境-3', by: 'any', text: '贏要矜持，輸要大器，這才叫牌品。' },
+  { id: '跨情境-4', by: 'any', text: '三十年河東，三十年河西，下局誰知道呢～' },
+  { id: '跨情境-5', by: 'any', text: '小賭怡情啦——重點是等下誰要請喝飲料？' },
+  { id: '跨情境-6', by: 'any', text: '這桌臥虎藏龍，我先敬大家一杯！' },
+  { id: '跨情境-7', by: 'any', text: '運氣這東西，今天不來，明天總會來的。' },
+  { id: '跨情境-8', by: 'any', text: '牌局如人生，起起落落才有意思嘛。' },
 ]
 
 // ── 4. 特殊 player 專屬台詞（在場時 40% 取代一般垃圾話）────────────────────
 
 // byOther: true = 這句由別的玩家講（調侃 who），否則 who 自己講
-type SpecialLine = { who: string; when: 'win' | 'lose'; text: string; byOther?: boolean }
+type SpecialLine = { id: string; who: string; when: 'win' | 'lose'; text: string; byOther?: boolean }
 
 const SPECIAL: SpecialLine[] = [
-  { who: 'Ian',   when: 'win',  text: '早就告訴過你們，13支我小學四年級就會了。' },
-  { who: 'Ian',   when: 'win',  text: '13支，13秒。' },
-  { who: 'Ian',   when: 'lose', text: '曾幾何時？尼姑做滿月——Ian 今晚居然輸了！', byOther: true },
-  { who: 'Glory', when: 'win',  text: '溪底沒魚，三界娘子為王！' },
-  { who: 'Glory', when: 'win',  text: '兵器千萬種，我偏愛用劍！' },
-  { who: 'Glory', when: 'lose', text: '願賭服輸，請客就請客，機率問題啦。' },
-  { who: 'Gary',  when: 'win',  text: '感覺……抓到訣竅了。' },
-  { who: 'Gary',  when: 'lose', text: '感覺來了……感覺又走了。' },
-  { who: 'Gary',  when: 'lose', text: '已經練了三年的功夫，還是打不贏你們這幾位老千。' },
-  { who: 'Gary',  when: 'lose', text: '我老婆只有給我五千塊預算哦……' },
-  { who: 'Jack',  when: 'win',  text: '字跡潦草，還請見諒。' },
-  { who: 'Jack',  when: 'win',  text: '媽媽有交代不要賭博——可是我贏了耶。' },
-  { who: 'Jack',  when: 'lose', text: '賭博師父在 2 樓——沒有褲子可以穿下樓來！' },
+  { id: '特殊-Ian-贏1',  who: 'Ian',   when: 'win',  text: '早就告訴過你們，13支我小學四年級就會了。' },
+  { id: '特殊-Ian-贏2',  who: 'Ian',   when: 'win',  text: '13支，13秒。' },
+  { id: '特殊-Ian-輸1',  who: 'Ian',   when: 'lose', text: '曾幾何時？尼姑做滿月——Ian 今晚居然輸了！', byOther: true },
+  { id: '特殊-Glory-贏1', who: 'Glory', when: 'win',  text: '溪底沒魚，三界娘子為王！' },
+  { id: '特殊-Glory-贏2', who: 'Glory', when: 'win',  text: '兵器千萬種，我偏愛用劍！' },
+  { id: '特殊-Glory-輸1', who: 'Glory', when: 'lose', text: '願賭服輸，請客就請客，機率問題啦。' },
+  { id: '特殊-Gary-贏1',  who: 'Gary',  when: 'win',  text: '感覺……抓到訣竅了。' },
+  { id: '特殊-Gary-輸1',  who: 'Gary',  when: 'lose', text: '感覺來了……感覺又走了。' },
+  { id: '特殊-Gary-輸2',  who: 'Gary',  when: 'lose', text: '已經練了三年的功夫，還是打不贏你們這幾位老千。' },
+  { id: '特殊-Gary-輸3',  who: 'Gary',  when: 'lose', text: '我老婆只有給我五千塊預算哦……' },
+  { id: '特殊-Jack-贏1',  who: 'Jack',  when: 'win',  text: '字跡潦草，還請見諒。' },
+  { id: '特殊-Jack-贏2',  who: 'Jack',  when: 'win',  text: '媽媽有交代不要賭博——可是我贏了耶。' },
+  { id: '特殊-Jack-輸1',  who: 'Jack',  when: 'lose', text: '賭博師父在 2 樓——沒有褲子可以穿下樓來！' },
 ]
 
 const BIG4 = ['Gary', 'Glory', 'Ian', 'Jack']
 
 // ── 5. 局勢評論台詞（給對話用，比 debug 描述口語）───────────────────────────
 
-const SITUATION_LINES: Record<string, string[]> = {
+const SITUATION_LINES: Record<string, IdText[]> = {
   close_game: [
-    '這局打得有夠近，大家分數咬得緊緊的！',
-    '好險好險，這場差一點點就換人請客了！',
+    { id: '局勢-接近-1', text: '這局打得有夠近，大家分數咬得緊緊的！' },
+    { id: '局勢-接近-2', text: '好險好險，這場差一點點就換人請客了！' },
   ],
   runaway_winner: [
-    '{winner} 根本一路領先，完全沒人追得上嘛！',
-    '{winner} 遙遙領先，後面的都在追心酸的～',
+    { id: '局勢-遙遙領先-1', text: '{winner} 根本一路領先，完全沒人追得上嘛！' },
+    { id: '局勢-遙遙領先-2', text: '{winner} 遙遙領先，後面的都在追心酸的～' },
   ],
   close_bottom: [
-    '最後幾名分數超接近，{loser} 就差那麼一點點！',
-    '墊底之爭好刺激，{loser} 惜敗！',
+    { id: '局勢-墊底之爭-1', text: '最後幾名分數超接近，{loser} 就差那麼一點點！' },
+    { id: '局勢-墊底之爭-2', text: '墊底之爭好刺激，{loser} 惜敗！' },
   ],
   big_loser: [
-    '{loser} 這次輸得有點重啊……',
-    '{loser} 的分數……我都不忍心念出來。',
+    { id: '局勢-大輸-1', text: '{loser} 這次輸得有點重啊……' },
+    { id: '局勢-大輸-2', text: '{loser} 的分數……我都不忍心念出來。' },
   ],
   blowout: [
-    '今晚兩樣情：{winner} 大豐收，{loser} 大失血！',
-    '一個天堂一個地獄——{winner} 笑著，{loser} 哭著。',
+    { id: '局勢-大贏大輸-1', text: '今晚兩樣情：{winner} 大豐收，{loser} 大失血！' },
+    { id: '局勢-大贏大輸-2', text: '一個天堂一個地獄——{winner} 笑著，{loser} 哭著。' },
   ],
   normal: [],
 }
 
 // ── 6. 劇本產生 ─────────────────────────────────────────────────────────────
 
+// 內部：帶編號的台詞
+interface IdLine { speaker: string; text: string; id: string }
+
 export interface GeneratedScript {
   lines: QuipLine[]
+  quipIds: string[]        // 本次劇本實際用到的梗編號（依顯示順序）
   debug: {
     players: GamePlayer[]
     situation: Situation
@@ -243,20 +261,29 @@ export function generateScript(summary: GameSummary): GeneratedScript {
   const teaser = (target: string) => pick(ps.filter(p => p.name !== target && p.name !== loser.name).length
     ? ps.filter(p => p.name !== target && p.name !== loser.name)
     : ps.filter(p => p.name !== target)).name
+  // 一句垃圾話的發話者：依 by 決定
+  const trashSpeaker = (t: TrashLine) =>
+    t.by === 'loser'  ? loser.name
+  : t.by === 'winner' ? winner.name
+  : t.by === 'any'    ? pick(ps).name
+  : teaser(t.at === 'winner' ? winner.name : loser.name)
 
   // a. 局勢/申訴評論 block
-  const aLines: QuipLine[] = []
+  const aLines: IdLine[] = []
   const apComments = appealComments(summary.appeals, loser.name)
-  for (const c of apComments) aLines.push({ speaker: commentator(), text: c })
+  for (const c of apComments) aLines.push({ speaker: commentator(), text: c.text, id: c.id })
   // 局勢評論：申訴評論已有 2 句時 50% 跳過；normal 情境沒有專屬台詞也跳過
   if (!(apComments.length >= 2 && chance(0.5))) {
     const tag = pick(situation.tags)
     const pool = SITUATION_LINES[tag] ?? []
-    if (pool.length) aLines.push({ speaker: commentator(), text: sub(pick(pool)) })
+    if (pool.length) {
+      const s = pick(pool)
+      aLines.push({ speaker: commentator(), text: sub(s.text), id: s.id })
+    }
   }
 
   // b. 垃圾話 block（1~2 句）
-  const bLines: QuipLine[] = []
+  const bLines: IdLine[] = []
   const useSpecial = BIG4.some(n => ps.some(p => p.name === n)) && chance(0.40)
   if (useSpecial) {
     const cands = SPECIAL.filter(s =>
@@ -264,39 +291,39 @@ export function generateScript(summary: GameSummary): GeneratedScript {
       (s.when === 'lose' && s.who === loser.name))
     if (cands.length) {
       const s = pick(cands)
-      bLines.push({ speaker: s.byOther ? teaser(s.who) : s.who, text: s.text })
+      bLines.push({ speaker: s.byOther ? teaser(s.who) : s.who, text: s.text, id: s.id })
     }
   }
   if (bLines.length === 0) {
     const cands = TRASH.filter(t => !t.need || t.need(scores))
     const t = pick(cands)
-    const speaker = t.by === 'loser' ? loser.name
-      : t.by === 'winner' ? winner.name
-      : teaser(t.at === 'winner' ? winner.name : loser.name)
-    bLines.push({ speaker, text: sub(t.text) })
+    bLines.push({ speaker: trashSpeaker(t), text: sub(t.text), id: t.id })
   }
   // 40% 補一句回應（別人調侃 loser 自嘲後 / loser 自嘲後別人補刀）
   if (chance(0.40)) {
     const first = bLines[0]
     const cands = TRASH.filter(t => !t.need || t.need(scores))
-      .filter(t => sub(t.text) !== first.text)
+      .filter(t => t.id !== first.id)
       .filter(t => (first.speaker === loser.name ? t.by === 'other' : t.by === 'loser'))
     if (cands.length) {
       const t = pick(cands)
-      const speaker = t.by === 'loser' ? loser.name
-        : teaser(t.at === 'winner' ? winner.name : loser.name)
-      if (speaker !== first.speaker) bLines.push({ speaker, text: sub(t.text) })
+      const speaker = trashSpeaker(t)
+      if (speaker !== first.speaker) bLines.push({ speaker, text: sub(t.text), id: t.id })
     }
   }
 
   // c. 隨機先後融合，截至 2~4 句
   const blocks = chance(0.5) ? [...aLines, ...bLines] : [...bLines, ...aLines]
-  const lines  = blocks.slice(0, 4)
-  while (lines.length < 2 && aLines.length + bLines.length > lines.length) {
-    lines.push(blocks[lines.length])
+  const chosen = blocks.slice(0, 4)
+  while (chosen.length < 2 && blocks.length > chosen.length) {
+    chosen.push(blocks[chosen.length])
   }
 
-  return { lines, debug: { players: ps, situation, appeals: summary.appeals, appealComments: apComments } }
+  return {
+    lines:   chosen.map(l => ({ speaker: l.speaker, text: l.text })),
+    quipIds: chosen.map(l => l.id),
+    debug: { players: ps, situation, appeals: summary.appeals, appealComments: apComments.map(c => c.text) },
+  }
 }
 
 // ── 7. Debug 模擬 ───────────────────────────────────────────────────────────

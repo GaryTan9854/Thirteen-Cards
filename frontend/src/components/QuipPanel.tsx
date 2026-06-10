@@ -44,23 +44,51 @@ interface Props {
   onDone:       () => void
 }
 
+interface BuiltScript {
+  lines:   QuipLine[]
+  quipIds: string[] | null   // null = legacy fallback path (no usage logging)
+  tags:    string[]
+}
+
 // v15: structured generator (quipgen) when full player info is available;
 // falls back to the legacy script library otherwise.
-function buildLines(props: Props): QuipLine[] {
+function buildScript(props: Props): BuiltScript {
   const { loser, winner, names, mid, humanMid, winnerScore, loserScore, humanPlayer, players, appeals } = props
   if (players && players.length === 4) {
-    return generateScript({ players, appeals: appeals ?? [] }).lines
+    const s = generateScript({ players, appeals: appeals ?? [] })
+    return { lines: s.lines, quipIds: s.quipIds, tags: s.debug.situation.tags }
   }
   const ctx = { loser, winner, names, mid, humanMid, winnerScore, loserScore, humanPlayer } as QuipContext
-  return pickScript(ctx).lines.map(l => subLine(l, ctx))
+  return { lines: pickScript(ctx).lines.map(l => subLine(l, ctx)), quipIds: null, tags: [] }
 }
 
 export default function QuipPanel(props: Props) {
   const { onDone } = props
   const [lineIdx, setLineIdx] = useState(-1)      // -1 = waiting for initial delay
-  const linesRef = useRef<QuipLine[]>(buildLines(props))
+  const scriptRef = useRef<BuiltScript>(buildScript(props))
+  const linesRef  = useRef<QuipLine[]>(scriptRef.current.lines)
   const onDoneRef = useRef(onDone)
   useEffect(() => { onDoneRef.current = onDone }, [onDone])
+
+  // Log which 梗 fired (+ game context) once per panel — fire-and-forget.
+  // Only the structured-generator path carries quipIds; legacy fallback skips.
+  useEffect(() => {
+    const { quipIds, tags } = scriptRef.current
+    if (!quipIds || quipIds.length === 0) return
+    fetch('/api/log/quip', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        quip_ids: quipIds,
+        winner:   props.winner,
+        loser:    props.loser,
+        tags,
+        appeals:  props.appeals ?? [],
+        players:  props.players ?? [],
+      }),
+    }).catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Initial delay: wait 1.5s after game ends before showing first line
   useEffect(() => {

@@ -54,6 +54,17 @@ def init_db():
             participants TEXT,
             created_at   TEXT
         );
+        CREATE TABLE IF NOT EXISTS quip_usage (
+            id       INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts       TEXT,
+            quip_id  TEXT,
+            winner   TEXT,
+            loser    TEXT,
+            tags     TEXT,   -- json array: situation tags
+            appeals  TEXT,   -- json array: [{player, success}]
+            players  TEXT    -- json array: [{name, isHuman, score, rank}]
+        );
+        CREATE INDEX IF NOT EXISTS idx_quip_usage_qid ON quip_usage(quip_id);
         """)
 
 
@@ -289,4 +300,43 @@ def _league_row(r) -> Dict[str, Any]:
         "name":         r["name"],
         "participants": json.loads(r["participants"] or "[]"),
         "created_at":   r["created_at"],
+    }
+
+
+# ── Quip usage tracking ──────────────────────────────────────────────────────
+# One row per quip-id used (a single end-game script uses 2~4 quips → 2~4 rows
+# sharing the same ts/context). Denormalised so per-id frequency is a trivial
+# GROUP BY — lets us later surface the under-used 梗.
+
+def log_quip(rec: Dict[str, Any]):
+    quip_ids = rec.get("quip_ids") or []
+    if not quip_ids:
+        return
+    ts      = datetime.now().isoformat()
+    winner  = rec.get("winner") or ""
+    loser   = rec.get("loser") or ""
+    tags    = json.dumps(rec.get("tags") or [], ensure_ascii=False)
+    appeals = json.dumps(rec.get("appeals") or [], ensure_ascii=False)
+    players = json.dumps(rec.get("players") or [], ensure_ascii=False)
+    with _conn() as c:
+        c.executemany(
+            "INSERT INTO quip_usage (ts, quip_id, winner, loser, tags, appeals, players) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [(ts, qid, winner, loser, tags, appeals, players) for qid in quip_ids],
+        )
+
+
+def get_quip_stats() -> Dict[str, Any]:
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT quip_id, COUNT(*) AS count, MAX(ts) AS last_used "
+            "FROM quip_usage GROUP BY quip_id ORDER BY count ASC, last_used ASC"
+        ).fetchall()
+        total = c.execute("SELECT COUNT(DISTINCT ts) AS n FROM quip_usage").fetchone()
+    return {
+        "stats": [
+            {"quip_id": r["quip_id"], "count": r["count"], "last_used": r["last_used"]}
+            for r in rows
+        ],
+        "total_events": (total["n"] if total else 0),
     }

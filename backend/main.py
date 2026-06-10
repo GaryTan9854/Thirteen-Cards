@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "15.5"
+APP_VERSION = "15.6"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -1258,6 +1258,25 @@ def api_log_game(req: GameLogReq):
     if req.rounds:
         gl.save_rounds(req.game_id, [r.dict() for r in req.rounds])
     return {"ok": True}
+
+# ── Log: quip usage ───────────────────────────────────
+class QuipUsageReq(BaseModel):
+    quip_ids: List[str]
+    winner:   Optional[str] = None
+    loser:    Optional[str] = None
+    tags:     Optional[List[str]] = None
+    appeals:  Optional[List[Dict[str, Any]]] = None
+    players:  Optional[List[Dict[str, Any]]] = None
+
+@app.post("/api/log/quip")
+def api_log_quip(req: QuipUsageReq):
+    gl.log_quip(req.dict())
+    return {"ok": True}
+
+@app.get("/api/log/quip/stats")
+def api_quip_stats():
+    return gl.get_quip_stats()
+
 
 @app.get("/api/log/games")
 def api_list_games(limit: int = 100, mode: Optional[str] = None, league_only: bool = False):
