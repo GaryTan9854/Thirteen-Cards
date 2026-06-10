@@ -7,10 +7,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
 interface PlayerStat {
-  player:  string
-  games:   number
-  wins:    number
-  losses:  number
+  player:      string
+  games:       number
+  wins:        number
+  losses:      number
+  total_games: number
 }
 
 interface StatsResponse {
@@ -30,17 +31,14 @@ function pct(n: number, d: number) {
   return (n / d * 100).toFixed(0) + '%'
 }
 
-// 系統排行：期望值校準 + 場次可信度衰減
-// K=10 → 30場(一個月)可信度75%，場次少時拉回平均值67%
-const SYS_BASELINE = (1 * 2 + 1) / 4.5   // 純平均玩家的原始分 ≈ 0.667
-const SYS_K = 20
+// 系統排行：期望值校準（勝率 + 不敗率加權）
+// 公榜排行資格：有紀錄的總場次 > PUBLIC_MIN_GAMES 場
+const PUBLIC_MIN_GAMES = 60
 function sysScore(r: PlayerStat): number {
   if (!r.games) return 0
-  const w    = (r.wins / r.games) / 0.25
-  const u    = ((r.games - r.losses) / r.games) / 0.75
-  const raw  = Math.min((w * 2 + u) / 4.5, 1)
-  const conf = r.games / (r.games + SYS_K)
-  return conf * raw + (1 - conf) * SYS_BASELINE
+  const w   = (r.wins / r.games) / 0.25
+  const u   = ((r.games - r.losses) / r.games) / 0.75
+  return Math.min((w * 2 + u) / 4.5, 1)
 }
 
 function fmtDate(iso: string) {
@@ -122,8 +120,10 @@ export default function StatsPage() {
     }
   }
 
-  // Sort rows
-  const baseRows = data?.stats ?? []
+  // 公榜排行：只顯示有紀錄總場次 > PUBLIC_MIN_GAMES 的玩家
+  const isPublicLeaderboard = viewMode === 'public' && !effectivePlayer
+  const baseRows = (data?.stats ?? []).filter(
+    r => !isPublicLeaderboard || r.total_games > PUBLIC_MIN_GAMES)
   const rows = [...baseRows].sort((a, b) => {
     let va = 0, vb = 0
     if (sortCol === 'player')     { va = a.player.localeCompare(b.player); vb = 0 }
@@ -181,6 +181,13 @@ export default function StatsPage() {
         </div>
       </div>
 
+      {/* 公榜排行資格說明 */}
+      {isPublicLeaderboard && (
+        <div className="text-xs text-gray-500">
+          有紀錄的總場次 &gt; {PUBLIC_MIN_GAMES} 場即具備參與公榜排行之資格。
+        </div>
+      )}
+
       {/* Era info */}
       {data?.era_since && (
         <div className="text-xs text-gray-500 bg-gray-800/50 rounded-lg px-3 py-2">
@@ -223,7 +230,9 @@ export default function StatsPage() {
 
       {!loading && !error && rows.length === 0 && (
         <div className="text-gray-500 text-sm">
-          {period === 'month' ? '本月尚無紀錄' : '尚無紀錄'}
+          {isPublicLeaderboard
+            ? `尚無玩家總場次達 ${PUBLIC_MIN_GAMES} 場`
+            : period === 'month' ? '本月尚無紀錄' : '尚無紀錄'}
         </div>
       )}
 

@@ -13,7 +13,7 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "15.1"
+APP_VERSION = "15.2"
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -1381,6 +1381,19 @@ def api_stats(scope: str = "all", period: str = "all", player: str = ""):
                     # Co-last rule: all players at the lowest score get +1 loss.
                     stats[pname]["losses"] += 1
                 # 2nd/3rd place: no win, no loss
+
+        # Total recorded games per player across ALL history (ignores era/scope/period
+        # filters above) — used to gate 公榜排行 eligibility (> 60 games).
+        all_time_games: dict[str, int] = {}
+        for g in gl.get_games(limit=99999):
+            fs = g.get("final_scores")
+            if not fs or not isinstance(fs, dict):
+                continue
+            for pname in fs.keys():
+                all_time_games[pname] = all_time_games.get(pname, 0) + 1
+
+        for s in stats.values():
+            s["total_games"] = all_time_games.get(s["player"], 0)
 
         rows_out = sorted(stats.values(),
                           key=lambda s: (s["wins"] - s["losses"], s["wins"]),
