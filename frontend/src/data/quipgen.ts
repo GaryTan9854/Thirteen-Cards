@@ -214,9 +214,7 @@ const SITUATION_LINES: Record<string, string[]> = {
     '今晚兩樣情：{winner} 大豐收，{loser} 大失血！',
     '一個天堂一個地獄——{winner} 笑著，{loser} 哭著。',
   ],
-  normal: [
-    '這局中規中矩，輸贏都還在朋友價～',
-  ],
+  normal: [],
 }
 
 // ── 6. 劇本產生 ─────────────────────────────────────────────────────────────
@@ -250,10 +248,11 @@ export function generateScript(summary: GameSummary): GeneratedScript {
   const aLines: QuipLine[] = []
   const apComments = appealComments(summary.appeals, loser.name)
   for (const c of apComments) aLines.push({ speaker: commentator(), text: c })
-  // 局勢評論：申訴評論已有 2 句時 50% 跳過
+  // 局勢評論：申訴評論已有 2 句時 50% 跳過；normal 情境沒有專屬台詞也跳過
   if (!(apComments.length >= 2 && chance(0.5))) {
     const tag = pick(situation.tags)
-    aLines.push({ speaker: commentator(), text: sub(pick(SITUATION_LINES[tag] ?? SITUATION_LINES.normal)) })
+    const pool = SITUATION_LINES[tag] ?? []
+    if (pool.length) aLines.push({ speaker: commentator(), text: sub(pick(pool)) })
   }
 
   // b. 垃圾話 block（1~2 句）
