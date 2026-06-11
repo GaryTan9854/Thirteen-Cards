@@ -42,6 +42,28 @@ const rand    = (n: number) => Math.floor(Math.random() * n)
 const pick    = <T,>(arr: T[]): T => arr[rand(arr.length)]
 const chance  = (p: number) => Math.random() < p
 
+// ── 避免重複：記住最近用過的梗編號，選梗時優先挑「最近沒用過」的 ──────────
+// localStorage 持久化（瀏覽器）；node 模擬環境 fallback 至 in-memory。
+const RECENT_KEY = 'tc_quip_recent'
+const RECENT_MAX = 20
+let _recentMem: string[] = []
+function loadRecent(): string[] {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') } catch { return _recentMem }
+}
+function saveRecent(ids: string[]) {
+  _recentMem = ids
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(ids)) } catch { /* node */ }
+}
+export function rememberQuips(ids: string[]) {
+  saveRecent([...ids, ...loadRecent()].slice(0, RECENT_MAX))
+}
+// 從候選中挑一個：優先挑最近沒用過的；全都用過才退回全體隨機
+function pickFresh<T>(cands: T[], idOf: (t: T) => string): T {
+  const recent = new Set(loadRecent())
+  const fresh = cands.filter(c => !recent.has(idOf(c)))
+  return pick(fresh.length ? fresh : cands)
+}
+
 // ── 1. 比分狀態判斷 ─────────────────────────────────────────────────────────
 
 export interface Situation {
@@ -94,12 +116,12 @@ export function appealComments(appeals: AppealResult[], loser: string): IdText[]
   const out: IdText[] = []
   if (!a1.success) {
     // 申訴失敗不必每局都講（60% 提及），講法也有變化
-    if (chance(0.60)) out.push(pick([
+    if (chance(0.60)) out.push(pickFresh([
       { id: '申訴失敗-1', text: `哎呀，${a1.player} 沒申訴成功，功虧一簣！` },
       { id: '申訴失敗-2', text: `${a1.player} 申訴了個寂寞，越申越輸……` },
       { id: '申訴失敗-3', text: `${a1.player} 想翻盤結果翻車，這就是人生啊。` },
       { id: '申訴失敗-4', text: `申訴無效！${a1.player} 還倒貼了一筆。` },
-    ]))
+    ], t => t.id))
     return out
   }
   out.push({ id: '申訴成功-1', text: `哇！${a1.player} 逆轉成功耶！太猛了！` })
@@ -185,25 +207,39 @@ const TRASH: TrashLine[] = [
 // ── 4. 特殊 player 專屬台詞（在場時 40% 取代一般垃圾話）────────────────────
 
 // byOther: true = 這句由別的玩家講（調侃 who），否則 who 自己講
-type SpecialLine = { id: string; who: string; when: 'win' | 'lose'; text: string; byOther?: boolean }
+// when: win=最贏  lose=最輸  notlose=只要不是最輸（如 Glory 甲殼蟲）
+type SpecialLine = { id: string; who: string; when: 'win' | 'lose' | 'notlose'; text: string; byOther?: boolean }
 
 const SPECIAL: SpecialLine[] = [
-  { id: '特殊-Ian-贏1',  who: 'Ian',   when: 'win',  text: '早就告訴過你們，13支我小學四年級就會了。' },
-  { id: '特殊-Ian-贏2',  who: 'Ian',   when: 'win',  text: '13支，13秒。' },
-  { id: '特殊-Ian-輸1',  who: 'Ian',   when: 'lose', text: '曾幾何時？尼姑做滿月——Ian 今晚居然輸了！', byOther: true },
-  { id: '特殊-Glory-贏1', who: 'Glory', when: 'win',  text: '溪底沒魚，三界娘子為王！' },
-  { id: '特殊-Glory-贏2', who: 'Glory', when: 'win',  text: '兵器千萬種，我偏愛用劍！' },
-  { id: '特殊-Glory-輸1', who: 'Glory', when: 'lose', text: '願賭服輸，請客就請客，機率問題啦。' },
-  { id: '特殊-Gary-贏1',  who: 'Gary',  when: 'win',  text: '感覺……抓到訣竅了。' },
-  { id: '特殊-Gary-輸1',  who: 'Gary',  when: 'lose', text: '感覺來了……感覺又走了。' },
-  { id: '特殊-Gary-輸2',  who: 'Gary',  when: 'lose', text: '已經練了三年的功夫，還是打不贏你們這幾位老千。' },
-  { id: '特殊-Gary-輸3',  who: 'Gary',  when: 'lose', text: '我老婆只有給我五千塊預算哦……' },
-  { id: '特殊-Jack-贏1',  who: 'Jack',  when: 'win',  text: '字跡潦草，還請見諒。' },
-  { id: '特殊-Jack-贏2',  who: 'Jack',  when: 'win',  text: '媽媽有交代不要賭博——可是我贏了耶。' },
-  { id: '特殊-Jack-輸1',  who: 'Jack',  when: 'lose', text: '賭博師父在 2 樓——沒有褲子可以穿下樓來！' },
+  { id: '特殊-Ian-贏1',   who: 'Ian',   when: 'win',     text: '早就告訴過你們，13支我小學四年級就會了。' },
+  { id: '特殊-Ian-贏2',   who: 'Ian',   when: 'win',     text: '13支，13秒。' },
+  { id: '特殊-Ian-輸1',   who: 'Ian',   when: 'lose',    text: '曾幾何時？尼姑做滿月——Ian 今晚居然輸了！', byOther: true },
+  { id: '特殊-Glory-贏1', who: 'Glory', when: 'win',     text: '溪底沒魚，三界娘子為王——Glory 你只是對手弱啦！', byOther: true },
+  { id: '特殊-Glory-贏2', who: 'Glory', when: 'win',     text: '兵器千萬種，我偏愛用劍！' },
+  { id: '特殊-Glory-贏3', who: 'Glory', when: 'win',     text: '兵器千萬種，Glory 你偏愛用劍（賤）哦！', byOther: true },
+  { id: '特殊-Glory-中1', who: 'Glory', when: 'notlose', text: '甲殼蟲爬玻璃——Glory 腳滑得很！', byOther: true },
+  { id: '特殊-Glory-輸1', who: 'Glory', when: 'lose',    text: '願賭服輸，請客就請客，機率問題啦。' },
+  { id: '特殊-Gary-贏1',  who: 'Gary',  when: 'win',     text: '感覺……抓到訣竅了。' },
+  { id: '特殊-Gary-輸1',  who: 'Gary',  when: 'lose',    text: '感覺來了……感覺又走了。' },
+  { id: '特殊-Gary-輸2',  who: 'Gary',  when: 'lose',    text: '已經練了三年的功夫，還是打不贏你們這幾位老千。' },
+  { id: '特殊-Gary-輸3',  who: 'Gary',  when: 'lose',    text: '我老婆只有給我五千塊預算哦……' },
+  { id: '特殊-Jack-贏1',  who: 'Jack',  when: 'win',     text: '字跡潦草，還請見諒。' },
+  { id: '特殊-Jack-贏2',  who: 'Jack',  when: 'win',     text: '媽媽有交代：出門遊玩千萬不要賭博——Jack 你們這群人太黑了！', byOther: true },
+  { id: '特殊-Jack-贏3',  who: 'Jack',  when: 'win',     text: '老太太下樓梯——Jack 今晚不得不扶啊！', byOther: true },
+  { id: '特殊-Jack-輸1',  who: 'Jack',  when: 'lose',    text: '賭博師父在 2 樓——沒有褲子可以穿下樓來！' },
+  { id: '特殊-Jack-輸2',  who: 'Jack',  when: 'lose',    text: '賭博師父在 2 樓——Jack 沒褲子穿下樓來囉！', byOther: true },
 ]
 
 const BIG4 = ['Gary', 'Glory', 'Ian', 'Jack']
+
+// ── AI 美女撒嬌台詞（美女在場時，對人類最贏/最輸者講，增加柔和感）──────────
+const BEAUTY_NAMES = ['妲己','妹喜','褒姒','驪姬','西施','王昭君','楊貴妃','貂蟬']
+const BEAUTY_COAX: { id: string; at: 'winner' | 'loser'; text: string }[] = [
+  { id: '美女嬌-輸-1', at: 'loser',  text: '{loser} 辛苦了，妾身來幫你按摩放鬆！' },
+  { id: '美女嬌-輸-2', at: 'loser',  text: '{loser} 辛苦了，妾身來煮個泡麵給你吃！' },
+  { id: '美女嬌-贏-1', at: 'winner', text: '哇～{winner} 哥哥好厲害，妹妹太崇拜了！' },
+  { id: '美女嬌-贏-2', at: 'winner', text: '{winner}～走嘛，帶我出去吃宵夜！' },
+]
 
 // ── 5. 局勢評論台詞（給對話用，比 debug 描述口語）───────────────────────────
 
@@ -219,6 +255,8 @@ const SITUATION_LINES: Record<string, IdText[]> = {
   close_bottom: [
     { id: '局勢-墊底之爭-1', text: '最後幾名分數超接近，{loser} 就差那麼一點點！' },
     { id: '局勢-墊底之爭-2', text: '墊底之爭好刺激，{loser} 惜敗！' },
+    { id: '局勢-DogFight-1', text: '最後兩名上演 Dog Fight 空中纏鬥——{loser} 還是被擊落了！' },
+    { id: '局勢-DogFight-2', text: '這場 Dog Fight 打得精彩，可惜 {loser} 最後墊底！' },
   ],
   big_loser: [
     { id: '局勢-大輸-1', text: '{loser} 這次輸得有點重啊……' },
@@ -268,47 +306,58 @@ export function generateScript(summary: GameSummary): GeneratedScript {
   : t.by === 'any'    ? pick(ps).name
   : teaser(t.at === 'winner' ? winner.name : loser.name)
 
-  // a. 局勢/申訴評論 block
+  // a. 局勢/申訴評論 block（份量壓低，把空間讓給垃圾話）
   const aLines: IdLine[] = []
   const apComments = appealComments(summary.appeals, loser.name)
   for (const c of apComments) aLines.push({ speaker: commentator(), text: c.text, id: c.id })
-  // 局勢評論：申訴評論已有 2 句時 50% 跳過；normal 情境沒有專屬台詞也跳過
-  if (!(apComments.length >= 2 && chance(0.5))) {
+  // 局勢評論：無申訴評論時 70% 講一句；已有 1 句申訴評論時只 30%；2 句以上跳過
+  if (apComments.length === 0 ? chance(0.70) : (apComments.length < 2 && chance(0.30))) {
     const tag = pick(situation.tags)
     const pool = SITUATION_LINES[tag] ?? []
     if (pool.length) {
-      const s = pick(pool)
+      const s = pickFresh(pool, x => x.id)
       aLines.push({ speaker: commentator(), text: sub(s.text), id: s.id })
     }
   }
 
-  // b. 垃圾話 block（1~2 句）
+  // b. 垃圾話 block（1~3 句）
   const bLines: IdLine[] = []
   const useSpecial = BIG4.some(n => ps.some(p => p.name === n)) && chance(0.40)
   if (useSpecial) {
     const cands = SPECIAL.filter(s =>
-      (s.when === 'win'  && s.who === winner.name) ||
-      (s.when === 'lose' && s.who === loser.name))
+      (s.when === 'win'     && s.who === winner.name) ||
+      (s.when === 'lose'    && s.who === loser.name) ||
+      (s.when === 'notlose' && s.who !== loser.name && ps.some(p => p.name === s.who)))
     if (cands.length) {
-      const s = pick(cands)
+      const s = pickFresh(cands, x => x.id)
       bLines.push({ speaker: s.byOther ? teaser(s.who) : s.who, text: s.text, id: s.id })
     }
   }
   if (bLines.length === 0) {
     const cands = TRASH.filter(t => !t.need || t.need(scores))
-    const t = pick(cands)
+    const t = pickFresh(cands, x => x.id)
     bLines.push({ speaker: trashSpeaker(t), text: sub(t.text), id: t.id })
   }
-  // 40% 補一句回應（別人調侃 loser 自嘲後 / loser 自嘲後別人補刀）
-  if (chance(0.40)) {
+  // 60% 補一句回應（別人調侃 loser 自嘲後 / loser 自嘲後別人補刀）
+  if (chance(0.60)) {
     const first = bLines[0]
     const cands = TRASH.filter(t => !t.need || t.need(scores))
       .filter(t => t.id !== first.id)
       .filter(t => (first.speaker === loser.name ? t.by === 'other' : t.by === 'loser'))
     if (cands.length) {
-      const t = pick(cands)
+      const t = pickFresh(cands, x => x.id)
       const speaker = trashSpeaker(t)
       if (speaker !== first.speaker) bLines.push({ speaker, text: sub(t.text), id: t.id })
+    }
+  }
+  // 美女撒嬌：在場美女對「人類」最贏或最輸者，35% 補一句柔和話
+  const beautiesHere = ps.filter(p => BEAUTY_NAMES.includes(p.name))
+  if (beautiesHere.length > 0 && chance(0.35)) {
+    const cands = BEAUTY_COAX.filter(c =>
+      (c.at === 'winner' && winner.isHuman) || (c.at === 'loser' && loser.isHuman))
+    if (cands.length) {
+      const c = pickFresh(cands, x => x.id)
+      bLines.push({ speaker: pick(beautiesHere).name, text: sub(c.text), id: c.id })
     }
   }
 
@@ -318,6 +367,9 @@ export function generateScript(summary: GameSummary): GeneratedScript {
   while (chosen.length < 2 && blocks.length > chosen.length) {
     chosen.push(blocks[chosen.length])
   }
+
+  // 記住本次用過的梗，下次優先挑別的
+  rememberQuips(chosen.map(l => l.id))
 
   return {
     lines:   chosen.map(l => ({ speaker: l.speaker, text: l.text })),
