@@ -3,8 +3,10 @@ set -e
 
 # ThirteenCards Deploy Script
 # Usage:
-#   ./deploy.sh           — full deploy (rsync + remote build + pm2 restart)
-#   ./deploy.sh --quick   — skip npm install, just rsync + build + restart
+#   ./deploy.sh                      — full deploy (rsync + remote build + pm2 restart)
+#   ./deploy.sh --quick              — skip npm install, just rsync + build + restart
+#   ./deploy.sh [major|minor|patch]  — force version bump level
+#       default: auto-detect from commit messages since last tag (fallback: patch)
 
 REMOTE_USER="gary"
 REMOTE_HOST="192.168.1.11"
@@ -12,43 +14,56 @@ REMOTE_DIR="/Users/gary/thirteencards-dist"
 SSH_KEY="$HOME/.ssh/id_ed25519"
 SSH_OPTS="-i $SSH_KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=no"
 QUICK=false
+BUMP=""
 
 for arg in "$@"; do
-  [[ "$arg" == "--quick" ]] && QUICK=true
+  case "$arg" in
+    --quick) QUICK=true ;;
+    major|minor|patch) BUMP=$arg ;;
+  esac
 done
 
 cd "$(dirname "$0")"
 
-# ── Version bump ────────────────────────────────────────────────────────────
-CURRENT_VER=$(python3 -c "
-import re
-with open('backend/main.py') as f:
-    m = re.search(r'APP_VERSION = \"([^\"]+)\"', f.read())
-    print(m.group(1) if m else '1.0')
-")
-NEXT_VER=$(python3 -c "
-parts = '$CURRENT_VER'.split('.')
-major, minor = int(parts[0]), int(parts[1])
-print(f'{major + 1}.0' if minor == 20 else f'{major}.{minor + 1}')
-")
-python3 -c "
-import re
-path = 'backend/main.py'
-with open(path) as f:
-    content = f.read()
-content = re.sub(r'APP_VERSION = \"[^\"]+\"', 'APP_VERSION = \"$NEXT_VER\"', content)
-with open(path, 'w') as f:
-    f.write(content)
-"
-echo "🔢 Version bumped: v$CURRENT_VER → v$NEXT_VER"
+# ── Version bump (SemVer: MAJOR.MINOR.PATCH) ────────────────────────────────
+# 自動判斷：掃描上次 tag 以來所有 commit message，取最高等級
+#   feat!: / breaking: → major   feat: → minor   其他（fix/refactor/perf/style…）→ patch
+CURRENT_VER=$(grep -o 'APP_VERSION = "[^"]*"' backend/main.py | cut -d'"' -f2)
+
+if [ -z "$BUMP" ]; then
+  LAST_TAG=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "")
+  SUBJECTS=$(git log ${LAST_TAG:+$LAST_TAG..}HEAD --pretty=%s 2>/dev/null || echo "")
+  BUMP=patch
+  echo "$SUBJECTS" | grep -qE '^(breaking:|[a-z]+(\([^)]*\))?!:)' && BUMP=major
+  if [ "$BUMP" = "patch" ]; then
+    echo "$SUBJECTS" | grep -qE '^feat(\([^)]*\))?:' && BUMP=minor
+  fi
+fi
+
+IFS=. read -r MA MI PA <<< "$CURRENT_VER"
+PA=${PA:-0}
+case "$BUMP" in
+  major) MA=$((MA+1)); MI=0; PA=0 ;;
+  minor) MI=$((MI+1)); PA=0 ;;
+  *)     PA=$((PA+1)) ;;
+esac
+NEXT_VER="$MA.$MI.$PA"
+
+# Build number = git commit 總數（含本次 deploy commit）
+BUILD=$(( $(git rev-list --count HEAD) + 1 ))
+
+sed -i '' "s/APP_VERSION = \"[^\"]*\"/APP_VERSION = \"$NEXT_VER\"/" backend/main.py
+sed -i '' "s/APP_BUILD = \"[^\"]*\"/APP_BUILD = \"$BUILD\"/" backend/main.py
+echo "🔢 Version: v$CURRENT_VER → v$NEXT_VER ($BUMP) | Build: $BUILD"
 
 echo "📝 [0/4] Committing to git…"
 git add -A
 if ! git diff --cached --quiet; then
-  git commit -m "deploy ThirteenCards v$NEXT_VER $(date '+%Y-%m-%d %H:%M')"
+  git commit -m "deploy ThirteenCards v$NEXT_VER (build $BUILD) $(date '+%Y-%m-%d %H:%M')"
+  git tag "v$NEXT_VER"
 fi
 if git remote | grep -q origin; then
-  git push origin main 2>/dev/null || git push origin master 2>/dev/null || echo "   (git push skipped)"
+  git push origin main --tags 2>/dev/null || git push origin master --tags 2>/dev/null || echo "   (git push skipped)"
 fi
 
 echo "💾 [1/5] Backing up data on MBP…"

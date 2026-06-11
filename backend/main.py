@@ -13,7 +13,8 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "15.7"
+APP_VERSION = "2.0.0"
+APP_BUILD = "0"  # deploy.sh 自動寫入（= git commit 總數）
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -42,7 +43,7 @@ app.add_middleware(
 # ── Health ────────────────────────────────────────────
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "app": "ThirteenCards", "version": APP_VERSION}
+    return {"status": "ok", "app": "ThirteenCards", "version": APP_VERSION, "build": APP_BUILD}
 
 
 # ── Game: play a full 4-player game ──────────────────

@@ -1,6 +1,6 @@
 # ThirteenCards — CLAUDE.md
 
-十三支 (Chinese Poker / Big Two Variant) 平台。**當前版本 v14.14**。
+十三支 (Chinese Poker / Big Two Variant) 平台。**當前版本 v2.0.0（SemVer 重置）**。
 
 > Recent session 詳情 → `SESSION_HANDOFF.md`
 
@@ -201,6 +201,8 @@ RA4 honors attitude；RA3 永遠傳 0；前端 `_attSupports()` 限制只有 RA 
 ### JSONL 月份檔
 - `login_YYYY-MM.jsonl`、`games_YYYY-MM.jsonl`、`rounds_YYYY-MM.jsonl`
 
-## 版本規則
-- bump +0.1 每次 deploy；minor=20 時升 major
-- **目前 v14.14**
+## 版本規則（SemVer，2026-06 起）
+- 格式 `MAJOR.MINOR.PATCH`；2026-06-11 從 v15.7 重置為 **v2.0.0**
+- deploy.sh 自動判斷 bump：commit message `feat:`→minor、`feat!:`/`breaking:`→major、其他→patch；可 `./deploy.sh major|minor|patch` 強制指定
+- Build number = git commit 總數，deploy 時寫入 `APP_BUILD`，`/api/health` 回傳 `{version, build}`
+- 每次 deploy 自動打 git tag `vX.Y.Z`；舊 tag / 歷史紀錄保留不動
