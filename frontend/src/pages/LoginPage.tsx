@@ -83,6 +83,7 @@ export default function LoginPage() {
   const [name,          setName]          = useState('')
   const [error,         setError]         = useState('')
   const [version,       setVersion]       = useState('')
+  const [build,         setBuild]         = useState('')
   const [bioName,       setBioName]       = useState<string | null>(null)  // saved passkey name
   const [bioLoading,    setBioLoading]    = useState(false)
   const [showBioOffer,  setShowBioOffer]  = useState(false)   // offer after first name-login
@@ -96,7 +97,7 @@ export default function LoginPage() {
 
     fetch('/api/health')
       .then(r => r.json())
-      .then(d => setVersion(d.version ?? ''))
+      .then(d => { setVersion(d.version ?? ''); setBuild(d.build ?? '') })
       .catch(() => {})
 
     // Check for saved passkey
@@ -183,7 +184,7 @@ export default function LoginPage() {
             <span className="text-sky-400"> Cards</span>
           </h1>
           <p className="text-sky-400 text-sm mt-1">十三支線上對戰</p>
-          {version && <p className="text-sky-400 text-xs mt-1">v{version}</p>}
+          {version && <p className="text-sky-400 text-xs mt-1">v{version}{build && ` (${build})`}</p>}
         </div>
 
         {/* ── Passkey quick-login ── */}
