@@ -35,15 +35,15 @@ def compete(h1, h2):
 
     if h1.specialhand != "normal":
         if h2.specialhand != "normal":
-            # Winner determined by SpecialHand VALUE (higher = stronger)
-            # Amount collected = winner's own charge (per-name override if applicable)
-            v1 = h1.handtype_val
-            v2 = h2.handtype_val
-            if v1 > v2:
-                res[3] = _get_special_charge(h1)
-            elif v1 < v2:
-                res[3] = -_get_special_charge(h2)
-            # else: same value (same hand type) → tie, res[3] = 0
+            # Both 報到：同梯（charge 相同）互不計分；不同梯則高梯收低梯一份高梯的 charge。
+            # 例：單pair (6) vs 全小 (6) → tie 0；大全大 (18) vs 單pair (6) → 高梯 +18。
+            c1 = _get_special_charge(h1)
+            c2 = _get_special_charge(h2)
+            if c1 > c2:
+                res[3] = c1
+            elif c1 < c2:
+                res[3] = -c2
+            # else: same tier → tie, res[3] = 0
         else:
             res[3] = _get_special_charge(h1)
         return res
