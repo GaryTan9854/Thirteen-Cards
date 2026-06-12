@@ -72,11 +72,12 @@ frontend/src/
 
 ### 攻擊閾值（hand_lookup.py，所有策略共用）
 ```python
-_ATK_RANK3  = 257   # top  ≥ 56.5%  (AJ2 亂)
-_ATK_RANK5M = 4545  # mid  ≥ 60.9%  (JJ33+2 兩對)
-_ATK_RANK5B = 3707  # bot  ≥ 69.9%  (23457 同花)
+_ATK_RANK3  = 360   # top ≥ 79.1%（2026-06-12 sweep 調嚴）
+_ATK_RANK5M = 4350  # mid ≥ 58.3%（sweep 調鬆）
+_ATK_RANK5B = 3707  # bot ≥ 69.9%（sweep 不敏感，維持）
 ```
-`eval_attack(h3, hm, hb)` 三墩同時達標才算攻擊候選。**這些是一筆畫下訂的常數，未來 ML sweep 可調**。
+`eval_attack(h3, hm, hb)` 三墩同時達標才算攻擊候選。可用 `set_attack_thresholds()` 注入（sweep 用）。
+2026-06-12 由 `ml/sweep_atk.py`（duplicate-deal、3 獨立 seed、50k 副確認）由 257/4545/3707 調整，+0.187±0.012 分/副。
 
 ### Rule-based scoring
 - defense = `s1*4 + s2*2 + s3`
@@ -182,10 +183,17 @@ RA4 honors attitude；RA3 永遠傳 0；前端 `_attSupports()` 限制只有 RA 
 - `best_arrangement_ml(handstrs, attitude)` (`arrange.py`)
 - `_arrange` strategies: `ml` / `ml_neutral` / `ml_aggressive` / `ml_conservative`
 
+### Benchmark / Sweep 基礎建設（2026-06-12）
+- `ml/duel.py` — duplicate-deal 配對 harness（同副發牌、單座位換排法、其餘固定；每副 4 配對樣本；計分含怪物倍率+全桌槍數倍率；特殊牌局跳過）
+- `ml/sweep_atk.py` — ATK 閾值 grid sweep CLI（`--quick/--fine/--deals/--workers`）
+- 效率關鍵：`arrange._ra3_candidate_pool`（昂貴、閾值無關）與 `_ra3_select`（便宜、閾值相關）已拆開；sweep 每組合只重跑 select → 216 組合 × 2000 副只要 **20 秒**（M3）
+- 結果存 `ml/data/sweep_atk_*.json`
+
 ### 待辦
-- [ ] **階段 a**：sweep `_ATK_RANK3/5M/5B`（att=0 baseline）。M3 MBA 6³×2000 場 ~30min、7³×5000 場 ~3.5hr。**前置**：把閾值改為可注入參數。
-- [ ] **階段 b**：在 a 的 baseline 之上研究 attitude 動態公式
-- [ ] ML benchmark：ScoringNet vs RA vs MC（100手×50sims）
+- [x] **階段 a**：ATK 閾值 sweep ✅ 2026-06-12 → 257/4545/3707 → **360/4350/3707**（+0.187±0.012 分/副）
+- [ ] **階段 b**：attitude 動態公式（用 duel harness + 整場模擬；長期目標：以單局得分分布對 match-win 機率做 DP，取代手刻公式）
+- [ ] **ML 第一期**：ScoringNet 分布頭（quantile/categorical 取代 μ/σ）→ self-play 迭代重生標籤（opp_strategy=ml）→ 用 duel harness 對調滿 RA4 驗收（2000 副顯著正分差）
+- [ ] ML benchmark：ScoringNet vs RA vs MC（用 duel.py，不再用獨立對局）
 - [ ] 觀察 RA4 vs RA3 實戰勝率，可能簡化 UI（移除模型選擇）
 
 ## Log & League 系統

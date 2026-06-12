@@ -49,6 +49,19 @@
 - **公榜資格**：全歷史總場次 > 60 才上榜（後端 `/api/log/stats` 回傳 `total_games`，不受 era/scope 篩選影響）；sysScore 移除可信度衰減（SYS_K/conf）；頁面附註「有紀錄的總場次 > 60 場即具備參與公榜排行之資格」。
 - **MBP pm2**：需先 `source ~/.nvm/nvm.sh`（binary 在 `~/.nvm/versions/node/v24.14.1/bin/pm2`），直接 ssh 找不到。
 
+## 5. 本輪（2026-06-12，ML session 開跑）
+
+### 俏皮話全域權重
+- log 分析（281 次、79/98 梗）：類別比例已達標（戰況+申訴 39%），問題是**類別內集中**——`申訴成功-1` 15 次 vs 變體 1~2 次。根因：localStorage 防重複只看單機最近 20 個、低頻情境掉出視窗、跨裝置不共享。
+- 修法：`quipgen.ts` 新增 `primeQuipStats()`（抓 `/api/log/quip/stats`，sessionStorage `tc_quip_global` 快取 10min）；`pickFresh` 權重 = 近期懲罰 `1/(1+3×cnt)` × 全域懲罰 `1/(1+(全域次數−池內最小))`（池內相對化，避免權重隨時間萎縮）。QuipPanel module-load 時 prime、每局 log 後 refresh。後端不用改。
+
+### ML Step 0（benchmark 基礎建設 + 階段 a 完成）
+- `arrange.py` refactor：`_ra3_core` 拆成 `_ra3_candidate_pool`（昂貴、閾值無關）+ `_ra3_select`（便宜、閾值相關）。**等價驗證**：vs git 舊版 RA3+RA4 各 400 seeded 手 0 mismatch。⚠ `Deck` 用 `secrets.SystemRandom` 不可 seed——benchmark 一律用 `ml/duel.py: gen_deal(rng)`。
+- `hand_lookup.py`：`set_attack_thresholds()` / `get_attack_thresholds()` 注入介面。
+- `ml/duel.py` + `ml/sweep_atk.py`：duplicate-deal harness + sweep CLI（詳見 CLAUDE.md）。
+- **Sweep 結果**：coarse 216×2k（20s）→ fine 2 輪 20k（各 ~150s，seed 777/31337 一致）→ 50k 確認（seed 99001）：**(360, 4350, 3707)** vs 舊 (257, 4545, 3707) = **+0.187±0.012 分/副**（t≈15，2.8% 手牌改變）。頭墩門檻 56.5%→79.1% 大幅調嚴（亂牌頭不夠強就別攻）、中墩 60.9%→58.3% 略鬆、尾墩不敏感。r3>400 開始回落（過嚴錯失攻擊機會）。**已寫入 production 常數，未 deploy**。
+- ML 第一期/第二期路線圖已記入 CLAUDE.md 待辦（分布頭 → self-play 迭代 → duel 驗收；第二期 attitude 用得分分布對 match-win DP）。
+
 ## 待辦 / 觀察
 - [ ] 累積幾天 quip log 後拉 `GET /api/log/quip/stats` 看真實分布；可考慮把 DB 統計接進選梗權重（取代/補強 localStorage 防重複）。
 - [ ] 觀察「大的擺後面」實戰觀感；其他零件互換組合（如雙葫蘆分配 trip）再評估加入 `_BOT_FIRST_GROUPS`。

@@ -762,16 +762,28 @@ def _ra3_filtered_pool(handstrs: list) -> list:
     return rc_final if rc_final else rc_ok
 
 
-def _ra3_core(handstrs: list, attitude: float):
+def _ra3_select(pool: list, attitude: float):
+    """Threshold-dependent selection step: defense vs attack + attitude.
+
+    Cheap relative to pool construction — the ATK threshold sweep re-runs only
+    this step over a cached pool (see ml/sweep_atk.py)."""
+    best_def = max(pool, key=lambda t: score_defensive(*t))
+    attack_cands = [c for c in pool if eval_attack(*c)]
+    if not attack_cands:
+        return best_def
+    best_att = max(attack_cands, key=lambda t: score_arrangement(*t))
+    bot_edge = 0.3 if best_def[2].handtype_val > best_att[2].handtype_val else -0.3
+    return best_att if attitude > bot_edge else best_def
+
+
+def _ra3_candidate_pool(handstrs: list):
     """
-    Shared core for RuleAlpha3 (attitude=0 fixed) and RuleAlpha4 (dynamic attitude).
+    Pool-construction half of _ra3_core (attitude / ATK-threshold independent).
 
-    Uses the '牌型排法' display-panel filtering pipeline as the candidate pool,
-    then selects the best via score_defensive / eval_attack + attitude.
-
-    C0 preprocessing (attitude-independent):
-      • 雙葫蘆 — ≥2 trips → _enum_double_fullhouse, return if found
-      • 怪物尾墩 — pool 含鐵支/同花順 → 取 score_defensive 最高者
+    Returns (kind, data):
+      ('fixed', arrangement) — C0a monster bot, no selection needed
+      ('pool', pool)         — run _ra3_select(pool, attitude)
+      ('fallback', None)     — empty pool → best_arrangement_rulealpha
     """
     inv = analyze_inventory(handstrs)
 
@@ -786,36 +798,34 @@ def _ra3_core(handstrs: list, attitude: float):
         c0b_pool = (_enum_double_fullhouse_all(handstrs, inv)
                     + _enum_pair_triple_fullhouse(handstrs, inv))
         if c0b_pool:
-            best_def = max(c0b_pool, key=lambda t: score_defensive(*t))
-            attack_cands = [c for c in c0b_pool if eval_attack(*c)]
-            if not attack_cands:
-                return best_def
-            best_att = max(attack_cands, key=lambda t: score_arrangement(*t))
-            bot_edge = 0.3 if best_def[2].handtype_val > best_att[2].handtype_val else -0.3
-            return best_att if attitude > bot_edge else best_def
+            return ('pool', c0b_pool)
 
     pool = _ra3_filtered_pool(handstrs)
     if not pool:
-        return best_arrangement_rulealpha(handstrs, attitude)   # safe fallback
+        return ('fallback', None)
 
     # ── C0a: Monster early-abort (鐵支 / 同花順) in pool ─────────────────────
     _BOT_MONSTER_CAT = {7, 8}
     monster_pool = [t for t in pool if min(t[2].handtype_val, 8) in _BOT_MONSTER_CAT]
     if monster_pool:
-        return max(monster_pool, key=lambda t: score_defensive(*t))
+        return ('fixed', max(monster_pool, key=lambda t: score_defensive(*t)))
 
-    best_def = max(pool, key=lambda t: score_defensive(*t))
-    attack_cands = [c for c in pool if eval_attack(*c)]
+    return ('pool', pool)
 
-    if not attack_cands:
-        return best_def
 
-    best_att = max(attack_cands, key=lambda t: score_arrangement(*t))
-    if best_def[2].handtype_val > best_att[2].handtype_val:
-        bot_edge = 0.3
-    else:
-        bot_edge = -0.3
-    return best_att if attitude > bot_edge else best_def
+def _ra3_core(handstrs: list, attitude: float):
+    """
+    Shared core for RuleAlpha3 (attitude=0 fixed) and RuleAlpha4 (dynamic attitude).
+
+    Uses the '牌型排法' display-panel filtering pipeline as the candidate pool,
+    then selects the best via score_defensive / eval_attack + attitude.
+    """
+    kind, data = _ra3_candidate_pool(handstrs)
+    if kind == 'fixed':
+        return data
+    if kind == 'pool':
+        return _ra3_select(data, attitude)
+    return best_arrangement_rulealpha(handstrs, attitude)   # safe fallback
 
 
 def best_arrangement_rulealpha3(handstrs: list, attitude: float = 0.0):

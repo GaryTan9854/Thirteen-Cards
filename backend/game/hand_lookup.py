@@ -16,9 +16,9 @@ pct5_bot(hand5)      → float 0..1     尾墩名次%（None = 不入池）
 
 eval_attack(h3,hm,hb) → bool  三墩同時達攻擊門檻
 
-攻擊門檻（名次%）：
-  頭 ≥ 56.5%  (AJ2 亂)
-  中 ≥ 60.9%  (JJ33+2 兩對)
+攻擊門檻（名次%，2026-06-12 sweep 後）：
+  頭 ≥ 79.1%
+  中 ≥ 58.3%
   尾 ≥ 69.9%  (23457 同花)
 """
 
@@ -33,8 +33,11 @@ _TOT5M  = 7462
 _TOT5B  = 5305
 
 # 攻擊門檻（名次%，整數名次）
-_ATK_RANK3  = 257   # AJ2 亂       257/455  = 56.5%
-_ATK_RANK5M = 4545  # JJ33+2 兩對  4545/7462 = 60.9%
+# 2026-06-12 ml/sweep_atk.py duplicate-deal sweep（3 獨立 seed、最終 50k 副確認
+# +0.187±0.012 分/副 vs 舊值 257/4545/3707）：頭墩門檻大幅調嚴、中墩略鬆。
+# 尾墩在 3000–4050 區間不敏感，維持原值。
+_ATK_RANK3  = 360   # 88+3 對8     360/455  = 79.1%
+_ATK_RANK5M = 4350  # 8866+5 兩對  4350/7462 = 58.3%
 _ATK_RANK5B = 3707  # 23457 同花   3707/5305 = 69.9%
 
 
@@ -138,6 +141,20 @@ def winrate5_mid(h) -> float:
 def winrate5_bot(h) -> float:
     """尾墩：能打敗 C(52,5) 中多少比例的手牌（包含低於門檻的弱牌）。"""
     return _WR5B.get(_key5(h), 0.0)
+
+
+# ── 攻擊門檻注入（ML sweep 用）───────────────────────────────────────────────
+
+def set_attack_thresholds(r3: int = None, r5m: int = None, r5b: int = None):
+    """覆寫攻擊門檻（None = 不變）。production 不呼叫即維持預設常數。"""
+    global _ATK_RANK3, _ATK_RANK5M, _ATK_RANK5B
+    if r3  is not None: _ATK_RANK3  = r3
+    if r5m is not None: _ATK_RANK5M = r5m
+    if r5b is not None: _ATK_RANK5B = r5b
+
+
+def get_attack_thresholds() -> tuple:
+    return (_ATK_RANK3, _ATK_RANK5M, _ATK_RANK5B)
 
 
 # ── 攻擊判斷 ─────────────────────────────────────────────────────────────────
