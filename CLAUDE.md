@@ -1,6 +1,6 @@
 # ThirteenCards — CLAUDE.md
 
-十三支 (Chinese Poker / Big Two Variant) 平台。**當前版本 v2.0.1（SemVer，2026-06 從 v15.7 重置）**。
+十三支 (Chinese Poker / Big Two Variant) 平台。**當前版本 v2.0.5（SemVer，2026-06 從 v15.7 重置）**。
 
 > Recent session 詳情 → `SESSION_HANDOFF.md`
 
