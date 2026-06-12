@@ -398,7 +398,7 @@ export function generateScript(summary: GameSummary): GeneratedScript {
 
   // b. 垃圾話 block（1~3 句）
   const bLines: IdLine[] = []
-  const useSpecial = BIG4.some(n => ps.some(p => p.name === n)) && chance(0.40)
+  const useSpecial = BIG4.some(n => ps.some(p => p.name === n)) && chance(0.20)
   if (useSpecial) {
     const cands = SPECIAL.filter(s =>
       (s.when === 'win'     && s.who === winner.name) ||
