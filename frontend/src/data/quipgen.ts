@@ -57,11 +57,19 @@ function saveRecent(ids: string[]) {
 export function rememberQuips(ids: string[]) {
   saveRecent([...ids, ...loadRecent()].slice(0, RECENT_MAX))
 }
-// 從候選中挑一個：優先挑最近沒用過的；全都用過才退回全體隨機
+// 從候選中加權挑選：最近用過的權重下降（1/(1+2×次數)），
+// 冷門梗機率高、熱門梗仍偶爾出現，比純去除更平滑。
 function pickFresh<T>(cands: T[], idOf: (t: T) => string): T {
-  const recent = new Set(loadRecent())
-  const fresh = cands.filter(c => !recent.has(idOf(c)))
-  return pick(fresh.length ? fresh : cands)
+  const recent = loadRecent()
+  const cnt = (id: string) => recent.filter(r => r === id).length
+  const weights = cands.map(c => 1 / (1 + 2 * cnt(idOf(c))))
+  const total = weights.reduce((s, w) => s + w, 0)
+  let roll = Math.random() * total
+  for (let i = 0; i < cands.length; i++) {
+    roll -= weights[i]
+    if (roll <= 0) return cands[i]
+  }
+  return cands[cands.length - 1]
 }
 
 // ── 1. 比分狀態判斷 ─────────────────────────────────────────────────────────
@@ -79,9 +87,15 @@ export function analyzeSituation(playersIn: GamePlayer[]): Situation {
 
   const span = p1.score - p4.score
 
-  if (span <= 25) {
+  if (span <= 35) {
     tags.push('close_game')
     desc.push('局勢很接近——四家分數咬得很緊')
+  }
+  // Dog Fight（電影 Maverick 梗）：最後兩名的纏鬥。一盤可來回上百分，
+  // 所以分差門檻放很寬——只要最後兩名差距在 60 以內都算纏鬥過。
+  if (Math.abs(p3.score - p4.score) <= 60) {
+    tags.push('dogfight')
+    desc.push(`最後兩名 ${p3.name}/${p4.name} 上演 Dog Fight 纏鬥`)
   }
   if (p1.score - p2.score >= 30) {
     tags.push('runaway_winner')
@@ -115,8 +129,8 @@ export function appealComments(appeals: AppealResult[], loser: string): IdText[]
   const [a1, a2] = appeals
   const out: IdText[] = []
   if (!a1.success) {
-    // 申訴失敗不必每局都講（60% 提及），講法也有變化
-    if (chance(0.60)) out.push(pickFresh([
+    // 申訴失敗不必每局都講（45% 提及，騰空間給垃圾話），講法也有變化
+    if (chance(0.45)) out.push(pickFresh([
       { id: '申訴失敗-1', text: `哎呀，${a1.player} 沒申訴成功，功虧一簣！` },
       { id: '申訴失敗-2', text: `${a1.player} 申訴了個寂寞，越申越輸……` },
       { id: '申訴失敗-3', text: `${a1.player} 想翻盤結果翻車，這就是人生啊。` },
@@ -124,7 +138,12 @@ export function appealComments(appeals: AppealResult[], loser: string): IdText[]
     ], t => t.id))
     return out
   }
-  out.push({ id: '申訴成功-1', text: `哇！${a1.player} 逆轉成功耶！太猛了！` })
+  out.push(pickFresh([
+    { id: '申訴成功-1', text: `哇！${a1.player} 逆轉成功耶！太猛了！` },
+    { id: '申訴成功-2', text: `${a1.player} 大難不死必有後福，申訴翻身！` },
+    { id: '申訴成功-3', text: `絕地大反攻！${a1.player} 申訴申到起死回生！` },
+    { id: '申訴成功-4', text: `${a1.player} 這手申訴漂亮，從鬼門關前走回來了！` },
+  ], t => t.id))
   if (a2) {
     if (!a2.success) {
       out.push({ id: '申訴二-代請客', text: `${a2.player} 真倒楣，替 ${a1.player} 請客了！` })
@@ -232,13 +251,26 @@ const SPECIAL: SpecialLine[] = [
 
 const BIG4 = ['Gary', 'Glory', 'Ian', 'Jack']
 
-// ── AI 美女撒嬌台詞（美女在場時，對人類最贏/最輸者講，增加柔和感）──────────
+// ── AI 美女台詞（美女在場時對「人類」最贏/最輸者講：撒嬌/調侃/吃喝邀約）──
+// 注意：只對人類玩家講（哥哥/妾身等用語是對男性人類；輸家若是美女不觸發）。
 const BEAUTY_NAMES = ['妲己','妹喜','褒姒','驪姬','西施','王昭君','楊貴妃','貂蟬']
 const BEAUTY_COAX: { id: string; at: 'winner' | 'loser'; text: string }[] = [
+  // 對人類輸家：安慰、陪伴、虧他
   { id: '美女嬌-輸-1', at: 'loser',  text: '{loser} 辛苦了，妾身來幫你按摩放鬆！' },
   { id: '美女嬌-輸-2', at: 'loser',  text: '{loser} 辛苦了，妾身來煮個泡麵給你吃！' },
+  { id: '美女嬌-輸-3', at: 'loser',  text: '{loser} 別難過，今夜妾身陪你喝一杯～' },
+  { id: '美女嬌-輸-4', at: 'loser',  text: '{loser}～來，先乾一杯！呼乾啦，明天再贏回來！' },
+  { id: '美女嬌-輸-5', at: 'loser',  text: '{loser} 哥哥，今夜給你鬆一下，妹妹幫你搥搥背～' },
+  { id: '美女嬌-輸-6', at: 'loser',  text: '{loser} 你杯子是養金魚哦？快喝啦，輸牌就要認真喝！' },
+  { id: '美女嬌-輸-7', at: 'loser',  text: '{loser}～輸了沒關係，陪妹妹喝通宵、不醉不歸！' },
+  // 對人類贏家：崇拜、撒嬌、討請客
   { id: '美女嬌-贏-1', at: 'winner', text: '哇～{winner} 哥哥好厲害，妹妹太崇拜了！' },
   { id: '美女嬌-贏-2', at: 'winner', text: '{winner}～走嘛，帶我出去吃宵夜！' },
+  { id: '美女嬌-贏-3', at: 'winner', text: '{winner} 贏這麼多，請大家喝奶茶配雞排啦！' },
+  { id: '美女嬌-贏-4', at: 'winner', text: '{winner} 哥哥～麻辣火鍋你請，妹妹陪你不醉不歸！' },
+  { id: '美女嬌-贏-5', at: 'winner', text: '{winner}～乾杯啦！生台啤就是讚啦，呼乾啦！' },
+  { id: '美女嬌-贏-6', at: 'winner', text: '{winner} 哥哥帶我去吃燒烤嘛～今夜我陪你喝通宵！' },
+  { id: '美女嬌-贏-7', at: 'winner', text: '{winner}～人家想喝 sake，你請客剛剛好啦！' },
 ]
 
 // ── 5. 局勢評論台詞（給對話用，比 debug 描述口語）───────────────────────────
@@ -255,8 +287,11 @@ const SITUATION_LINES: Record<string, IdText[]> = {
   close_bottom: [
     { id: '局勢-墊底之爭-1', text: '最後幾名分數超接近，{loser} 就差那麼一點點！' },
     { id: '局勢-墊底之爭-2', text: '墊底之爭好刺激，{loser} 惜敗！' },
+  ],
+  dogfight: [
     { id: '局勢-DogFight-1', text: '最後兩名上演 Dog Fight 空中纏鬥——{loser} 還是被擊落了！' },
     { id: '局勢-DogFight-2', text: '這場 Dog Fight 打得精彩，可惜 {loser} 最後墊底！' },
+    { id: '局勢-DogFight-3', text: 'Dog Fight 纏鬥到最後一秒，{loser} 被鎖定、擊落、請客！' },
   ],
   big_loser: [
     { id: '局勢-大輸-1', text: '{loser} 這次輸得有點重啊……' },
@@ -350,9 +385,9 @@ export function generateScript(summary: GameSummary): GeneratedScript {
       if (speaker !== first.speaker) bLines.push({ speaker, text: sub(t.text), id: t.id })
     }
   }
-  // 美女撒嬌：在場美女對「人類」最贏或最輸者，35% 補一句柔和話
+  // 美女台詞：在場美女對「人類」最贏或最輸者，45% 補一句（撒嬌/吃喝邀約）
   const beautiesHere = ps.filter(p => BEAUTY_NAMES.includes(p.name))
-  if (beautiesHere.length > 0 && chance(0.35)) {
+  if (beautiesHere.length > 0 && chance(0.45)) {
     const cands = BEAUTY_COAX.filter(c =>
       (c.at === 'winner' && winner.isHuman) || (c.at === 'loser' && loser.isHuman))
     if (cands.length) {
