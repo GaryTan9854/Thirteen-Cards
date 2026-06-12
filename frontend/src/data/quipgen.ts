@@ -237,6 +237,16 @@ const TRASH: TrashLine[] = [
   { id: '酸輸家-6', by: 'other', at: 'loser', text: '今晚 {winner} 在收錢，{loser} 在收心情。' },
   { id: '酸輸家-7', by: 'other', at: 'loser', text: '{loser} 輸到沒褲子穿下樓囉～賭博師父住二樓！' },
 
+  // ── 贏家臭屁篇（贏家自己講）──
+  { id: '贏家臭屁-1', by: 'winner', text: '這把本來要放水的哎。' },
+  { id: '贏家臭屁-2', by: 'winner', text: '哎呀，不小心又贏了，真是不好意思。' },
+  { id: '贏家臭屁-3', by: 'winner', text: '今天出門穿的內褲，顏色真的對了。' },
+  { id: '贏家臭屁-4', by: 'winner', text: '謝謝大家，晚餐有著落了！' },
+  { id: '贏家臭屁-5', by: 'winner', text: '{loser} 要不要去尿一下，換個手氣？' },
+  { id: '贏家臭屁-6', by: 'winner', text: '{loser} 你怎麼會排這樣！？' },
+  { id: '贏家臭屁-7', by: 'winner', text: '請朋友吃飯是開心事，{loser} 不要一臉像要找人吵架的樣子。' },
+  { id: '贏家臭屁-8', by: 'winner', text: '看 {loser} 打牌像在拆房子，猶豫那麼久。' },
+
   // ── 酸贏家篇（別人調侃贏家）──
   { id: '酸贏家-1', by: 'other', at: 'winner', text: '溪底無魚，蝦仔做大王——{winner} 你只是對手太弱啦！' },
   { id: '酸贏家-2', by: 'other', at: 'winner', text: '兵器千萬種，{winner} 你偏愛用劍（賤）哦！' },
@@ -272,14 +282,6 @@ const SPECIAL: SpecialLine[] = [
   { id: '特殊-Glory-中1', who: 'Glory', when: 'notlose', text: '甲殼蟲爬玻璃——Glory 腳滑得很！', byOther: true },
   { id: '特殊-Glory-輸1', who: 'Glory', when: 'lose',    text: '願賭服輸，請客就請客，機率問題啦。' },
   { id: '特殊-Gary-贏1',  who: 'Gary',  when: 'win',     text: '感覺……抓到訣竅了。' },
-  { id: '特殊-Gary-贏2',  who: 'Gary',  when: 'win',     text: '這把本來要放水的哎。' },
-  { id: '特殊-Gary-贏3',  who: 'Gary',  when: 'win',     text: '哎呀，不小心又贏了，真是不好意思。' },
-  { id: '特殊-Gary-贏4',  who: 'Gary',  when: 'win',     text: '今天出門穿的內褲，顏色真的對了。' },
-  { id: '特殊-Gary-贏5',  who: 'Gary',  when: 'win',     text: '謝謝大家，晚餐有著落了！' },
-  { id: '特殊-Gary-贏6',  who: 'Gary',  when: 'win',     text: '要不要去尿一下，換個手氣？' },
-  { id: '特殊-Gary-贏7',  who: 'Gary',  when: 'win',     text: '你怎麼會排這樣！？' },
-  { id: '特殊-Gary-贏8',  who: 'Gary',  when: 'win',     text: '請朋友吃飯是開心事，不要一臉像要找人吵架的樣子。' },
-  { id: '特殊-Gary-贏9',  who: 'Gary',  when: 'win',     text: '看你打牌像在拆房子，猶豫那麼久。' },
   { id: '特殊-Gary-輸1',  who: 'Gary',  when: 'lose',    text: '感覺來了……感覺又走了。' },
   { id: '特殊-Gary-輸2',  who: 'Gary',  when: 'lose',    text: '已經練了三年的功夫，還是打不贏你們這幾位老千。' },
   { id: '特殊-Gary-輸3',  who: 'Gary',  when: 'lose',    text: '我老婆只有給我五千塊預算哦……' },
