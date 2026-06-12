@@ -338,6 +338,26 @@ def score_arrangement(h3: Hand3, hm: Hand5, hb: Hand5) -> float:
     return (p1 + p2 + p3) + 1.5 * p1 * p2 * p3 - 1.5 * (1-p1) * (1-p2) * (1-p3)
 
 
+def canonical_key(h3: Hand3, hm: Hand5, hb: Hand5) -> tuple:
+    """
+    「大的擺後面」排序鍵：先比尾墩分、再比中墩、再比頭墩（字典序）。
+
+    ⚠ 只適用於「中=三條、尾=葫蘆」的零件互換型組合（如 JJJ/777+44 vs
+    777/JJJ+44）：兩種擺法勝負只差在對手剛好落在兩個 trip rank 之間的窗口，
+    而對手尾墩出葫蘆的頻率遠高於中墩出三條，把大 trip 留在尾墩的條件勝率
+    較高，也符合人類牌感。
+    其他組合仍用 score_defensive（200 局實測：全面套用字典序反而 -0.9 分/局）。
+    """
+    return (hb.score, hm.score, h3.score)
+
+
+# 中=三條(3)、尾=葫蘆(6) 的型組合 → canonical 改用「大的擺後面」
+_BOT_FIRST_GROUPS = {(3, 6)}
+
+def _use_bot_first(mid_ht: int, bot_ht: int) -> bool:
+    return (mid_ht, bot_ht) in _BOT_FIRST_GROUPS
+
+
 def score_defensive(h3: Hand3, hm: Hand5, hb: Hand5) -> float:
     """
     防守分 = -(1-p1)(1-p2)(1-p3)。
@@ -647,9 +667,12 @@ def _ra3_filtered_pool(handstrs: list) -> list:
         groups[key].append((h3, hm, hb))
 
     pool: list = []
-    for variants in groups.values():
-        variants.sort(key=lambda t: score_defensive(*t), reverse=True)
-        pool.append(variants[0])   # canonical = highest score_defensive
+    for key, variants in groups.items():
+        if _use_bot_first(key[1], key[2]):
+            variants.sort(key=lambda t: canonical_key(*t), reverse=True)   # 大的擺後面
+        else:
+            variants.sort(key=lambda t: score_defensive(*t), reverse=True)
+        pool.append(variants[0])
 
     if not pool:
         return []

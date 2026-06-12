@@ -13,8 +13,8 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "2.0.4"
-APP_BUILD = "303"  # deploy.sh 自動寫入（= git commit 總數）
+APP_VERSION = "2.0.5"
+APP_BUILD = "304"  # deploy.sh 自動寫入（= git commit 總數）
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -333,7 +333,7 @@ def manual_arrange_info(req: ManualInfoRequest):
         not straights and flush_count == 0 and
         len(pairs_info) >= 2
     )
-    from game.arrange import enumerate_arrangements, score_defensive
+    from game.arrange import enumerate_arrangements, score_defensive, canonical_key
     if _is_pure_pairs:
         from game.arrange import enumerate_pure_pair_arrangements
         candidates = enumerate_pure_pair_arrangements(handstrs)
@@ -378,7 +378,7 @@ def manual_arrange_info(req: ManualInfoRequest):
         label = f"{_row_label(h3.handtype_val)}·{_row_label(hm.handtype_val)}·{_row_label(hb.handtype_val)}"
         grouped[label].append((h3, hm, hb))
 
-    # Sort variants within each group by score_defensive (best first).
+    # Sort variants within each group by canonical_key（尾→中→頭，大的擺後面；與 AI pool 一致）.
     # For groups whose every row is 亂/對/兩對 (no strong hand), the full enumeration
     # can yield dozens of variants that differ only in kicker selection.
     # Domain rule: limit to at most 2 distinct pair-rank structures × 2 scatter
@@ -390,7 +390,12 @@ def manual_arrange_info(req: ManualInfoRequest):
     _NO_SF  = {'亂', '對', '兩對', '三條', '葫蘆'}  # no straight / flush
     groups = []
     for label, variants in grouped.items():
-        variants.sort(key=lambda t: score_defensive(*t), reverse=True)
+        # 中=三條、尾=葫蘆 → 大的擺後面（與 AI pool 的 _use_bot_first 一致）
+        _, v_mid, v_bot = variants[0]
+        if _row_label(v_mid.handtype_val) == '三條' and _row_label(v_bot.handtype_val) == '葫蘆':
+            variants.sort(key=lambda t: canonical_key(*t), reverse=True)
+        else:
+            variants.sort(key=lambda t: score_defensive(*t), reverse=True)
 
         # Determine row types from the best variant
         top_t = _row_label(variants[0][0].handtype_val)
