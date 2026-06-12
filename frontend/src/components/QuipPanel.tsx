@@ -5,7 +5,11 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { QuipContext, QuipLine, isBeatuy, subLine, pickScript } from '../data/quips'
-import { generateScript, GamePlayer, AppealResult } from '../data/quipgen'
+import { generateScript, primeQuipStats, GamePlayer, AppealResult } from '../data/quipgen'
+
+// Prime global quip-usage counts once per page load so the weighted picker
+// has cross-device stats ready well before the first end-game panel mounts.
+primeQuipStats()
 
 // ── Avatar helpers ──────────────────────────────────────────────────────────
 
@@ -87,6 +91,7 @@ export default function QuipPanel(props: Props) {
         players:  props.players ?? [],
       }),
     }).catch(() => {})
+    primeQuipStats()   // refresh counts for the next game (sessionStorage TTL guards spam)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

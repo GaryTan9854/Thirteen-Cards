@@ -57,12 +57,45 @@ function saveRecent(ids: string[]) {
 export function rememberQuips(ids: string[]) {
   saveRecent([...ids, ...loadRecent()].slice(0, RECENT_MAX))
 }
-// 從候選中加權挑選：最近用過的權重下降（1/(1+2×次數)），
-// 冷門梗機率高、熱門梗仍偶爾出現，比純去除更平滑。
+// ── 全域使用統計（DB）──────────────────────────────────────────────────────
+// localStorage 防重複只看單一裝置最近 20 個，申訴成功這類低頻情境會掉出視窗、
+// 且跨裝置各自記憶 → 全域 log 仍集中在少數梗。改抓 DB 統計做跨裝置權重：
+// 候選池內次數高於池內最少者，權重下降，冷門梗自動浮上來。
+const GLOBAL_KEY = 'tc_quip_global'
+const GLOBAL_TTL = 10 * 60 * 1000
+let _globalCounts: Record<string, number> = {}
+
+export function primeQuipStats() {
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(GLOBAL_KEY) ?? 'null')
+    if (cached && Date.now() - cached.ts < GLOBAL_TTL) {
+      _globalCounts = cached.counts
+      return
+    }
+  } catch { /* ignore */ }
+  try {
+    fetch('/api/log/quip/stats')
+      .then(r => r.json())
+      .then(d => {
+        const counts: Record<string, number> = {}
+        for (const s of d.stats ?? []) counts[s.quip_id] = s.count
+        _globalCounts = counts
+        try { sessionStorage.setItem(GLOBAL_KEY, JSON.stringify({ ts: Date.now(), counts })) } catch { /* full */ }
+      })
+      .catch(() => {})
+  } catch { /* node */ }
+}
+
+// 從候選中加權挑選：
+//   近期懲罰（本裝置）：1/(1+3×近20次中出現數）
+//   全域懲罰（DB）   ：1/(1+(全域次數−池內最小值))，池內相對化避免權重隨時間全面萎縮
 function pickFresh<T>(cands: T[], idOf: (t: T) => string): T {
   const recent = loadRecent()
   const cnt = (id: string) => recent.filter(r => r === id).length
-  const weights = cands.map(c => 1 / (1 + 2 * cnt(idOf(c))))
+  const gcs = cands.map(c => _globalCounts[idOf(c)] ?? 0)
+  const gmin = Math.min(...gcs)
+  const weights = cands.map((c, i) =>
+    (1 / (1 + 3 * cnt(idOf(c)))) * (1 / (1 + (gcs[i] - gmin))))
   const total = weights.reduce((s, w) => s + w, 0)
   let roll = Math.random() * total
   for (let i = 0; i < cands.length; i++) {
