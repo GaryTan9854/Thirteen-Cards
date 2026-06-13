@@ -13,8 +13,8 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "2.1.3"
-APP_BUILD = "314"  # deploy.sh 自動寫入（= git commit 總數）
+APP_VERSION = "2.2.0"
+APP_BUILD = "316"  # deploy.sh 自動寫入（= git commit 總數）
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
