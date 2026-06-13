@@ -1218,6 +1218,36 @@ def best_arrangement_ml(handstrs: list, attitude: float = 0.0):
     return result
 
 
+def best_arrangement_dist(handstrs: list, attitude: float = 0.0):
+    """
+    DistNet（分布頭 ML，高階）選最佳排列。流程同 best_arrangement_ml，
+    但用 categorical 分布 + CVaR utility 取代 μ/σ。模型不存在時 fallback rule-based。
+    """
+    try:
+        from ml.dist_model import DistModel
+        model = DistModel.get()
+    except Exception:
+        model = None
+
+    if model is None:
+        return best_arrangement(handstrs)
+
+    qr = _try_monster_bot(handstrs)
+    if qr:
+        return qr
+    fp = _try_four_pairs(handstrs)
+    if fp:
+        return fp
+
+    candidates = enumerate_arrangements(handstrs)
+    if not candidates:
+        return best_arrangement(handstrs)
+
+    finalists = _prefilter_candidates(candidates, K=20)
+    result = model.best_arrangement(handstrs, attitude=attitude, candidates=finalists)
+    return result if result is not None else best_arrangement(handstrs)
+
+
 # ─── 3-card top generator (for top-first enumeration) ────────────────────────
 
 def _generate_3card_tops(handstrs: list) -> list:

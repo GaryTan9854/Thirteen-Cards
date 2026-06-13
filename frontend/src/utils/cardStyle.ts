@@ -9,12 +9,8 @@ import { useEffect, useState } from 'react'
 export type CardStyle = 'v1' | 'v2' | 'v3'
 const DEFAULT: CardStyle = 'v3'
 
-function load(): CardStyle {
-  const v = localStorage.getItem('tc_card_style')
-  return (v === 'v1' || v === 'v2' || v === 'v3') ? v : DEFAULT
-}
-
-let _style: CardStyle = load()
+// 2026-06：牌面定版 v3，不再提供選擇 UI。一律 v3，忽略舊的 localStorage 設定。
+let _style: CardStyle = DEFAULT
 const listeners = new Set<(s: CardStyle) => void>()
 
 export function getCardStyle(): CardStyle { return _style }

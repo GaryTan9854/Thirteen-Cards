@@ -9,3 +9,8 @@ frontend/dist/
 .DS_Store
 *.db
 backend/logs/
+
+# ML training artifacts (large / regenerable) — keep only dist_net_np.npz for inference
+backend/ml/data/dist_10k_*.npz
+backend/ml/data/train_*.npz
+backend/ml/data/*.pt

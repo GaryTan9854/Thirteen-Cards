@@ -22,7 +22,6 @@ import {
 } from '../utils/gameEffects'
 import { setScene, stopMusic } from '../utils/music'
 import { useVoiceOn } from '../utils/voice'
-import { useCardStyle, setCardStyle, CARD_STYLE_LABELS, CardStyle } from '../utils/cardStyle'
 import QuipPanel from '../components/QuipPanel'
 import AvatarPicker from '../components/AvatarPicker'
 
@@ -482,23 +481,46 @@ function LogToggle({ label, value, onChange }: { label: string; value: boolean; 
   )
 }
 
-function CardStyleSelect({ value, onChange }: { value: CardStyle; onChange: (v: CardStyle) => void }) {
+// ── AI 難易度 ────────────────────────────────────────────────────────────────
+// 單一難易度取代「各座模型設定」的四個 pulldown：所有 AI 座位共用同一強度。
+//   初階=RuleAlpha3  中階=RuleAlpha4  高階=DistNet(ML)  專家=ML2(att 優化，即將推出)
+const DIFFICULTY_TO_STRATEGY: Record<string, string> = {
+  beginner:     'rulealpha3',
+  intermediate: 'rulealpha4',
+  advanced:     'ml_dist',
+  expert:       'ml2',
+}
+const DIFFICULTY_OPTIONS: { value: string; label: string; sub: string; disabled?: boolean }[] = [
+  { value: 'beginner',     label: '初階', sub: '穩健排牌' },
+  { value: 'intermediate', label: '中階', sub: '動態攻守' },
+  { value: 'advanced',     label: '高階', sub: 'AI 學習' },
+  { value: 'expert',       label: '專家', sub: '即將推出', disabled: true },
+]
+const DEFAULT_DIFFICULTY = 'advanced'
+
+function DifficultySelect({ value, onChange, accent = 'sky' }:
+  { value: string; onChange: (v: string) => void; accent?: 'sky' | 'yellow' }) {
+  const onCls = accent === 'yellow'
+    ? 'bg-yellow-400 border-yellow-400 text-gray-900'
+    : 'bg-sky-500 border-sky-400 text-white'
   return (
-    <label className="flex items-center gap-2 select-none">
-      <span className="text-sm text-gray-300">牌面</span>
-      <div className="flex gap-1">
-        {(Object.keys(CARD_STYLE_LABELS) as CardStyle[]).map(s => (
-          <button key={s}
-            onClick={() => onChange(s)}
-            className={`px-2 py-0.5 rounded-md text-xs font-semibold transition border
-              ${value === s
-                ? 'bg-sky-500 border-sky-400 text-white'
-                : 'bg-slate-700 border-slate-600 text-gray-300 hover:border-sky-400'}`}>
-            {CARD_STYLE_LABELS[s]}
-          </button>
-        ))}
-      </div>
-    </label>
+    <div className="grid grid-cols-4 gap-2">
+      {DIFFICULTY_OPTIONS.map(o => (
+        <button key={o.value} type="button"
+          disabled={o.disabled}
+          onClick={() => !o.disabled && onChange(o.value)}
+          title={o.disabled ? 'ML2（att 優化版）尚在訓練' : ''}
+          className={`flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg border text-xs font-semibold transition
+            ${o.disabled
+              ? 'bg-slate-800/40 border-slate-700 text-gray-600 cursor-not-allowed'
+              : value === o.value
+                ? onCls
+                : 'bg-slate-700 border-slate-600 text-gray-200 hover:border-sky-400'}`}>
+          <span className="text-sm">{o.label}</span>
+          <span className="text-[10px] opacity-70 font-normal">{o.sub}</span>
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -569,7 +591,17 @@ export default function OnlinePage() {
   const [cfgAppeal,       setCfgAppeal]       = useState<number>(_savedSettings.cfgAppeal    ?? 1)
   const [cfgTimeLimit,    setCfgTimeLimit]    = useState(30)
   const [cfgInvitees,     setCfgInvitees]     = useState<string[]>([])
-  const [cfgStrategies,   setCfgStrategies]   = useState<string[]>(_savedSettings.cfgStrategies ?? ['rulealpha3', 'rulealpha3', 'rulealpha3', 'rulealpha3'])
+  // 難易度 → 全 AI 座位同一策略。cfgDifficulty 為新欄位：沒存過就一律 default 高階
+  //（不從舊 cfgStrategies 推回，因舊預設 RA3 並非玩家刻意選擇）。
+  const _savedDifficulty: string = _savedSettings.cfgDifficulty ?? DEFAULT_DIFFICULTY
+  const [cfgDifficulty,   setCfgDifficulty]   = useState<string>(_savedDifficulty)
+  const [cfgStrategies,   setCfgStrategies]   = useState<string[]>(
+    Array(4).fill(DIFFICULTY_TO_STRATEGY[_savedDifficulty] ?? DIFFICULTY_TO_STRATEGY[DEFAULT_DIFFICULTY]))
+  // 切換難易度：更新顯示 + 把四個座位策略一次設定
+  const applyDifficulty = (d: string) => {
+    setCfgDifficulty(d)
+    setCfgStrategies(Array(4).fill(DIFFICULTY_TO_STRATEGY[d] ?? DIFFICULTY_TO_STRATEGY[DEFAULT_DIFFICULTY]))
+  }
   const [cfgAiNames,      setCfgAiNames]      = useState<string[]>(() => randomBeauties())
   const [cfgAutoReshuffle, setCfgAutoReshuffle] = useState<boolean>(() => _savedSettings.cfgAutoReshuffle ?? false)
   const [cfgStepByStep,   setCfgStepByStep]   = useState(false)
@@ -643,14 +675,13 @@ export default function OnlinePage() {
   const _voiceOn = useVoiceOn()
   const voiceRef = useRef(_voiceOn)
   useEffect(() => { voiceRef.current = _voiceOn }, [_voiceOn])
-  const cardStyle = useCardStyle()
   const [quipCtx,      setQuipCtx]          = useState<{ loser: string; winner: string; names: string[]; mid: string[]; humanMid: string[]; winnerScore: number; loserScore: number; humanPlayer?: string; players?: { name: string; isHuman: boolean; score: number; rank: number }[]; appeals?: { player: string; success: boolean }[] } | null>(null)
 
   // Persist player-specific settings to localStorage whenever they change
   useEffect(() => {
     if (!player) return
-    localStorage.setItem(`tc_settings_${player}`, JSON.stringify({ cfgNormal, cfgAppeal, cfgStrategies, cfgAutoReshuffle }))
-  }, [player, cfgNormal, cfgAppeal, cfgStrategies, cfgAutoReshuffle])
+    localStorage.setItem(`tc_settings_${player}`, JSON.stringify({ cfgNormal, cfgAppeal, cfgStrategies, cfgDifficulty, cfgAutoReshuffle }))
+  }, [player, cfgNormal, cfgAppeal, cfgStrategies, cfgDifficulty, cfgAutoReshuffle])
   const ttsGenRef          = useRef(0)
   const soloPhaseRef       = useRef<string>('lobby')
   const soloAppealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -2230,22 +2261,6 @@ export default function OnlinePage() {
   // ── Solo setup screen (no WS, no OnlineBar) ───────────────────────────────
 
   function renderSoloSetup() {
-    const modelOptions = [
-      { value: 'rulealpha',  label: 'RuleAlpha' },
-      { value: 'rulealpha2', label: 'RuleAlpha2' },
-      { value: 'rulealpha3', label: 'RuleAlpha3' },
-      { value: 'rulealpha4', label: 'RuleAlpha4' },
-    ]
-    const ModelSelect = ({ idx }: { idx: number }) => (
-      <select
-        value={cfgStrategies[idx]}
-        onChange={e => setCfgStrategies(prev => prev.map((s, j) => j === idx ? e.target.value : s))}
-        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5
-                   text-white text-xs focus:outline-none focus:border-sky-400 cursor-pointer"
-      >
-        {modelOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-    )
     return (
       <div className="bg-slate-800/30 rounded-xl p-6 space-y-5">
         <div className="flex items-center gap-3">
@@ -2274,10 +2289,16 @@ export default function OnlinePage() {
           ))}
         </div>
 
-        {/* 各座設定 */}
+        {/* 難易度設定 */}
+        <div className="space-y-2">
+          <div className="text-sm text-gray-400">難易度設定（所有 AI 共用）</div>
+          <DifficultySelect value={cfgDifficulty} onChange={applyDifficulty} accent="sky" />
+        </div>
+
+        {/* 各座玩家選擇 */}
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <div className="text-sm text-gray-400">各座模型設定</div>
+            <div className="text-sm text-gray-400">各座玩家選擇</div>
             <div className="flex items-center gap-2">
               <LogToggle label="每局換人" value={cfgAutoReshuffle} onChange={setCfgAutoReshuffle} />
               <button
@@ -2296,7 +2317,6 @@ export default function OnlinePage() {
                               border border-slate-600 rounded-lg truncate">
                 {player}
               </div>
-              <ModelSelect idx={0} />
             </div>
             {/* AI 1 / 2 / 3 */}
             {cfgAiNames.map((name, i) => (
@@ -2319,7 +2339,6 @@ export default function OnlinePage() {
                 >
                   {BEAUTIES.map(b => <option key={b} value={b}>{b}</option>)}
                 </select>
-                <ModelSelect idx={i + 1} />
               </div>
             ))}
           </div>
@@ -2330,7 +2349,6 @@ export default function OnlinePage() {
           <div className="text-sm text-gray-400">顯示設定</div>
           <div className="flex flex-wrap gap-4 items-center">
             <LogToggle label="逐墩比牌" value={cfgStepByStep} onChange={setCfgStepByStep} />
-            <CardStyleSelect value={cardStyle} onChange={setCardStyle} />
           </div>
         </div>
 
@@ -2553,23 +2571,6 @@ export default function OnlinePage() {
         prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p].slice(0, 3)
       )
 
-    const modelOptions = [
-      { value: 'rulealpha',  label: 'RuleAlpha' },
-      { value: 'rulealpha2', label: 'RuleAlpha2' },
-      { value: 'rulealpha3', label: 'RuleAlpha3' },
-      { value: 'rulealpha4', label: 'RuleAlpha4' },
-    ]
-    const ModelSelect = ({ idx }: { idx: number }) => (
-      <select
-        value={cfgStrategies[idx]}
-        onChange={e => setCfgStrategies(prev => prev.map((s, j) => j === idx ? e.target.value : s))}
-        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5
-                   text-white text-xs focus:outline-none focus:border-yellow-400 cursor-pointer"
-      >
-        {modelOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-    )
-
     // Determine per-slot display: slot 1/2/3 = invited player or AI
     const slotLabels = [0, 1, 2].map(i => cfgInvitees[i] ?? cfgAiNames[i] ?? `AI ${i + 1}`)
     const slotIsHuman = [0, 1, 2].map(i => !!cfgInvitees[i])
@@ -2595,9 +2596,15 @@ export default function OnlinePage() {
           ))}
         </div>
 
-        {/* 各座設定 */}
+        {/* 難易度設定 */}
         <div className="space-y-2">
-          <div className="text-sm text-gray-400">各座模型設定</div>
+          <div className="text-sm text-gray-400">難易度設定（所有 AI 共用）</div>
+          <DifficultySelect value={cfgDifficulty} onChange={applyDifficulty} accent="yellow" />
+        </div>
+
+        {/* 各座玩家選擇 */}
+        <div className="space-y-2">
+          <div className="text-sm text-gray-400">各座玩家選擇</div>
           <div className="grid grid-cols-4 gap-2">
             {/* 你 */}
             <div className="space-y-1.5">
@@ -2606,7 +2613,6 @@ export default function OnlinePage() {
                               border border-yellow-700 rounded-lg truncate">
                 {player}
               </div>
-              <ModelSelect idx={0} />
             </div>
             {/* 位置 2 / 3 / 4 */}
             {slotLabels.map((label, i) => (
@@ -2636,7 +2642,6 @@ export default function OnlinePage() {
                     {BEAUTIES.map(b => <option key={b} value={b}>{b}</option>)}
                   </select>
                 )}
-                <ModelSelect idx={i + 1} />
               </div>
             ))}
           </div>
@@ -2669,7 +2674,6 @@ export default function OnlinePage() {
         <div className="space-y-2 border-t border-slate-600/40 pt-3">
           <div className="flex flex-wrap gap-4 items-center">
             <LogToggle label="逐墩比牌" value={cfgStepByStep} onChange={setCfgStepByStep} />
-            <CardStyleSelect value={cardStyle} onChange={setCardStyle} />
           </div>
         </div>
 

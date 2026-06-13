@@ -95,6 +95,9 @@ rsync -az -e "ssh $SSH_OPTS" \
   --exclude 'backend/logs/' \
   --exclude 'backend/game_logs.db' \
   --exclude '.git/' \
+  --exclude 'backend/ml/data/dist_10k_*.npz' \
+  --exclude 'backend/ml/data/train_*.npz' \
+  --exclude 'backend/ml/data/*.pt' \
   "$(dirname "$0")/" \
   $REMOTE_USER@$REMOTE_HOST:$REMOTE_DIR/
 

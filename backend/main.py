@@ -127,6 +127,18 @@ def arrange_hand(req: ArrangeRequest):
         else:
             h13.arrange13()
             arr = h13
+    elif strategy in ("ml_dist", "ml_dist_aggressive", "ml_dist_conservative", "ml2"):
+        # DistNet（高階）；ml2（專家）尚未訓練，暫 fallback 同 DistNet。
+        from game.arrange import best_arrangement_dist
+        attitude = {"ml_dist_aggressive": 0.8, "ml_dist_conservative": -0.8}.get(strategy, 0.0)
+        result = best_arrangement_dist(req.hand, attitude=attitude)
+        if result:
+            h13.htop, h13.hmid, h13.hbot = result
+            h13.ss = [h13.htop.score, h13.hmid.score, h13.hbot.score]
+            arr = h13
+        else:
+            h13.arrange13()
+            arr = h13
     elif strategy == "rulealpha2":
         from game.arrange import best_arrangement_rulealpha2
         result = best_arrangement_rulealpha2(req.hand, attitude=0.0)

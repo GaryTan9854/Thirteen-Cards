@@ -172,8 +172,25 @@ def _arrange(hand_cards, strategy: str, attitude_override: float = None) -> 'Han
         from .evaluate import best_arrangement_mc
         result = best_arrangement_mc(cardstrs, top_k=20, n_sims=150)
         return result["arrangement"]
+    elif strategy in ('ml_dist', 'ml_dist_aggressive', 'ml_dist_conservative', 'ml2'):
+        # DistNet（分布頭 ML，高階）。ml2（專家，att 優化版）尚未訓練，暫 fallback 同 DistNet。
+        from .arrange import best_arrangement_dist
+        att = attitude_override if attitude_override is not None else \
+              {'ml_dist_aggressive': 0.8, 'ml_dist_conservative': -0.8}.get(strategy, 0.0)
+        h = Hand13(cardstrs)
+        sp = h.chk_special()
+        h.specialhand = sp
+        if sp != 'normal':
+            return h
+        result = best_arrangement_dist(cardstrs, attitude=att)
+        if result:
+            h.htop, h.hmid, h.hbot = result
+            h.ss = [h.htop.score, h.hmid.score, h.hbot.score]
+            h.score = sum(h.ss)
+            h.totalscore = h.score
+        return h
     elif strategy in ('ml', 'ml_neutral', 'ml_aggressive', 'ml_conservative'):
-        # ML Scoring Network：根據 attitude 選最佳排列
+        # 舊 ML Scoring Network（μ/σ）：根據 attitude 選最佳排列
         from .arrange import best_arrangement_ml
         attitude = {'ml_aggressive': 0.8, 'ml_conservative': -0.8}.get(strategy, 0.0)
         h = Hand13(cardstrs)

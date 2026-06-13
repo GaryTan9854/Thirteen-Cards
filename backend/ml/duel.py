@@ -109,6 +109,39 @@ def arr_key(arrangement) -> tuple:
                  for h in arrangement)
 
 
+def eval_deal_arrfn(deal: list[list[str]], arrange_fn, attitude: float = 0.0):
+    """
+    泛化版配對評估：受測排牌函數 vs RA3 baseline（其餘三家固定 RA3）。
+
+    arrange_fn(handstrs) → (h3, hm, hb)；回傳 None 表示放棄此手（沿用 baseline）。
+    回傳 (sum_diff, n_changed) 或 None（含特殊牌型跳過）。
+    """
+    hands13 = [Hand13(hs) for hs in deal]
+    for h in hands13:
+        if h.chk_special() != 'normal':
+            return None
+
+    ctxs = [pool_ctx(hs) for hs in deal]
+    base_arrs = [select_arrangement(c, 0.0) for c in ctxs]
+    if any(a is None for a in base_arrs):
+        return None
+    base_keys = [arr_key(a) for a in base_arrs]
+    base_h13s = [build_h13(deal[i], base_arrs[i]) for i in range(4)]
+    base_scores = table_scores(base_h13s)
+
+    s = 0.0
+    changed = 0
+    for i in range(4):
+        cand = arrange_fn(deal[i])
+        if cand is None or arr_key(cand) == base_keys[i]:
+            continue
+        changed += 1
+        h13s = base_h13s[:]
+        h13s[i] = build_h13(deal[i], cand)
+        s += table_scores(h13s)[i] - base_scores[i]
+    return s, changed
+
+
 def eval_deal_thresholds(deal: list[list[str]], grid: list[tuple],
                          attitude: float = 0.0):
     """
