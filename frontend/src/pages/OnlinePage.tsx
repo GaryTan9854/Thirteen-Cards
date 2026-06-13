@@ -591,9 +591,11 @@ export default function OnlinePage() {
   const [cfgAppeal,       setCfgAppeal]       = useState<number>(_savedSettings.cfgAppeal    ?? 1)
   const [cfgTimeLimit,    setCfgTimeLimit]    = useState(30)
   const [cfgInvitees,     setCfgInvitees]     = useState<string[]>([])
-  // 難易度 → 全 AI 座位同一策略。cfgDifficulty 為新欄位：沒存過就一律 default 高階
-  //（不從舊 cfgStrategies 推回，因舊預設 RA3 並非玩家刻意選擇）。
-  const _savedDifficulty: string = _savedSettings.cfgDifficulty ?? DEFAULT_DIFFICULTY
+  // 難易度 → 全 AI 座位同一策略。一次性遷移（diffV2）：難易度是全新功能，
+  // 之前測試時誤存的 cfgDifficulty 一律忽略，第一次載入強制回到 default 大神，
+  // 之後才尊重玩家選擇。
+  const _savedDifficulty: string = (_savedSettings.diffV2 ? _savedSettings.cfgDifficulty : undefined)
+    ?? DEFAULT_DIFFICULTY
   const [cfgDifficulty,   setCfgDifficulty]   = useState<string>(_savedDifficulty)
   const [cfgStrategies,   setCfgStrategies]   = useState<string[]>(
     Array(4).fill(DIFFICULTY_TO_STRATEGY[_savedDifficulty] ?? DIFFICULTY_TO_STRATEGY[DEFAULT_DIFFICULTY]))
@@ -680,7 +682,7 @@ export default function OnlinePage() {
   // Persist player-specific settings to localStorage whenever they change
   useEffect(() => {
     if (!player) return
-    localStorage.setItem(`tc_settings_${player}`, JSON.stringify({ cfgNormal, cfgAppeal, cfgStrategies, cfgDifficulty, cfgAutoReshuffle }))
+    localStorage.setItem(`tc_settings_${player}`, JSON.stringify({ cfgNormal, cfgAppeal, cfgStrategies, cfgDifficulty, cfgAutoReshuffle, diffV2: true }))
   }, [player, cfgNormal, cfgAppeal, cfgStrategies, cfgDifficulty, cfgAutoReshuffle])
   const ttsGenRef          = useRef(0)
   const soloPhaseRef       = useRef<string>('lobby')
