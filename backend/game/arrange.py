@@ -556,6 +556,14 @@ def _try_four_pairs(handstrs: list):
     if any(len(cs) >= 5 for cs in by_suit.values()):
         return None
 
+    # If a straight is available, don't intercept — the 4 clustered pairs often
+    # hide a straight (e.g. 99 TT JQ K → 9-T-J-Q-K) that beats any two-pair line.
+    # Fall through to full enumerate so 順 arrangements are considered & EV-picked.
+    all_ranks = set(by_rank)
+    if (any(set(range(hi - 4, hi + 1)).issubset(all_ranks) for hi in range(14, 5, -1))
+            or {14, 2, 3, 4, 5}.issubset(all_ranks)):
+        return None
+
     # pair_ranks desc: [p0(largest), p1(2nd), p2(3rd), p3(4th/smallest)]
     p0, p1, p2, p3 = pair_ranks
 
