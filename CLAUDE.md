@@ -1,6 +1,6 @@
 # ThirteenCards — CLAUDE.md
 
-十三支 (Chinese Poker / Big Two Variant) 平台。**當前版本 v2.0.5（SemVer，2026-06 從 v15.7 重置）**。
+十三支 (Chinese Poker / Big Two Variant) 平台，**543 規則**（Jack/Glory/Gary 自訂，含 25 種報到牌型）。**當前版本 v2.4.0**。
 
 > Recent session 詳情 → `SESSION_HANDOFF.md`
 
@@ -170,18 +170,25 @@ RA4 honors attitude；RA3 永遠傳 0；前端 `_attSupports()` 限制只有 RA 
 
 ## ML 系統
 
-### 資料 (`data_collector.py`)
-- `train_10k.npz`：9.5k hands × 187 排列 = 1.79M 筆 (37 MB)
-- 特徵：93-dim（`features.py`）
+### 現役模型：DistNet「大神」(2026-06-13)
+- **ml/dist_model.py**：DistNet 93→[256,256,128,64]→**61-atom categorical 分布**頭（取代舊 μ/σ）。打槍/怪物倍率使分布多峰，分布頭才描述得了。
+- **推理純 numpy**（MBP 2015 Intel 無 torch）：權重 `ml/data/dist_net_np.npz`（由 `export_numpy()` 從 .pt 匯出）。決策 utility = E[z] + CVaR 風險傾斜（attitude 旋鈕，但 production att=0）。
+- 標籤 `ml/collect_dist.py`：61-atom 直方圖、對手 RA3、含全桌槍數倍率；`--shards N` 可續跑。訓練 `ml/train_dist.py`（soft-label CE，MPS 40 epoch ~2.5 分）。
+- **驗收**：DistNet att=0 vs RA3 +0.85±0.11 分/副(t=7.7)；舊 ScoringNet 只有平手。
+- 整合：`best_arrangement_dist(handstrs, attitude)` (arrange.py)，選定後套 `_canonicalize_fullhouse`（葫蘆最小對鐵則）。策略字串 `ml_dist`/`ml2`。
 
-### 模型 (`ml/scoring_model.py`)
-- ScoringNet: LayerNorm → [256→256→128→64] → μ + σ heads
-- Loss: Huber(μ) + 0.3·Huber(σ) + 0.2·PairwiseRanking
-- MPS 加速，60 epochs ~5hr
+### 難易度 → 策略（前端 OnlinePage DIFFICULTY_TO_STRATEGY）
+- 菜鳥=rulealpha3、老仙=rulealpha4、**大神=ml_dist(default)**、傳說=ml2(未訓練，暫 fallback DistNet、UI 灰底「即將推出」)
 
-### 整合
-- `best_arrangement_ml(handstrs, attitude)` (`arrange.py`)
-- `_arrange` strategies: `ml` / `ml_neutral` / `ml_aggressive` / `ml_conservative`
+### 舊模型 (`ml/scoring_model.py`, `data_collector.py`)
+- ScoringNet μ/σ；已被 DistNet 取代（vs RA3 僅平手）。`ml`/`ml_*` 策略仍在但不是 default。MBP 無 torch → 這些會 fallback rule-based。
+
+### attitude 動態調整：實證無效，勿再投入（2026-06-13）
+- match_sim/headtohead 實測：動態 attitude 對「不墊底」~0、oracle 上限僅 +2.8pp、槓桿 0.17/2。十三支變異數由發牌主導，重排固定手牌造不出變異數。**傳說該做「DistNet+MC精算」而非 attitude。**
+
+### 候選池與 fast-path（arrange.py）
+- `enumerate_arrangements` 啟發式產生 ~150-340 候選（全合法空間 ~2萬）；覆蓋測試初步顯示窮舉最優 100% 在池內（待完整確認，見 ml/eval_coverage.py）。
+- fast-path 攔截只有 `_try_monster_bot`（怪物尾，中性）與 `_try_four_pairs`（四輪車；已加順子 gate，2026-06-13）。其餘牌型走完整 enumerate。
 
 ### Benchmark / Sweep 基礎建設（2026-06-12）
 - `ml/duel.py` — duplicate-deal 配對 harness（同副發牌、單座位換排法、其餘固定；每副 4 配對樣本；計分含怪物倍率+全桌槍數倍率；特殊牌局跳過）
@@ -189,12 +196,18 @@ RA4 honors attitude；RA3 永遠傳 0；前端 `_attSupports()` 限制只有 RA 
 - 效率關鍵：`arrange._ra3_candidate_pool`（昂貴、閾值無關）與 `_ra3_select`（便宜、閾值相關）已拆開；sweep 每組合只重跑 select → 216 組合 × 2000 副只要 **20 秒**（M3）
 - 結果存 `ml/data/sweep_atk_*.json`
 
+### 遊戲本質數據（2026-06-13）
+- 攻/守分界：RA3 att=0 下 **守 89% / 攻 11%**（EV-max 自然結果）。
+- 報到率：單手 **4.2%**、一桌 ~16%；報到向三家各收 → 最小 6 分報到 = 淨 +18。
+- 本質：技術差真實（大神≫老仙≫初階），但報到放大運氣 → 「技術+顯著運氣，像撲克」。
+
 ### 待辦
-- [x] **階段 a**：ATK 閾值 sweep ✅ 2026-06-12 → 257/4545/3707 → **360/4350/3707**（+0.187±0.012 分/副）
-- [ ] **階段 b**：attitude 動態公式（用 duel harness + 整場模擬；長期目標：以單局得分分布對 match-win 機率做 DP，取代手刻公式）
-- [ ] **ML 第一期**：ScoringNet 分布頭（quantile/categorical 取代 μ/σ）→ self-play 迭代重生標籤（opp_strategy=ml）→ 用 duel harness 對調滿 RA4 驗收（2000 副顯著正分差）
-- [ ] ML benchmark：ScoringNet vs RA vs MC（用 duel.py，不再用獨立對局）
-- [ ] 觀察 RA4 vs RA3 實戰勝率，可能簡化 UI（移除模型選擇）
+- [x] 階段 a ATK 閾值 sweep → 360/4350/3707
+- [x] ML 第一期 DistNet 上線（+0.85/副 vs RA3）
+- [x] 階段 b attitude → 實證無效，否決
+- [ ] **傳說(ml2)**：DistNet 快篩 top-k + MC 精算（修 argmax regret，繞過標籤雜訊）
+- [ ] 縮/推策略表（ml/shrink_table.py 跑中）、候選池覆蓋確認（ml/eval_coverage.py 跑中）
+- [ ] (可選) v2 高 sims 重訓 DistNet，看能否自學會葫蘆/稀有牌型鐵則
 
 ## Log & League 系統
 

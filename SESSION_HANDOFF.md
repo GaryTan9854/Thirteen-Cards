@@ -1,4 +1,4 @@
-# SESSION_HANDOFF — ThirteenCards v15.0 → v2.0.5（2026-06-12）
+# SESSION_HANDOFF — ThirteenCards（最新：v2.4.0，2026-06-13/14）
 
 > Architecture / 通則 → 讀 `CLAUDE.md`。本檔記錄最近 session 的決策、debug 歷史、待辦。
 
@@ -6,6 +6,49 @@
 ```
 讀 /Users/user/documents/thirteencards/CLAUDE.md 和 SESSION_HANDOFF.md，接續 ThirteenCards 工作。
 ```
+
+---
+
+## ★ 2026-06-13/14 Session（ML 第一/二期 + 排牌 bug + 遊戲本質分析）
+
+### 已上線
+- **v2.1.x** 俏皮話 DB 全域權重、贏家臭屁篇(by:winner)、BIG4 觸發率 40%→20%
+- **v2.2.0** DistNet「大神」ML 上線 + 難易度 UI 改版
+- **v2.3.x** 難易度趣味命名(菜鳥/老仙/大神/傳說)、default 大神、四輪車順子 gate
+- **v2.4.0** 葫蘆最小對子 canonicalize
+
+### ML 第一期 — DistNet「大神」（成功上線）
+- **collect_dist.py**：分布標籤(61-atom 直方圖 [-60,+60])、對手 RA3、含全桌槍數倍率。`--shards N` 可續跑。**長任務一律 `caffeinate -i` 包本體**（吃過虧，見 memory）。
+- **dist_model.py**：DistNet（93→[256²,128,64]→61 logits）。**推理改純 numpy**（MBP 2015 Intel 無 torch；numpy vs torch 機率誤差 4e-7）。決策 = E[z] + CVaR 風險傾斜（att 旋鈕）。訓練存檔自動 `export_numpy()` → `dist_net_np.npz`（ship 這個，不 ship .pt/shards）。
+- **train_dist.py**：soft-label CE，MPS ~2.5 分鐘 40 epoch 收斂。⚠ MPS 上 `non_blocking=True` 會產生 NaN，已關。
+- **驗收**（ml/duel.py 配對 harness）：DistNet att=0 vs RA3 **+0.85±0.11 分/副 (t=7.7)**，舊 ScoringNet 只有 −0.13（平手）。
+- 接進 `best_arrangement_dist`（arrange.py）+ `_arrange`/`/api/game/arrange` 的 `ml_dist`/`ml2` 策略。難易度對應：初階=RA3、中階=RA4、高階=ml_dist、專家=ml2（未訓練，暫 fallback DistNet、UI 灰底）。
+
+### ML 第二期 — attitude（結論：死路，別做）
+- ml/match_sim.py 整場模擬 + ml/headtohead.py 同場對決。
+- **關鍵發現**：attitude 只在「非線性目標」（不墊底/名次）才可能有用；總分目標下 att=0 可證明最優。
+- 實測：動態 attitude policies 對「不墊底」**全部 ~0 或略負**；**oracle 上限僅 +2.8pp**（看穿未來作弊）；**attitude 槓桿 0.17/2**（91% 的局攻/守切換對結果無影響）。機制：十三支變異數由發牌主導，重排固定手牌幾乎造不出變異數。
+- **大神 vs 老仙 同場 6000 局**：大神 **+1.13 分/場(t=11.4)**、不墊底 **+1.6pp(t=5.3)** —— 大神完勝，且不墊底也贏（靠純實力非 attitude）。
+- → **傳說 ≠ 動態 attitude**。唯一可能有肉的方向：**傳說 = DistNet 快篩 + MC 精算**（修正 ML 的 argmax regret，繞過下面的雜訊問題）。
+
+### 排牌 bug & 鐵則（Gary 帶 domain 知識共同 debug，皆已修上線）
+- **四輪車漏順子 bug**：`_try_four_pairs` 只擋同花、沒擋順子，四對手牌常藏順子（如 99TT JQK→9-K 順）卻被強制排兩對。修法：加順子 gate（偵測到順即 `return None` 落回 enumerate）。一個點修好 RA3/RA4/大神三路。**只有四輪車有此 fast-path bug**（怪物尾中性、三/二/五輪車走正常 enumerate 無事）。
+- **葫蘆最小對子鐵則**：葫蘆大小只看三條、對子部分對排名零貢獻 → 應持最小對。ML 偶誤排（如 AAA/88/33 把 88 浪費在葫蘆，-0.42）。`_canonicalize_fullhouse`（貪婪到不動點、只在葫蘆↔一對墩間搬、每步驗證、雙葫蘆正確、零風險）套在 best_arrangement_dist 之後。
+- **為何 ML 會犯葫蘆錯**：非 epoch 不足（已收斂）；是**訊號 0.42 分 < 100-sim 標籤雜訊 ±0.8**，且牌型稀少 → 被抹平。教訓：可證明的恆等式該寫死，不該硬學。
+- **純四輪車縮/推 + 對子分配**：MC 驗證 Gary 的**分配鐵則正確**（推:top P2/mid P1/bot(P3,P4)；縮:R/(P2,P3)/(P1,P4)），但**形狀(縮vs推)是逐手 EV 決策**，取決於對子+單張高低。
+
+### 遊戲本質分析（本日最有價值的收尾）
+- **攻/守分界**：RA3 att=0 下 **守 89% / 攻 11%**（只有 12.9% 手牌攻得起來）。是 EV-max 自然結果，非缺陷。「守」≠無技術，功夫在排法細節。
+- **報到率**：單手 **4.2%**；一桌 4 家 **~16%（每 6 局一人報到）**。報到向三家各收一份 → 最小 6 分報到 = 淨 +18，≈3 局普通牌。
+- **遊戲本質**：技術差真實可測（大神≫老仙≫初階），但 543 報到規則把運氣放大 → 「技術+顯著運氣，像撲克」，短局運氣主導、長局技術浮現。可調旋鈕：降報到分值/收一份、拉長局數。
+
+### 過夜跑（交接時仍在跑，結果待撈）
+- **ml/shrink_table.py**：純四輪車縮/推「21點式」決策表（[P2×最大單張]→推勝率%）。結果 → `ml/data/shrink_table.npy` + 印出的表（task log）。
+- **ml/eval_coverage.py**（排在 shrink 後）：候選池覆蓋測試（真窮舉 72,072 種 vs enumerate）。**初測 n=6 極佳：enumerate 222 個 vs 全空間 22,573 個，窮舉最優 100% 在池內、gap=0** → enumerate 大概率完整，待 80 手確認。
+- ⚠ 注意 `ml/data/shrink_table.npy` 若是 30 列那是舊冒煙檔；完整跑是 ~5000 列。
+
+### ML 工具索引（backend/ml/）
+duel.py(配對harness) · collect_dist.py(分布標籤) · dist_model.py(DistNet+numpy推理) · train_dist.py · bench_dist.py · match_sim.py(整場) · headtohead.py(大神vs老仙) · eval_fastpaths.py(怪物尾/四輪車驗證) · eval_canon4p.py(縮推canonical驗證) · shrink_table.py(縮推表) · eval_coverage.py(池覆蓋) · sweep_atk.py(閾值sweep)
 
 ---
 
