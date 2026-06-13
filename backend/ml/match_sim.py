@@ -1,31 +1,27 @@
 """
-match_sim.py — ML 第二期 Step 1-3：整場比賽模擬 + attitude policy 評估
+match_sim.py — ML 第二期：整場比賽模擬 + attitude policy 最佳化（目標：不墊底）
 
-核心問題：動態 attitude（看局勢攻守）值不值得做？
+Gary 的真實目標：四人(Gary/Glory/Ian/Jack)實戰，**唯一最輸的人請客**。
+所以最關鍵的非線性指標是 **P(不墊底)** —— 避免成為嚴格最後一名。
+（總分最大下 att=0 可證明最優、attitude 無用；只有非線性目標才有空間。）
 
-關鍵理論點（先講清楚）：
-  若比賽目標是「累積總分最大」，則每局獨立最大化期望分（att=0）**可證明就是最佳**，
-  動態 attitude 毫無價值——因為總分對單局分是線性的，線性期望可加。
-  動態 attitude 只在目標**非線性**時才有用：
-    • P(整場第 1) ——「贏家全拿」式
-    • P(不墊底)  —— 墊底要請客的真實誘因
-    • 名次分     —— 1/2/3/4 名給不同分
-  所以本 harness 同時量三個指標，讓數據說話。
+不墊底的最優策略形狀（賭桌直覺）：
+  • 眼看要墊底（吊車尾）→ 加大變異數搏翻身（攻）
+  • 安全在中段、離墊底夠遠 → 縮小變異數守住（守）
+  • 早盤分差小 → 接近中性
 
-設計：
-  • 整場 = N 局。每局發 52 張給 4 家，各自排牌，table_scores 結算（含全桌槍數倍率），
-    累加到 cumulative。槍數倍率是「局內」的（掃幾家對手），無跨局狀態 → match state
-    只有（4 家累積分、剩餘局數）。
-  • 受測座位 seat0 用 attitude policy（吃 state）；其餘三家固定 att=0（現行高階）。
-    這樣隔離出「attitude 本身」的價值。
-  • 所有座位都用 DistNet，只差 attitude。
+架構（為了能自由最佳化策略）：
+  每場每局，對手(att=0)排一次；seat0 在 attitude 網格 {-0.8..+0.8} 各排一次，
+  預存「該局該 att 等級的 4 家得分向量」。之後評估任意策略 = 純查表累加，
+  完全不再呼叫模型 → 可評估上百個 policy / 做 grid 最佳化。
 
 用法（backend/ 下）：
-    python3 -m ml.match_sim --matches 2000 --rounds 8
+    python3 -m ml.match_sim --matches 6000 --rounds 6
 """
 
 from __future__ import annotations
 import argparse
+import math
 import random
 import time
 import numpy as np
@@ -33,40 +29,15 @@ import numpy as np
 from game.hands import Hand13
 from ml.duel import gen_deal, build_h13, table_scores
 from ml.dist_model import DistModel
-from game.game import compute_dynamic_attitude
+
+ATT_GRID = np.array([-0.8, 0.0, 0.8], dtype=np.float32)   # 守 / 中 / 攻
+NEUTRAL_IDX = 1   # ATT_GRID[1] == 0.0
 
 
-# ── attitude policies：state → seat0 的 attitude ────────────────────────────
-# state = (round_idx, n_rounds, cum_scores[4], seat=0)
+# ── 預計算每場：round_tables[ri] = (5, 4) 各 att 等級下的 4 家得分 ──────────────
 
-def pol_neutral(round_idx, n_rounds, cum, seat=0):
-    return 0.0
-
-def pol_heuristic(round_idx, n_rounds, cum, seat=0):
-    """現行 compute_dynamic_attitude 公式。"""
-    return compute_dynamic_attitude(round_idx, n_rounds, cum[seat], list(cum))
-
-def make_linear_endgame(k_pos=1.0, k_gp=1.0):
-    """參數化 policy（供 grid 搜尋）：att = clip( (1-2*pos) * gp^? ... )。
-    這裡用簡潔形式：落後且接近終盤 → 攻；領先且接近終盤 → 守。早盤接近 0。"""
-    def pol(round_idx, n_rounds, cum, seat=0):
-        gp = round_idx / max(1, n_rounds)            # 0→1 賽程
-        lo, hi = min(cum), max(cum)
-        if hi - lo < 1e-9:
-            return 0.0
-        pos = (cum[seat] - lo) / (hi - lo)           # 0=last 1=first
-        return float(np.clip((1 - 2 * pos) * (k_gp * gp + (1 - k_gp) * 0.5) * k_pos, -1, 1))
-    return pol
-
-
-# ── 整場模擬 ──────────────────────────────────────────────────────────────────
-# 關鍵優化：對手（seats 1-3）固定 att=0，其排牌只依手牌、與局勢無關 → 同一場發牌下，
-# 所有 policy（含 baseline）共用同一份對手排牌，且只有 seat0 隨 policy 變。
-# 因此可「配對」評估：同發牌、預排對手一次，每個 policy 只重排 seat0。
-
-def _prep_match(n_rounds: int, rng: random.Random, model: DistModel):
-    """回傳每局的 (seat0_hand, opp_h13s[3], seat0_special_h13_or_None)。"""
-    rounds = []
+def prep_match_tables(n_rounds: int, rng: random.Random, model: DistModel):
+    tables = []
     for _ in range(n_rounds):
         deal = gen_deal(rng)
         opp = []
@@ -79,113 +50,157 @@ def _prep_match(n_rounds: int, rng: random.Random, model: DistModel):
                 opp.append(build_h13(deal[seat], model.best_arrangement(deal[seat], attitude=0.0)))
         h0 = Hand13(deal[0])
         sp0 = h0.chk_special()
+        tbl = np.zeros((len(ATT_GRID), 4), dtype=np.float32)
         if sp0 != 'normal':
-            h0.specialhand = sp0          # 報到手：compete 走 charge（與對手特殊手一致）
-            rounds.append((deal[0], opp, (h0, sp0)))
+            h0.specialhand = sp0
+            sc = table_scores([h0, *opp])           # att 無關
+            tbl[:] = sc
         else:
-            rounds.append((deal[0], opp, (None, sp0)))
-    return rounds
-
-
-def _play_match(rounds, seat0_policy, model: DistModel, n_rounds: int) -> list[float]:
-    cum = [0.0, 0.0, 0.0, 0.0]
-    for ri, (hand0, opp, (sp_h0, sp0)) in enumerate(rounds):
-        if sp_h0 is not None:
-            h0 = sp_h0
-        else:
-            att = seat0_policy(ri, n_rounds, cum, 0)
-            h0 = build_h13(hand0, model.best_arrangement(hand0, attitude=att))
-        sc = table_scores([h0, *opp])
-        for s in range(4):
-            cum[s] += sc[s]
-    return cum
+            for li, att in enumerate(ATT_GRID):
+                a = build_h13(deal[0], model.best_arrangement(deal[0], attitude=float(att)))
+                tbl[li] = table_scores([a, *opp])
+        tables.append(tbl)
+    return tables
 
 
 # ── 指標 ─────────────────────────────────────────────────────────────────────
 
-def _outcome(cum: list[float]):
-    """回傳 seat0 的 (win, notlast, rankscore)。平手按比例分攤。"""
+def outcome(cum) -> tuple:
     me = cum[0]
     greater = sum(1 for x in cum if x > me)
-    equal   = sum(1 for x in cum if abs(x - me) < 1e-9)   # 含自己
-    # 第 1 名機率（平手均分）
-    win = (1.0 / equal) if greater == 0 else 0.0
-    # 不墊底：嚴格最低才算墊底
-    fewer = sum(1 for x in cum if x < me)
-    notlast = 0.0 if (fewer == 0 and equal == 1) else 1.0
-    # 名次分：1名=3, 2名=1, 3名=-1, 4名=-3（與直覺名次獎勵一致）
-    rank = greater  # 0..3 （0=第1）
-    rankscore = [3.0, 1.0, -1.0, -3.0][min(rank, 3)]
-    return win, notlast, rankscore, me
+    equal   = sum(1 for x in cum if abs(x - me) < 1e-9)
+    fewer   = sum(1 for x in cum if x < me)
+    win     = (1.0 / equal) if greater == 0 else 0.0
+    last    = 1.0 if (fewer == 0 and equal == 1) else 0.0    # 嚴格唯一墊底才算
+    return win, 1.0 - last, [3., 1., -1., -3.][min(greater, 3)], me
 
 
-def evaluate_paired(policies: dict, n_matches: int, n_rounds: int, seed: int,
-                    model: DistModel):
+# ── 策略：state → att 等級 index（吃預存表）──────────────────────────────────
+# state：round_idx, n_rounds, cum[4]（seat0 視角）
+
+def pol_neutral(ri, n, cum):
+    return NEUTRAL_IDX
+
+def make_notlast(margin=12.0, gp_pow=1.0):
     """
-    配對評估：每場同發牌、共用對手排牌，所有 policy 都跑一遍。
-    回報各 policy 的絕對指標，以及相對 'att=0' 基準的配對差（± se, t）。
+    針對「不墊底」：看 seat0 與「目前最後一名」「目前倒數第二」的距離。
+      • 我就是最後一名 → 攻（搏翻身），越接近終盤越用力
+      • 我安全領先倒數第二一個 margin 以上 → 守（鎖住，別掉下去）
+      • 介於之間 → 中性
     """
+    def pol(ri, n, cum):
+        gp = (ri / max(1, n)) ** gp_pow            # 賽程進度權重
+        me = cum[0]
+        others = sorted(cum[1:])                    # 對手由低到高
+        worst_other = others[0]
+        if me <= worst_other:                       # 我（暫時）墊底
+            lvl = 0.4 + 0.4 * gp                    # 落後越晚越搏
+            return _snap(+lvl)
+        # 我不是最後：離最後一名(對手最低)的安全距離
+        cushion = me - worst_other
+        if cushion >= margin:
+            return _snap(-(0.4 + 0.4 * gp))         # 安全 → 守住
+        return NEUTRAL_IDX
+    return pol
+
+def _snap(att: float) -> int:
+    return int(np.abs(ATT_GRID - att).argmin())
+
+
+# ── 評估（純查表，超快）──────────────────────────────────────────────────────
+
+def play(tables, policy, n_rounds) -> list:
+    cum = [0.0, 0.0, 0.0, 0.0]
+    for ri in range(n_rounds):
+        li = policy(ri, n_rounds, cum)
+        sc = tables[ri][li]
+        for s in range(4):
+            cum[s] += float(sc[s])
+    return cum
+
+
+def oracle_notlast(tables, n_rounds) -> tuple:
+    """
+    天花板：窮舉所有 attitude 序列(3^n)，回傳
+      (best_notlast, lever)
+    best_notlast = 是否「存在」一個序列讓 seat0 不墊底（事後諸葛、看穿未來）
+    lever        = 此場平均每局有幾個 att 等級會改變 seat0 的得分向量（attitude 槓桿）
+    """
+    import itertools
+    # lever 診斷
+    lever = 0.0
+    for ri in range(n_rounds):
+        uniq = len({tuple(np.round(tables[ri][li], 3)) for li in range(len(ATT_GRID))})
+        lever += (uniq - 1)
+    lever /= n_rounds
+    best = 0.0
+    for seq in itertools.product(range(len(ATT_GRID)), repeat=n_rounds):
+        cum = [0.0, 0.0, 0.0, 0.0]
+        for ri, li in enumerate(seq):
+            sc = tables[ri][li]
+            for s in range(4):
+                cum[s] += float(sc[s])
+        _, nl, _, _ = outcome(cum)
+        if nl > best:
+            best = nl
+            if best >= 1.0:
+                break
+    return best, lever
+
+
+def evaluate(policies: dict, n_matches, n_rounds, seed, model, with_oracle=False):
     names = list(policies)
-    acc = {k: {'win': 0.0, 'notlast': 0.0, 'rank': 0.0, 'total': 0.0} for k in names}
-    # 配對差（vs neutral）的逐場樣本，算 se
+    acc = {k: [0.0, 0.0, 0.0, 0.0] for k in names}            # win, notlast, rank, total
+    dnl = {k: [0.0, 0.0] for k in names}                       # 配對 Δ不墊底 vs att=0：sum,sumsq
     base = 'att=0'
-    diff = {k: {'win': [0.0, 0.0], 'rank': [0.0, 0.0]} for k in names}  # [sum, sumsq]
+    orc_nl = 0.0; lever_sum = 0.0
     t0 = time.time()
     for i in range(n_matches):
-        rounds = _prep_match(n_rounds, random.Random(seed + i), model)
-        out = {}
+        tables = prep_match_tables(n_rounds, random.Random(seed + i), model)
+        outs = {}
         for k in names:
-            cum = _play_match(rounds, policies[k], model, n_rounds)
-            w, nl, rs, me = _outcome(cum)
-            acc[k]['win'] += w; acc[k]['notlast'] += nl; acc[k]['rank'] += rs; acc[k]['total'] += me
-            out[k] = (w, rs)
+            w, nl, rk, me = outcome(play(tables, policies[k], n_rounds))
+            a = acc[k]; a[0]+=w; a[1]+=nl; a[2]+=rk; a[3]+=me
+            outs[k] = nl
         for k in names:
-            for m, idx in (('win', 0), ('rank', 1)):
-                d = out[k][idx] - out[base][idx]
-                diff[k][m][0] += d
-                diff[k][m][1] += d * d
+            d = outs[k] - outs[base]
+            dnl[k][0] += d; dnl[k][1] += d*d
+        if with_oracle:
+            bnl, lev = oracle_notlast(tables, n_rounds)
+            orc_nl += bnl; lever_sum += lev
     n = n_matches
-    el = time.time() - t0
-    print(f"{n} matches × {n_rounds} 局, {el:.0f}s\n")
-    print(f"{'policy':22s} {'勝率':>7} {'不墊底':>7} {'名次分':>7} {'總分':>7} "
-          f"{'Δ勝率(pp)':>14} {'Δ名次分':>14}")
-    import math
+    print(f"{n} matches × {n_rounds} 局, {time.time()-t0:.0f}s  "
+          f"(對手 3×att=0；seat0 換策略)\n")
+    print(f"{'策略':18s} {'勝率':>6} {'不墊底':>7} {'名次分':>7} {'總分':>7} {'Δ不墊底(pp)':>18}")
     for k in names:
         a = acc[k]
-        def fmt_diff(m):
-            s, sq = diff[k][m]
-            mean = s / n
-            se = math.sqrt(max(0.0, sq / n - mean * mean) / n)
-            if k == base:
-                return f"{'—':>14}"
-            t = mean / se if se > 0 else 0.0
-            scale = 100 if m == 'win' else 1
-            return f"{mean*scale:+7.2f}±{se*scale:4.2f}(t{t:+.1f})"
-        print(f"{k:22s} {a['win']/n*100:6.1f}% {a['notlast']/n*100:6.1f}% "
-              f"{a['rank']/n:+7.3f} {a['total']/n:+6.2f} {fmt_diff('win')} {fmt_diff('rank')}")
+        s, sq = dnl[k]; m = s/n; se = math.sqrt(max(0., sq/n - m*m)/n)
+        dd = '—'.rjust(18) if k == base else \
+             f"{m*100:+6.2f} ± {se*100:4.2f} (t{(m/se if se>0 else 0):+.1f})"
+        print(f"{k:18s} {a[0]/n*100:5.1f}% {a[1]/n*100:6.1f}% {a[2]/n:+7.3f} {a[3]/n:+6.2f} {dd}")
+    if with_oracle:
+        print(f"\n天花板 oracle 不墊底 {orc_nl/n*100:5.1f}%（事後最佳序列，看穿未來）"
+              f"  vs att=0 {acc[base][1]/n*100:.1f}%"
+              f"  → 上限增幅 {(orc_nl-acc[base][1])/n*100:+.1f}pp")
+        print(f"attitude 槓桿：平均每局 {lever_sum/n:.2f}/{len(ATT_GRID)-1} 個非中性等級會改變得分")
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--matches', type=int, default=3000)
-    ap.add_argument('--rounds', type=int, default=8)
+    ap.add_argument('--matches', type=int, default=6000)
+    ap.add_argument('--rounds', type=int, default=6)
     ap.add_argument('--seed', type=int, default=70000)
     args = ap.parse_args()
-
     model = DistModel.get()
     if model is None:
-        print("DistModel 不存在，先訓練")
-        return
-
-    print("對手：3 家固定 att=0 DistNet；seat0 換 policy。基準 att=0 應 ~25% 勝率。\n")
+        print("DistModel 不存在"); return
     policies = {
-        'att=0':            pol_neutral,
-        '啟發式公式':          pol_heuristic,
-        'endgame k=0.6':    make_linear_endgame(k_pos=0.6),
-        'endgame k=1.0':    make_linear_endgame(k_pos=1.0),
-        'endgame k=1.4':    make_linear_endgame(k_pos=1.4),
+        'att=0':                  pol_neutral,
+        'notlast m=8':            make_notlast(margin=8),
+        'notlast m=12 gp=2':      make_notlast(margin=12, gp_pow=2.0),
+        'notlast m=20':           make_notlast(margin=20),
     }
-    evaluate_paired(policies, args.matches, args.rounds, args.seed, model)
+    evaluate(policies, args.matches, args.rounds, args.seed, model, with_oracle=True)
 
 
 if __name__ == '__main__':
