@@ -491,10 +491,10 @@ const DIFFICULTY_TO_STRATEGY: Record<string, string> = {
   expert:       'ml2',
 }
 const DIFFICULTY_OPTIONS: { value: string; label: string; sub: string; disabled?: boolean }[] = [
-  { value: 'beginner',     label: '初階', sub: '穩健排牌' },
-  { value: 'intermediate', label: '中階', sub: '動態攻守' },
-  { value: 'advanced',     label: '高階', sub: 'AI 學習' },
-  { value: 'expert',       label: '專家', sub: '即將推出', disabled: true },
+  { value: 'beginner',     label: '菜鳥', sub: '誤闖叢林的小白兔' },
+  { value: 'intermediate', label: '老仙', sub: '現職計程車司機，聽我的準沒錯' },
+  { value: 'advanced',     label: '大神', sub: '小四開始打牌，從此未逢敵手' },
+  { value: 'expert',       label: '傳說', sub: '牌道至境，不可言說', disabled: true },
 ]
 const DEFAULT_DIFFICULTY = 'advanced'
 
@@ -2291,7 +2291,7 @@ export default function OnlinePage() {
 
         {/* 難易度設定 */}
         <div className="space-y-2">
-          <div className="text-sm text-gray-400">難易度設定（所有 AI 共用）</div>
+          <div className="text-sm text-gray-400">難易度</div>
           <DifficultySelect value={cfgDifficulty} onChange={applyDifficulty} accent="sky" />
         </div>
 
@@ -2321,7 +2321,7 @@ export default function OnlinePage() {
             {/* AI 1 / 2 / 3 */}
             {cfgAiNames.map((name, i) => (
               <div key={i} className="space-y-1.5">
-                <div className="text-xs text-gray-500">AI {i + 1}</div>
+                <div className="text-xs text-gray-500">玩家 {i + 1}</div>
                 <select
                   value={name}
                   onChange={e => {
@@ -2598,7 +2598,7 @@ export default function OnlinePage() {
 
         {/* 難易度設定 */}
         <div className="space-y-2">
-          <div className="text-sm text-gray-400">難易度設定（所有 AI 共用）</div>
+          <div className="text-sm text-gray-400">難易度</div>
           <DifficultySelect value={cfgDifficulty} onChange={applyDifficulty} accent="yellow" />
         </div>
 
