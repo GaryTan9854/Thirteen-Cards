@@ -1226,10 +1226,70 @@ def best_arrangement_ml(handstrs: list, attitude: float = 0.0):
     return result
 
 
+def _canonicalize_fullhouse(arr):
+    """
+    可證明的鐵則 canonicalize：葫蘆的「對子」部分對排名零貢獻（只看三條），
+    故葫蘆應持「全域最小的對子」，把較大的對子讓給『一對』墩。
+    只在「葫蘆墩 ↔ 一對墩」之間搬對子；搬完重新驗證牌型不變、墩序 top≤mid≤bot 不亂，
+    任一不符就原封返回（零風險，永不變差）。若該對子其實是順/花的一部分，那墩就不會是
+    『葫蘆』或『一對』，自然被排除。
+    """
+    if not arr:
+        return arr
+    from collections import Counter
+
+    def _pr(p):   # 該墩對子的點數（無則 None）
+        c = Counter(int(x[:2]) for x in p.handlist)
+        return next((r for r, n in c.items() if n == 2), None)
+
+    def _tr(p):   # 該墩三條的點數
+        c = Counter(int(x[:2]) for x in p.handlist)
+        return next((r for r, n in c.items() if n == 3), None)
+
+    def _build(cards):
+        h = Hand3(cards) if len(cards) == 3 else Hand5(cards)
+        h.score_hand()
+        return h
+
+    piles = list(arr)                       # [top(Hand3), mid(Hand5), bot(Hand5)]
+    # 貪婪修正到不動點：任何「葫蘆墩對子 > 某一對墩對子」就交換（葫蘆讓出大對），
+    # 每次交換都驗證牌型不變 + 墩序不亂；嚴格單調(一對墩對子變大)，必收斂。
+    for _ in range(6):                       # 上限防呆（最多 3 墩，幾步必停）
+        swapped = False
+        fh_idxs = [i for i, p in enumerate(piles) if getattr(p, 'handtype', '') == '葫蘆']
+        op_idxs = [i for i, p in enumerate(piles) if getattr(p, 'handtype', '') == '一對']
+        for fi in fh_idxs:
+            pf, tr = _pr(piles[fi]), _tr(piles[fi])
+            if pf is None or tr is None:
+                continue
+            for oi in op_idxs:
+                pd = _pr(piles[oi])
+                if pd is None or pd >= pf:
+                    continue                 # 一對墩已持較大/相等對子，無需動
+                new_fh = [c for c in piles[fi].handlist if int(c[:2]) == tr] + \
+                         [c for c in piles[oi].handlist if int(c[:2]) == pd]
+                new_op = [c for c in piles[oi].handlist if int(c[:2]) != pd] + \
+                         [c for c in piles[fi].handlist if int(c[:2]) == pf]
+                cand = list(piles)
+                cand[fi] = _build(new_fh)
+                cand[oi] = _build(new_op)
+                if (cand[fi].handtype == '葫蘆' and cand[oi].handtype == '一對'
+                        and cand[0].score <= cand[1].score <= cand[2].score):
+                    piles = cand
+                    swapped = True
+                    break
+            if swapped:
+                break
+        if not swapped:
+            break
+    return tuple(piles)
+
+
 def best_arrangement_dist(handstrs: list, attitude: float = 0.0):
     """
     DistNet（分布頭 ML，高階）選最佳排列。流程同 best_arrangement_ml，
     但用 categorical 分布 + CVaR utility 取代 μ/σ。模型不存在時 fallback rule-based。
+    選定後套用 _canonicalize_fullhouse（葫蘆取最小對的鐵則，修正 ML 偶發誤排）。
     """
     try:
         from ml.dist_model import DistModel
@@ -1253,7 +1313,9 @@ def best_arrangement_dist(handstrs: list, attitude: float = 0.0):
 
     finalists = _prefilter_candidates(candidates, K=20)
     result = model.best_arrangement(handstrs, attitude=attitude, candidates=finalists)
-    return result if result is not None else best_arrangement(handstrs)
+    if result is None:
+        return best_arrangement(handstrs)
+    return _canonicalize_fullhouse(result)
 
 
 # ─── 3-card top generator (for top-first enumeration) ────────────────────────
