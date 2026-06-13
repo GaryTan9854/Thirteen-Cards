@@ -215,7 +215,6 @@ const TRASH: TrashLine[] = [
   { id: '自嘲-7',  by: 'loser', text: '感覺來了……感覺又走了。' },
   { id: '自嘲-8',  by: 'loser', text: '練了三年的功夫，還是打不贏你們這幾位老千。' },
   { id: '自嘲-9',  by: 'loser', text: '願賭服輸，請客就請客，機率問題啦。' },
-  { id: '自嘲-10', by: 'loser', text: '我老婆只有給我五千塊預算哦……' },
   { id: '運氣-1',  by: 'loser', text: '今天手氣比天氣預報還不準。' },
   { id: '運氣-2',  by: 'loser', text: '神仙難救無命牌啊。', need: s => s.loserScore <= -30 },
   { id: '爛牌-1',  by: 'loser', text: '巧婦難為無米之炊，牌太爛了啦。' },
