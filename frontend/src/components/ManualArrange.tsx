@@ -614,13 +614,21 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
   }
   const matchedGroup = useMemo(()=>{
     if(!info) return -1
-    for(let gi=0; gi<Math.min(info.groups.length,10); gi++){
+    for(let gi=0; gi<info.groups.length; gi++){
       for(const v of info.groups[gi].variants){
         if(arrsMatch(v.top,arr.top) && arrsMatch(v.mid,arr.mid) && arrsMatch(v.bot,arr.bot)) return gi
       }
     }
+    // Fallback: the current arrangement is a valid member of a 牌型 group even when
+    // its exact kicker layout isn't one of the stored variants (e.g. the rule-based
+    // default排法 differs from the panel's canonical variants). Match by 頭·中·尾 類別.
+    if(rowTypes){
+      const sig = `${rowTypes.top}·${rowTypes.mid}·${rowTypes.bot}`
+      const gi  = info.groups.findIndex(g=>g.label===sig)
+      if(gi>=0) return gi
+    }
     return -1
-  },[info, arr])
+  },[info, arr, rowTypes])
 
   return (
     <>

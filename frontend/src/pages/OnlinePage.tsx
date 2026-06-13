@@ -87,7 +87,7 @@ interface SoloState {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const BEAUTIES = ['西施', '王昭君', '貂蟬', '楊貴妃', '妺喜', '妲己', '褒姒', '驪姬']
+const BEAUTIES = ['西施', '王昭君', '貂蟬', '楊貴妃', '妹喜', '妲己', '褒姒', '驪姬']
 
 // ─── Beauty Carousel ──────────────────────────────────────────────────────────
 
@@ -490,11 +490,12 @@ const DIFFICULTY_TO_STRATEGY: Record<string, string> = {
   advanced:     'ml_dist',
   expert:       'ml2',
 }
-const DIFFICULTY_OPTIONS: { value: string; label: string; sub: string; disabled?: boolean }[] = [
-  { value: 'beginner',     label: '菜鳥', sub: '誤闖叢林的小白兔' },
-  { value: 'intermediate', label: '老仙', sub: '現職計程車司機，聽我的準沒錯' },
-  { value: 'advanced',     label: '大神', sub: '小四開始打牌，從此未逢敵手' },
-  { value: 'expert',       label: '傳說', sub: '牌道至境，不可言說', disabled: true },
+// tint: 未選取時 label/sub 的色調，讓每個難易度的趣味文案各有性格、不再一片灰白
+const DIFFICULTY_OPTIONS: { value: string; label: string; sub: string; tint: string; disabled?: boolean }[] = [
+  { value: 'beginner',     label: '菜鳥', sub: '誤闖叢林的小白兔',           tint: 'text-emerald-300' },
+  { value: 'intermediate', label: '老仙', sub: '現職計程車司機，聽我的準沒錯', tint: 'text-amber-300' },
+  { value: 'advanced',     label: '大神', sub: '小四開始打牌，從此未逢敵手',   tint: 'text-sky-300' },
+  { value: 'expert',       label: '傳說', sub: '牌道至境，不可言說',           tint: 'text-fuchsia-300', disabled: true },
 ]
 const DEFAULT_DIFFICULTY = 'advanced'
 
@@ -510,14 +511,15 @@ function DifficultySelect({ value, onChange, accent = 'sky' }:
           disabled={o.disabled}
           onClick={() => !o.disabled && onChange(o.value)}
           title={o.disabled ? 'ML2（att 優化版）尚在訓練' : ''}
-          className={`flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg border text-xs font-semibold transition
+          className={`flex flex-col items-center gap-1 px-2 py-2.5 rounded-lg border text-xs font-semibold transition
             ${o.disabled
               ? 'bg-slate-800/40 border-slate-700 text-gray-600 cursor-not-allowed'
               : value === o.value
                 ? onCls
-                : 'bg-slate-700 border-slate-600 text-gray-200 hover:border-sky-400'}`}>
-          <span className="text-sm">{o.label}</span>
-          <span className="text-[10px] opacity-70 font-normal">{o.sub}</span>
+                : 'bg-slate-700 border-slate-600 text-gray-100 hover:border-sky-400'}`}>
+          <span className="text-base">{o.label}</span>
+          <span className={`text-xs font-normal leading-snug text-center
+            ${value === o.value || o.disabled ? 'opacity-80' : o.tint}`}>{o.sub}</span>
         </button>
       ))}
     </div>
@@ -1066,8 +1068,12 @@ export default function OnlinePage() {
     const isAi = info.loser_is_ai
     const gen  = info.appeal_generation
     if (isAi) {
-      // AI always appeals → auto-decide + announce
-      // Store the timer ID so startSoloRound can cancel it if the user clicks "下一局 →" first.
+      // AI always appeals → auto-decide + announce.
+      // Delay is only there to let the spoken announcement land — with voice off
+      // there's no reason to make the player wait, so cut it to a brief beat that
+      // just lets the appeal popup register. Store the timer ID so startSoloRound
+      // can cancel it if the user clicks "下一局 →" first.
+      const delay = voiceRef.current ? 2200 : 700
       soloAppealTimerRef.current = setTimeout(() => {
         soloAppealTimerRef.current = null
         // Guard: if the user already advanced past appeal_pending, do nothing.
@@ -1076,7 +1082,7 @@ export default function OnlinePage() {
         if (voiceRef.current) speak(`${name} 決定${label}！`, 0.88)
         if (onDecide) onDecide(true)
         else send({ type: 'appeal_decision', accept: true })
-      }, 3500)
+      }, delay)
     } else {
       const msg = gen === 0
         ? `比賽結束，請問 ${name}，你要申訴嗎？`
@@ -2315,7 +2321,7 @@ export default function OnlinePage() {
             {/* 你 */}
             <div className="space-y-1.5">
               <div className="text-xs text-gray-500">你</div>
-              <div className="text-xs font-semibold text-sky-300 px-2 py-1.5 bg-slate-800/60
+              <div className="text-sm font-semibold text-sky-300 px-2 py-1.5 bg-slate-800/60
                               border border-slate-600 rounded-lg truncate">
                 {player}
               </div>
@@ -2337,7 +2343,7 @@ export default function OnlinePage() {
                     })
                   }}
                   className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5
-                             text-white text-xs focus:outline-none focus:border-sky-400 cursor-pointer"
+                             text-white text-sm focus:outline-none focus:border-sky-400 cursor-pointer"
                 >
                   {BEAUTIES.map(b => <option key={b} value={b}>{b}</option>)}
                 </select>
@@ -2611,7 +2617,7 @@ export default function OnlinePage() {
             {/* 你 */}
             <div className="space-y-1.5">
               <div className="text-xs text-gray-500">你</div>
-              <div className="text-xs font-semibold text-yellow-300 px-2 py-1.5 bg-yellow-900/40
+              <div className="text-sm font-semibold text-yellow-300 px-2 py-1.5 bg-yellow-900/40
                               border border-yellow-700 rounded-lg truncate">
                 {player}
               </div>
@@ -2621,7 +2627,7 @@ export default function OnlinePage() {
               <div key={i} className="space-y-1.5">
                 <div className="text-xs text-gray-500">位置 {i + 2}</div>
                 {slotIsHuman[i] ? (
-                  <div className="text-xs font-semibold text-blue-300 px-2 py-1.5 bg-blue-900/30
+                  <div className="text-sm font-semibold text-blue-300 px-2 py-1.5 bg-blue-900/30
                                   border border-blue-700 rounded-lg truncate">
                     {label}
                   </div>
@@ -2639,7 +2645,7 @@ export default function OnlinePage() {
                       })
                     }}
                     className="w-full bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5
-                               text-white text-xs focus:outline-none focus:border-yellow-400 cursor-pointer"
+                               text-white text-sm focus:outline-none focus:border-yellow-400 cursor-pointer"
                   >
                     {BEAUTIES.map(b => <option key={b} value={b}>{b}</option>)}
                   </select>

@@ -9,6 +9,26 @@
 
 ---
 
+## ★ 2026-06-14 Session（UI/俏皮話/體感 6 連修）
+
+修了 Gary 回報的 6 項（皆改 source，**尚未 deploy**）：
+1. **俏皮話統計 + BIG4 梗公開化**：撈 production `/api/log/quip/stats`（697 次、98/108 梗出現）。未出現 8 個全是 Ian/Jack 特殊梗（solo 無此人）。甲殼蟲其實出現 7 次但綁 `who:'Glory'`，Gary solo 看不到。
+   - 把 BIG4 招牌中**缺公開版**的精選梗 copy 進公用庫（無條件、機率同其他）：`贏家臭屁-9~12`（13秒/小四就會/偏愛用劍/抓到訣竅）、`自嘲-7~10`（感覺又走/老千/願賭服輸/五千預算）、`跨情境-9` + `酸贏家-7`（甲殼蟲滑溜）。
+   - **權重調整**（quipgen.ts）：申訴失敗提及 45%→**30%**、局勢評論無申訴時 70%→**30%**、美女撒嬌 45%→**70%**。
+   - **美女撒嬌 +35 句**（`美女嬌-贏-8~42`）：崇拜/牌技/排牌/吃喝。新增 `{bro}` token = 哥哥；目標若在 `FEMALE_HUMANS`（目前空集）則略去「哥哥」。sim 驗證 4000 局美女線 68.7%、無殘留 `{bro}`。
+2. **妹喜頭像錯**：根因 `OnlinePage.tsx:90` + `room.py:20` 把「妹喜」誤打成「**妺喜**」(妺 U+59BA vs 妹 U+59B9)，與 BeautyAvatar/QuipPanel 的「妹」對不上 → fallback 錯頭像。兩處改回「妹喜」。
+3. **難易度排太蒼白/小字太小**：每難易度給色調（菜鳥綠/老仙琥珀/大神天藍/傳說洋紅），小字 10px→`text-xs`、標題 `text-sm`→`text-base`（`DifficultySelect`）。
+4. **Gary 大玩家字小**：「你」名字框與 AI dropdown 統一 `text-xs`→`text-sm`（solo + 連線房）。
+5. **「對·對·葫蘆」沒 highlight**：`ManualArrange.tsx matchedGroup` 原本只精確比張數，規則排牌的踢腳分配與面板 canonical 變體不同 → 比對失敗。改成精確失敗時 fallback 用「頭·中·尾」類別 label 比對。
+6. **申訴局前停頓太久**：AI 輸家自動申訴的 `scheduleAppealVoice` 固定 3500ms 改 voice-aware：語音開 2200 / 語音關 **700ms**。
+
+### 待驗證（Gary 江湖傳言，下次有空跑 duel/MC 驗）
+- **尾墩順但不夠大 → 宜「縮」中墩**：即 `亂・兩對・順`（top 亂、mid 兩對、bot 順）。
+- **尾墩同花 → 宜 `對・對・同花`**（top 對、mid 對、bot 同花）。
+- 驗法：duplicate-deal harness（ml/duel.py），篩出符合前提的手牌，比「依此規則排」vs RA3 預設的得分差。
+
+---
+
 ## ★ 2026-06-13/14 Session（ML 第一/二期 + 排牌 bug + 遊戲本質分析）
 
 ### 已上線

@@ -162,8 +162,8 @@ export function appealComments(appeals: AppealResult[], loser: string): IdText[]
   const [a1, a2] = appeals
   const out: IdText[] = []
   if (!a1.success) {
-    // 申訴失敗不必每局都講（45% 提及，騰空間給垃圾話），講法也有變化
-    if (chance(0.45)) out.push(pickFresh([
+    // 申訴失敗不必每局都講（30% 提及，騰空間給垃圾話/美女撒嬌），講法也有變化
+    if (chance(0.30)) out.push(pickFresh([
       { id: '申訴失敗-1', text: `哎呀，${a1.player} 沒申訴成功，功虧一簣！` },
       { id: '申訴失敗-2', text: `${a1.player} 申訴了個寂寞，越申越輸……` },
       { id: '申訴失敗-3', text: `${a1.player} 想翻盤結果翻車，這就是人生啊。` },
@@ -211,6 +211,11 @@ const TRASH: TrashLine[] = [
   { id: '自嘲-4',  by: 'loser', text: '本來想來賺錢，結果來捐款。' },
   { id: '自嘲-5',  by: 'loser', text: '錢進得快，出去得更快……' },
   { id: '自嘲-6',  by: 'loser', text: '輸到連祖先都認不出來了。', need: s => s.loserScore <= -40 },
+  // 從 BIG4 招牌 genericize 進公用庫的精選自嘲（不再綁特定玩家，出現機率與其他同）
+  { id: '自嘲-7',  by: 'loser', text: '感覺來了……感覺又走了。' },
+  { id: '自嘲-8',  by: 'loser', text: '練了三年的功夫，還是打不贏你們這幾位老千。' },
+  { id: '自嘲-9',  by: 'loser', text: '願賭服輸，請客就請客，機率問題啦。' },
+  { id: '自嘲-10', by: 'loser', text: '我老婆只有給我五千塊預算哦……' },
   { id: '運氣-1',  by: 'loser', text: '今天手氣比天氣預報還不準。' },
   { id: '運氣-2',  by: 'loser', text: '神仙難救無命牌啊。', need: s => s.loserScore <= -30 },
   { id: '爛牌-1',  by: 'loser', text: '巧婦難為無米之炊，牌太爛了啦。' },
@@ -246,6 +251,11 @@ const TRASH: TrashLine[] = [
   { id: '贏家臭屁-6', by: 'winner', text: '{loser} 你怎麼會排這樣！？' },
   { id: '贏家臭屁-7', by: 'winner', text: '請朋友吃飯是開心事，{loser} 不要一臉像要找人吵架的樣子。' },
   { id: '贏家臭屁-8', by: 'winner', text: '看 {loser} 打牌像在拆房子，猶豫那麼久。' },
+  // 從 BIG4 招牌 genericize 進公用庫的精選臭屁（不再綁特定玩家，出現機率與其他同）
+  { id: '贏家臭屁-9',  by: 'winner', text: '13 支，13 秒。' },
+  { id: '贏家臭屁-10', by: 'winner', text: '早就說過，這遊戲我小學四年級就會了。' },
+  { id: '贏家臭屁-11', by: 'winner', text: '兵器千萬種，我偏愛用劍！' },
+  { id: '贏家臭屁-12', by: 'winner', text: '感覺……抓到訣竅了。' },
 
   // ── 酸贏家篇（別人調侃贏家）──
   { id: '酸贏家-1', by: 'other', at: 'winner', text: '溪底無魚，蝦仔做大王——{winner} 你只是對手太弱啦！' },
@@ -254,6 +264,7 @@ const TRASH: TrashLine[] = [
   { id: '酸贏家-4', by: 'other', at: 'winner', text: '人生如戲全靠演技，{winner} 一把爛牌演成世界名作！', need: s => s.winnerScore >= 20 },
   { id: '酸贏家-5', by: 'other', at: 'winner', text: '{winner} 手氣若會傳染，我一定戴口罩！', need: s => s.winnerScore >= 30 },
   { id: '酸贏家-6', by: 'other', at: 'winner', text: '運來鐵成金——{winner} 今晚摸什麼都是金！' },
+  { id: '酸贏家-7', by: 'other', at: 'winner', text: '甲殼蟲爬玻璃——{winner} 今晚滑溜得很，誰都攔不住！' },
 
   // ── 跨情境篇（任何人都能講，不限特殊 player）──
   { id: '跨情境-1', by: 'any', text: '十三支，三分靠技術，七分靠心臟！' },
@@ -264,6 +275,9 @@ const TRASH: TrashLine[] = [
   { id: '跨情境-6', by: 'any', text: '這桌臥虎藏龍，我先敬大家一杯！' },
   { id: '跨情境-7', by: 'any', text: '運氣這東西，今天不來，明天總會來的。' },
   { id: '跨情境-8', by: 'any', text: '牌局如人生，起起落落才有意思嘛。' },
+  // 從 Glory 招牌「甲殼蟲」genericize 出來的公開版：任何人/任何局都能講，
+  // 不再綁特定玩家（solo 對美女時也能出現）。
+  { id: '跨情境-9',  by: 'any', text: '甲殼蟲爬玻璃——看誰今晚腳滑溜得最順！' },
 ]
 
 // ── 4. 特殊 player 專屬台詞（在場時 40% 取代一般垃圾話）────────────────────
@@ -297,6 +311,8 @@ const BIG4 = ['Gary', 'Glory', 'Ian', 'Jack']
 // ── AI 美女台詞（美女在場時對「人類」最贏/最輸者講：撒嬌/調侃/吃喝邀約）──
 // 注意：只對人類玩家講（哥哥/妾身等用語是對男性人類；輸家若是美女不觸發）。
 const BEAUTY_NAMES = ['妲己','妹喜','褒姒','驪姬','西施','王昭君','楊貴妃','貂蟬']
+// 女性人類玩家名單：美女台詞中的 {bro}（哥哥）對女生略去。預設空，未來有女生玩家再補。
+const FEMALE_HUMANS = new Set<string>([])
 const BEAUTY_COAX: { id: string; at: 'winner' | 'loser'; text: string }[] = [
   // 對人類輸家：安慰、陪伴、虧他
   { id: '美女嬌-輸-1', at: 'loser',  text: '{loser} 辛苦了，妾身來幫你按摩放鬆！' },
@@ -314,6 +330,93 @@ const BEAUTY_COAX: { id: string; at: 'winner' | 'loser'; text: string }[] = [
   { id: '美女嬌-贏-5', at: 'winner', text: '{winner}～乾杯啦！生台啤就是讚啦，呼乾啦！' },
   { id: '美女嬌-贏-6', at: 'winner', text: '{winner} 哥哥帶我去吃燒烤嘛～今夜我陪你喝通宵！' },
   { id: '美女嬌-贏-7', at: 'winner', text: '{winner}～人家想喝 sake，你請客剛剛好啦！' },
+  // 擴充：崇拜/牌技/排牌/吃喝撒嬌。{bro}=哥哥（女生目標自動略去）
+  { id: '美女嬌-贏-8',  at: 'winner', text: '哎呀，又贏了？你是不是偷偷開天眼呀？' },
+  { id: '美女嬌-贏-9',  at: 'winner', text: '{bro}這牌技，妹妹只能甘拜下風～' },
+  { id: '美女嬌-贏-10', at: 'winner', text: '人家本來想贏你的，結果又被欺負了啦～' },
+  { id: '美女嬌-贏-11', at: 'winner', text: '{bro}這麼厲害，讓妹妹抱個大腿好不好～' },
+  { id: '美女嬌-贏-12', at: 'winner', text: '{bro}果然是神級的，太崇拜了～' },
+  { id: '美女嬌-贏-13', at: 'winner', text: '這手牌打得漂亮，我都想鼓掌了！' },
+  { id: '美女嬌-贏-14', at: 'winner', text: '這一局看得我心服口服～' },
+  { id: '美女嬌-贏-15', at: 'winner', text: '{bro}這身功夫，怕是練了幾十年吧？' },
+  { id: '美女嬌-贏-16', at: 'winner', text: '妹妹敬你一杯，先乾為敬～' },
+  { id: '美女嬌-贏-17', at: 'winner', text: '今晚不談輸贏，只談交情～' },
+  { id: '美女嬌-贏-18', at: 'winner', text: '來來來，感情深，一口悶～' },
+  { id: '美女嬌-贏-19', at: 'winner', text: '酒逢知己千杯少，陪妹妹喝一杯嘛～' },
+  { id: '美女嬌-贏-20', at: 'winner', text: '這杯敬牌神，祝{bro}把把通殺！' },
+  { id: '美女嬌-贏-21', at: 'winner', text: '今晚夜黑風高，啊不，月色正好，一起吃個宵夜嘛？' },
+  { id: '美女嬌-贏-22', at: 'winner', text: '打完這局，陪妹妹去吃碗熱湯麵吧～' },
+  { id: '美女嬌-贏-23', at: 'winner', text: '贏了這麼多，不請客說不過去吧？' },
+  { id: '美女嬌-贏-24', at: 'winner', text: '{bro}請客，我負責捧場～' },
+  { id: '美女嬌-贏-25', at: 'winner', text: '聽說附近有家不錯的小館子呢～' },
+  { id: '美女嬌-贏-26', at: 'winner', text: '{bro}今天殺氣有點重喔～' },
+  { id: '美女嬌-贏-27', at: 'winner', text: '你再這樣贏下去，我要翻桌啦～' },
+  { id: '美女嬌-贏-28', at: 'winner', text: '哎呀，牌都被你算光了～' },
+  { id: '美女嬌-贏-29', at: 'winner', text: '江湖傳聞果然不假～' },
+  { id: '美女嬌-贏-30', at: 'winner', text: '看來又是一位深藏不露的高手～' },
+  { id: '美女嬌-贏-31', at: 'winner', text: '頭中尾擺得這麼漂亮，真讓人羨慕～' },
+  { id: '美女嬌-贏-32', at: 'winner', text: '這牌型排得像藝術品一樣～' },
+  { id: '美女嬌-贏-33', at: 'winner', text: '{bro}這副牌，怕是早就想好了吧～' },
+  { id: '美女嬌-贏-34', at: 'winner', text: '排牌如行雲流水，賞心悅目呢～' },
+  { id: '美女嬌-贏-35', at: 'winner', text: '這手十三支，簡直是教科書等級～' },
+  { id: '美女嬌-贏-36', at: 'winner', text: '{bro}贏牌的樣子，比月亮還耀眼呢～' },
+  { id: '美女嬌-贏-37', at: 'winner', text: '{bro}別一直贏嘛，給妹妹留點面子～' },
+  { id: '美女嬌-贏-38', at: 'winner', text: '{bro}的牌技這麼高，害人家心跳都快了～' },
+  { id: '美女嬌-贏-39', at: 'winner', text: '牌桌上的{bro}，和平常不太一樣呢～' },
+  { id: '美女嬌-贏-40', at: 'winner', text: '{bro}再贏下去，妹妹可要收學費拜師了～' },
+  { id: '美女嬌-贏-41', at: 'winner', text: '{bro}今天運氣這麼好，要不要順便去買彩票？' },
+  { id: '美女嬌-贏-42', at: 'winner', text: '{bro}負責贏牌，妹妹負責喊厲害～' },
+  // 美女輸牌系列：美女輸給人類贏家後的傲嬌/不服/嗆聲（仍對贏家講，at:'winner'）
+  { id: '美女輸牌-1',  at: 'winner', text: '這局不算，我剛剛分心了。' },
+  { id: '美女輸牌-2',  at: 'winner', text: '運氣也是實力的一部分？哼。' },
+  { id: '美女輸牌-3',  at: 'winner', text: '你今天運氣倒是不錯。' },
+  { id: '美女輸牌-4',  at: 'winner', text: '再來一局，我還沒認真呢。' },
+  { id: '美女輸牌-5',  at: 'winner', text: '本姑娘只是讓你高興一下。' },
+  { id: '美女輸牌-6',  at: 'winner', text: '呀，居然輸給你了呢～' },
+  { id: '美女輸牌-7',  at: 'winner', text: '先別得意，等等有你哭的。' },
+  { id: '美女輸牌-8',  at: 'winner', text: '你笑得這麼開心，待會可別笑不出來。' },
+  { id: '美女輸牌-9',  at: 'winner', text: '勝負未定，{bro}高興得太早了。' },
+  { id: '美女輸牌-10', at: 'winner', text: '哼，人家記住你了。' },
+  { id: '美女輸牌-11', at: 'winner', text: '今晚的酒都不香了。' },
+  { id: '美女輸牌-12', at: 'winner', text: '真掃興，居然輸了。' },
+  { id: '美女輸牌-13', at: 'winner', text: '我看不是你厲害，是牌偏心。' },
+  { id: '美女輸牌-14', at: 'winner', text: '這副牌要是給我重來一次……' },
+  { id: '美女輸牌-15', at: 'winner', text: '來人，再開一局！' },
+  { id: '美女輸牌-16', at: 'winner', text: '北風吹得人心煩。' },
+  { id: '美女輸牌-17', at: 'winner', text: '看來今日天時不在我。' },
+  { id: '美女輸牌-18', at: 'winner', text: '此局且記下了。' },
+  { id: '美女輸牌-19', at: 'winner', text: '下回再見，未必是這結果。' },
+  { id: '美女輸牌-20', at: 'winner', text: '你贏了，但別高興太久。' },
+  { id: '美女輸牌-21', at: 'winner', text: '呵呵，你以為自己很厲害？' },
+  { id: '美女輸牌-22', at: 'winner', text: '運氣總有用完的時候。' },
+  { id: '美女輸牌-23', at: 'winner', text: '希望你等等還笑得出來。' },
+  { id: '美女輸牌-24', at: 'winner', text: '我喜歡看人得意後翻車。' },
+  { id: '美女輸牌-25', at: 'winner', text: '這筆帳，本宮記下了。' },
+  { id: '美女輸牌-26', at: 'winner', text: '真無趣。' },
+  { id: '美女輸牌-27', at: 'winner', text: '連笑都懶得笑了。' },
+  { id: '美女輸牌-28', at: 'winner', text: '贏一次就這麼開心？' },
+  { id: '美女輸牌-29', at: 'winner', text: '別把運氣誤認成實力。' },
+  { id: '美女輸牌-30', at: 'winner', text: '希望下一局別讓我失望。' },
+  { id: '美女輸牌-31', at: 'winner', text: '哎呀呀，小瞧你了。' },
+  { id: '美女輸牌-32', at: 'winner', text: '今天算你走運。' },
+  { id: '美女輸牌-33', at: 'winner', text: '{bro}最好一直這麼幸運呢。' },
+  { id: '美女輸牌-34', at: 'winner', text: '贏我一次，可不代表什麼。' },
+  { id: '美女輸牌-35', at: 'winner', text: '下一局我可不會客氣。' },
+  { id: '美女輸牌-36', at: 'winner', text: '很好，你成功惹我生氣了。' },
+  { id: '美女輸牌-37', at: 'winner', text: '看來得拿出真本事了。' },
+  { id: '美女輸牌-38', at: 'winner', text: '本來想讓著你的。' },
+  { id: '美女輸牌-39', at: 'winner', text: '等會輸了可別求饒。' },
+  { id: '美女輸牌-40', at: 'winner', text: '你最好祈禱好運別跑掉。' },
+  { id: '美女輸牌-41', at: 'winner', text: '哼，牌神今天請假是不是？' },
+  { id: '美女輸牌-42', at: 'winner', text: '我懷疑你偷偷買通發牌員。' },
+  { id: '美女輸牌-43', at: 'winner', text: '這局有黑幕，本姑娘要求重賽！' },
+  { id: '美女輸牌-44', at: 'winner', text: '好好享受現在，等等就輪到你哭了。' },
+  { id: '美女輸牌-45', at: 'winner', text: '你先得意，反正我記仇。' },
+  { id: '美女輸牌-46', at: 'winner', text: '今天的牌桌，對美女很不友善。' },
+  { id: '美女輸牌-47', at: 'winner', text: '連輸兩局？這不合理！' },
+  { id: '美女輸牌-48', at: 'winner', text: '我接受失敗，但不接受輸成這樣。' },
+  { id: '美女輸牌-49', at: 'winner', text: '很好，我的勝負欲被你喚醒了。' },
+  { id: '美女輸牌-50', at: 'winner', text: '看來今晚有人要被我追殺了。' },
 ]
 
 // ── 5. 局勢評論台詞（給對話用，比 debug 描述口語）───────────────────────────
@@ -388,8 +491,9 @@ export function generateScript(summary: GameSummary): GeneratedScript {
   const aLines: IdLine[] = []
   const apComments = appealComments(summary.appeals, loser.name)
   for (const c of apComments) aLines.push({ speaker: commentator(), text: c.text, id: c.id })
-  // 局勢評論：無申訴評論時 70% 講一句；已有 1 句申訴評論時只 30%；2 句以上跳過
-  if (apComments.length === 0 ? chance(0.70) : (apComments.length < 2 && chance(0.30))) {
+  // 局勢評論：無申訴評論時 30% 講一句；已有 1 句申訴評論時只 30%；2 句以上跳過
+  // （壓低局勢/申訴占比，把空間讓給垃圾話與美女撒嬌）
+  if (apComments.length === 0 ? chance(0.30) : (apComments.length < 2 && chance(0.30))) {
     const tag = pick(situation.tags)
     const pool = SITUATION_LINES[tag] ?? []
     if (pool.length) {
@@ -428,14 +532,17 @@ export function generateScript(summary: GameSummary): GeneratedScript {
       if (speaker !== first.speaker) bLines.push({ speaker, text: sub(t.text), id: t.id })
     }
   }
-  // 美女台詞：在場美女對「人類」最贏或最輸者，45% 補一句（撒嬌/吃喝邀約）
+  // 美女台詞：在場美女對「人類」最贏或最輸者，70% 補一句（撒嬌/吃喝邀約）
   const beautiesHere = ps.filter(p => BEAUTY_NAMES.includes(p.name))
-  if (beautiesHere.length > 0 && chance(0.45)) {
+  if (beautiesHere.length > 0 && chance(0.70)) {
     const cands = BEAUTY_COAX.filter(c =>
       (c.at === 'winner' && winner.isHuman) || (c.at === 'loser' && loser.isHuman))
     if (cands.length) {
       const c = pickFresh(cands, x => x.id)
-      bLines.push({ speaker: pick(beautiesHere).name, text: sub(c.text), id: c.id })
+      // {bro}=哥哥（男性人類目標）；目標若為女生則略去「哥哥」（FEMALE_HUMANS）
+      const tgt     = c.at === 'winner' ? winner : loser
+      const broWord = FEMALE_HUMANS.has(tgt.name) ? '' : '哥哥'
+      bLines.push({ speaker: pick(beautiesHere).name, text: sub(c.text).replace(/\{bro\}/g, broWord), id: c.id })
     }
   }
 

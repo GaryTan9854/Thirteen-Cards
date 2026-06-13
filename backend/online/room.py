@@ -17,7 +17,7 @@ import asyncio
 import random
 from typing import Dict, List, Optional
 
-BEAUTIES = ['西施', '王昭君', '貂蟬', '楊貴妃', '妺喜', '妲己', '褒姒', '驪姬']
+BEAUTIES = ['西施', '王昭君', '貂蟬', '楊貴妃', '妹喜', '妲己', '褒姒', '驪姬']
 
 
 class Phase:
