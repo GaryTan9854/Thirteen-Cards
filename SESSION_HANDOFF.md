@@ -9,6 +9,32 @@
 
 ---
 
+## ★ 2026-06-14 PM Session（傳說 = DistNet + 直接最佳化 P(不墊底)）
+
+### 核心決策（Gary 定調）
+- 真實賭注 = 最輸者請客 → 真目標 **min P(嚴格墊底)**，非總分/最勝。最勝 att=0 最優；不墊底 attitude 必要。
+- **純量 attitude 與 low-leverage 的矛盾如何解**：lever = P(旋鈕改排法)×P(改排法改得分)×P(改得分翻名次)。純量 CVaR 旋鈕**鏈1 極低**（±0.8 很少翻 argmax，lever~0.1/2、Δ~0）。oracle +2.8pp 只是**旋鈕**的天花板（每局只在 3 個 att 排法裡選），非名次最優上限。
+- **解法 = 換決策目標、不重訓 DistNet**：用 DistNet 既有的「每排法得分分布」直接算 P(不墊底) 選 argmin。
+
+### 已上線 v2.10.0 — 傳說(ml2) 不墊底決策層
+- `game/notlast.py`：`round_marginal()` 載入預存每局淨分邊際 M；`notlast_p_last(...)` 用 MC（對手 rl 局、我未來 rl-1 局都抽 M）算 `h[t]=P(嚴格墊底|本局得分=support[t])`。
+- `arrange.best_arrangement_notlast(hand, my_cum, opp_cums, rounds_left)`：對候選(K=80)的 DistNet 分布算 `probs·h`，argmin。套 `_canonicalize_fullhouse`。保留怪物尾/四輪車 fast-path。
+- `game.py _arrange(..., notlast_ctx)` + `play_one_game(..., cum_scores, rounds_left)`；`main.py PlayRequest +cum_scores +rounds_left`；前端傳說送目前比分+剩餘局數。
+- `ml/build_round_marginal.py` → `ml/data/round_marginal.npz`（att=0 best 排法分布平均，E[z]-0.6 std10.7）。
+- **大神(ml_dist att=0)/RA3/RA4 完全沒動。** 純量曲線 `computeAttitudeNotLast` 留作 fallback。
+
+### 單元驗證（已做）
+- 決策確實隨比分反應：**安全領先時 30% 手牌改選低變異**鎖名次；可救落後攻擊 ~4%（攻擊本就低價值＋EV池侷限，符合「不墊底價值主要在別丟掉安全領先」）。
+
+### 待撈結果
+- `ml/eval_notlast.py`（配對：同發牌+同對手排法，只 seat0 換決策）跑 **2000 matches × 6 局**中，log `ml/data/eval_notlast_0614_1120.log`。看 Δ P(不墊底) vs att=0（預期 +1~2pp、遠高於旋鈕的 ~0）。
+
+### 仍欠 / 下一步
+- shrink_table / eval_coverage 昨晚被 setsid(macOS 無) 與 harness kill 中斷，**尚未跑完**（attitude 優先，延後）。
+- 若 eval_notlast 證實有肉：可再(a)用更寬候選池給攻擊面、(b)opp marginal 分難易度、(c)把 K/nsim 對 MBP 速度調校。
+
+---
+
 ## ★ 2026-06-14 Session（UI/俏皮話/體感 6 連修）
 
 修了 Gary 回報的 6 項（皆改 source，**尚未 deploy**）：
