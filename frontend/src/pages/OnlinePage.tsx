@@ -24,6 +24,7 @@ import { setScene, stopMusic } from '../utils/music'
 import { useVoiceOn } from '../utils/voice'
 import QuipPanel from '../components/QuipPanel'
 import AvatarPicker from '../components/AvatarPicker'
+import { fetchPrefs, savePrefs, setLocalAvatar } from '../utils/prefs'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -681,10 +682,40 @@ export default function OnlinePage() {
   useEffect(() => { voiceRef.current = _voiceOn }, [_voiceOn])
   const [quipCtx,      setQuipCtx]          = useState<{ loser: string; winner: string; names: string[]; mid: string[]; humanMid: string[]; winnerScore: number; loserScore: number; humanPlayer?: string; players?: { name: string; isHuman: boolean; score: number; rank: number }[]; appeals?: { player: string; success: boolean }[] } | null>(null)
 
-  // Persist player-specific settings to localStorage whenever they change
+  // Cross-device sync: pull this player's avatar + settings from the backend on
+  // login, then hydrate local state. prefsReadyRef gates the upload effect below
+  // so we never clobber the server copy with mount-time defaults before it loads.
+  const prefsReadyRef = useRef(false)
   useEffect(() => {
     if (!player) return
-    localStorage.setItem(`tc_settings_${player}`, JSON.stringify({ cfgNormal, cfgAppeal, cfgStrategies, cfgDifficulty, cfgAutoReshuffle, diffV2: true }))
+    let cancelled = false
+    prefsReadyRef.current = false
+    fetchPrefs(player).then(p => {
+      if (cancelled) return
+      const s = p?.settings
+      if (s) {
+        if (typeof s.cfgNormal === 'number')        setCfgNormal(s.cfgNormal)
+        if (typeof s.cfgAppeal === 'number')        setCfgAppeal(s.cfgAppeal)
+        if (typeof s.cfgAutoReshuffle === 'boolean') setCfgAutoReshuffle(s.cfgAutoReshuffle)
+        if (s.diffV2 && s.cfgDifficulty)            applyDifficulty(s.cfgDifficulty)
+      }
+      // Avatar: only adopt the server copy when this device has none locally.
+      if (p?.avatar && !localStorage.getItem(`tc_avatar_${player}`)) {
+        setLocalAvatar(player, p.avatar)
+        setShowAvatarPicker(false)
+      }
+    }).finally(() => { if (!cancelled) prefsReadyRef.current = true })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player])
+
+  // Persist player-specific settings to localStorage (fast cache) + backend
+  // (cross-device) whenever they change.
+  useEffect(() => {
+    if (!player) return
+    const settings = { cfgNormal, cfgAppeal, cfgDifficulty, cfgAutoReshuffle, diffV2: true }
+    localStorage.setItem(`tc_settings_${player}`, JSON.stringify({ ...settings, cfgStrategies }))
+    if (prefsReadyRef.current) savePrefs(player, { settings })
   }, [player, cfgNormal, cfgAppeal, cfgStrategies, cfgDifficulty, cfgAutoReshuffle])
   const ttsGenRef          = useRef(0)
   const soloPhaseRef       = useRef<string>('lobby')

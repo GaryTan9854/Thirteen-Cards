@@ -7,6 +7,7 @@
  */
 
 import { useState, useRef } from 'react'
+import { savePrefs, setLocalAvatar } from '../utils/prefs'
 
 const MALES = [
   { file: '秀才', label: '書生' },
@@ -27,7 +28,6 @@ const FEMALES = [
 ]
 
 const BEAUTY_DIR = '/assets/beauties/v2'
-const STORAGE_KEY = (name: string) => `tc_avatar_${name}`
 
 function cropToSquare(file: File, maxPx: number): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -76,7 +76,8 @@ export default function AvatarPicker({ playerName, onDone }: Props) {
 
   function pickSystem(src: string) {
     setSelected(src)
-    localStorage.setItem(STORAGE_KEY(playerName), src)
+    setLocalAvatar(playerName, src)
+    savePrefs(playerName, { avatar: src })   // sync across devices
     // brief highlight then close
     setTimeout(onDone, 300)
   }
@@ -87,7 +88,8 @@ export default function AvatarPicker({ playerName, onDone }: Props) {
     setUploading(true)
     try {
       const dataUrl = await cropToSquare(file, 200)
-      localStorage.setItem(STORAGE_KEY(playerName), dataUrl)
+      setLocalAvatar(playerName, dataUrl)
+      savePrefs(playerName, { avatar: dataUrl })   // sync across devices
       setSelected(dataUrl)
       setTimeout(onDone, 300)
     } catch {

@@ -1296,6 +1296,22 @@ def api_quip_stats():
     return gl.get_quip_stats()
 
 
+# ── User prefs: avatar + settings synced across devices ───────────────────────
+class UserPrefsReq(BaseModel):
+    player:   str
+    avatar:   Optional[str] = None         # data-url or system asset path
+    settings: Optional[Dict[str, Any]] = None
+
+@app.get("/api/user/prefs")
+def api_get_user_prefs(player: str):
+    return gl.get_user_prefs(player)
+
+@app.post("/api/user/prefs")
+def api_save_user_prefs(req: UserPrefsReq):
+    gl.save_user_prefs(req.player, avatar=req.avatar, settings=req.settings)
+    return {"ok": True}
+
+
 @app.get("/api/log/games")
 def api_list_games(limit: int = 100, mode: Optional[str] = None, league_only: bool = False):
     return {"games": gl.get_games(limit, mode, league_only)}

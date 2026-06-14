@@ -10,6 +10,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
+import { savePrefs, setLocalAvatar, AVATAR_EVENT } from '../utils/prefs'
 
 // ── Beauty config ──────────────────────────────────────────────────────────────
 
@@ -84,10 +85,17 @@ export default function BeautyAvatar({ name, size = 80, isMe = false, className 
   const [hovering,  setHovering]  = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Load saved avatar from localStorage on mount
+  // Load saved avatar from localStorage on mount; re-read when a sync/upload
+  // elsewhere updates this player's avatar (AVATAR_EVENT).
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY(name))
-    if (saved) setCustomSrc(saved)
+    const reload = () => setCustomSrc(localStorage.getItem(STORAGE_KEY(name)))
+    reload()
+    const onUpd = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (!detail || detail.name === name) reload()
+    }
+    window.addEventListener(AVATAR_EVENT, onUpd)
+    return () => window.removeEventListener(AVATAR_EVENT, onUpd)
   }, [name])
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -95,7 +103,8 @@ export default function BeautyAvatar({ name, size = 80, isMe = false, className 
     if (!file) return
     try {
       const dataUrl = await cropToSquare(file, 200)
-      localStorage.setItem(STORAGE_KEY(name), dataUrl)
+      setLocalAvatar(name, dataUrl)
+      savePrefs(name, { avatar: dataUrl })   // sync across devices
       setCustomSrc(dataUrl)
     } catch {
       // silently ignore errors

@@ -65,6 +65,12 @@ def init_db():
             players  TEXT    -- json array: [{name, isHuman, score, rank}]
         );
         CREATE INDEX IF NOT EXISTS idx_quip_usage_qid ON quip_usage(quip_id);
+        CREATE TABLE IF NOT EXISTS user_prefs (
+            player     TEXT PRIMARY KEY,
+            avatar     TEXT,   -- data-url (base64 JPEG) or system asset path
+            settings   TEXT,   -- json: { cfgNormal, cfgAppeal, cfgDifficulty, ... }
+            updated_at TEXT
+        );
         """)
 
 
@@ -323,6 +329,43 @@ def log_quip(rec: Dict[str, Any]):
             "INSERT INTO quip_usage (ts, quip_id, winner, loser, tags, appeals, players) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
             [(ts, qid, winner, loser, tags, appeals, players) for qid in quip_ids],
+        )
+
+
+# ── User prefs (avatar + settings, synced across devices) ───────────────────────
+
+def get_user_prefs(player: str) -> Dict[str, Any]:
+    with _conn() as c:
+        row = c.execute(
+            "SELECT avatar, settings FROM user_prefs WHERE player = ?", (player,)
+        ).fetchone()
+    if not row:
+        return {"avatar": None, "settings": None}
+    settings = None
+    if row["settings"]:
+        try:
+            settings = json.loads(row["settings"])
+        except Exception:
+            settings = None
+    return {"avatar": row["avatar"], "settings": settings}
+
+
+def save_user_prefs(player: str,
+                    avatar: Optional[str] = None,
+                    settings: Optional[Dict[str, Any]] = None) -> None:
+    """Upsert; only the provided fields are overwritten (partial update)."""
+    now = datetime.now().isoformat()
+    with _conn() as c:
+        cur = c.execute(
+            "SELECT avatar, settings FROM user_prefs WHERE player = ?", (player,)
+        ).fetchone()
+        new_avatar   = avatar if avatar is not None else (cur["avatar"] if cur else None)
+        new_settings = (json.dumps(settings, ensure_ascii=False) if settings is not None
+                        else (cur["settings"] if cur else None))
+        c.execute(
+            "INSERT OR REPLACE INTO user_prefs (player, avatar, settings, updated_at) "
+            "VALUES (?, ?, ?, ?)",
+            (player, new_avatar, new_settings, now),
         )
 
 
