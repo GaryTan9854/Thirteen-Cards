@@ -700,9 +700,18 @@ export default function OnlinePage() {
         if (s.diffV2 && s.cfgDifficulty)            applyDifficulty(s.cfgDifficulty)
       }
       // Avatar: only adopt the server copy when this device has none locally.
-      if (p?.avatar && !localStorage.getItem(`tc_avatar_${player}`)) {
+      const localAvatar = localStorage.getItem(`tc_avatar_${player}`)
+      if (p?.avatar && !localAvatar) {
         setLocalAvatar(player, p.avatar)
         setShowAvatarPicker(false)
+      }
+      // Seed the server from this device when it has nothing yet, so existing
+      // local avatar/settings propagate to other devices without re-entering.
+      if (!p?.settings) {
+        savePrefs(player, { settings: { cfgNormal, cfgAppeal, cfgDifficulty, cfgAutoReshuffle, diffV2: true } })
+      }
+      if (!p?.avatar && localAvatar) {
+        savePrefs(player, { avatar: localAvatar })
       }
     }).finally(() => { if (!cancelled) prefsReadyRef.current = true })
     return () => { cancelled = true }
