@@ -1318,6 +1318,52 @@ def best_arrangement_dist(handstrs: list, attitude: float = 0.0):
     return _canonicalize_fullhouse(result)
 
 
+def best_arrangement_notlast(handstrs: list, my_cum: float, opp_cums: list,
+                             rounds_left: int):
+    """
+    傳說 級決策層：用 DistNet 各排法的「得分分布」直接最小化 P(嚴格墊底)，
+    取代純量 attitude。安全時自然選低變異、墊底時自然選高變異的排法，
+    且在每個會影響名次的手牌上生效（不像旋鈕只在偶然翻轉 argmax 時才生效）。
+    模型/邊際缺失或任何意外 → fallback DistNet att=0 → rule-based。
+    """
+    try:
+        from ml.dist_model import DistModel
+        model = DistModel.get()
+    except Exception:
+        model = None
+    if model is None:
+        return best_arrangement(handstrs)
+
+    qr = _try_monster_bot(handstrs)
+    if qr:
+        return qr
+    fp = _try_four_pairs(handstrs)
+    if fp:
+        return fp
+
+    candidates = enumerate_arrangements(handstrs)
+    if not candidates:
+        return best_arrangement(handstrs)
+    # 比大神(K=20)寬：不墊底「搏翻身」要的高變異排法常落在 EV-top20 之外。
+    finalists = _prefilter_candidates(candidates, K=80)
+
+    try:
+        import numpy as np
+        from game.features import encode
+        from game.notlast import round_marginal, notlast_p_last
+        X = np.stack([encode(handstrs, h3, hm, hb) for h3, hm, hb in finalists])
+        probs = model.predict_probs(X)                       # (K, 61)
+        support, M = round_marginal()
+        h = notlast_p_last(support, M, my_cum, opp_cums, rounds_left)
+        p_last = probs @ h                                   # (K,) P(墊底|排法)
+        result = finalists[int(p_last.argmin())]
+    except Exception:
+        result = model.best_arrangement(handstrs, attitude=0.0, candidates=finalists)
+    if result is None:
+        return best_arrangement(handstrs)
+    return _canonicalize_fullhouse(result)
+
+
 # ─── 3-card top generator (for top-first enumeration) ────────────────────────
 
 def _generate_3card_tops(handstrs: list) -> list:

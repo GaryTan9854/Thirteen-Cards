@@ -107,6 +107,25 @@ def _snap(att: float) -> int:
     return int(np.abs(ATT_GRID - att).argmin())
 
 
+def make_notlast_v2(safe_base=6.0, amp_base=0.4, amp_gp=0.4,
+                    deficit_boost=0.3, gp_pow=1.0):
+    """連續版不墊底曲線——與前端 OnlinePage.computeAttitudeNotLast 形狀一致。
+    ri=本局 0-indexed；對應前端 currentRound=ri+1、remaining=n-ri。
+    """
+    def pol(ri, n, cum):
+        gp        = ((ri + 1) / max(1, n)) ** gp_pow
+        remaining = max(1, n - ri)
+        S         = safe_base * math.sqrt(remaining)
+        amp       = amp_base + amp_gp * gp
+        cushion   = cum[0] - min(cum[1:])
+        if cushion <= 0:
+            att = min(1.0, amp + deficit_boost * min(1.0, -cushion / S))
+        else:
+            att = max(-1.0, -amp * min(1.0, cushion / S))
+        return _snap(att)
+    return pol
+
+
 # ── 評估（純查表，超快）──────────────────────────────────────────────────────
 
 def play(tables, policy, n_rounds) -> list:
@@ -169,6 +188,7 @@ def evaluate(policies: dict, n_matches, n_rounds, seed, model, with_oracle=False
             bnl, lev = oracle_notlast(tables, n_rounds)
             orc_nl += bnl; lever_sum += lev
     n = n_matches
+    notlast = {k: acc[k][1] / n for k in names}
     print(f"{n} matches × {n_rounds} 局, {time.time()-t0:.0f}s  "
           f"(對手 3×att=0；seat0 換策略)\n")
     print(f"{'策略':18s} {'勝率':>6} {'不墊底':>7} {'名次分':>7} {'總分':>7} {'Δ不墊底(pp)':>18}")
@@ -183,6 +203,7 @@ def evaluate(policies: dict, n_matches, n_rounds, seed, model, with_oracle=False
               f"  vs att=0 {acc[base][1]/n*100:.1f}%"
               f"  → 上限增幅 {(orc_nl-acc[base][1])/n*100:+.1f}pp")
         print(f"attitude 槓桿：平均每局 {lever_sum/n:.2f}/{len(ATT_GRID)-1} 個非中性等級會改變得分")
+    return notlast
 
 
 def main():
@@ -190,15 +211,31 @@ def main():
     ap.add_argument('--matches', type=int, default=6000)
     ap.add_argument('--rounds', type=int, default=6)
     ap.add_argument('--seed', type=int, default=70000)
+    ap.add_argument('--sweep', action='store_true',
+                    help='grid-search 不墊底 v2 曲線參數（safe_base × gp_pow × amp_base）')
     args = ap.parse_args()
     model = DistModel.get()
     if model is None:
         print("DistModel 不存在"); return
+
+    if args.sweep:
+        policies = {'att=0': pol_neutral}
+        for sb in (3.0, 4.5, 6.0, 9.0, 12.0):
+            for gpp in (0.5, 1.0, 2.0):
+                for ab in (0.3, 0.5):
+                    policies[f'v2 sb={sb} gp={gpp} ab={ab}'] = \
+                        make_notlast_v2(safe_base=sb, amp_base=ab, gp_pow=gpp)
+        notlast = evaluate(policies, args.matches, args.rounds, args.seed, model, with_oracle=True)
+        best = max((k for k in notlast if k != 'att=0'), key=lambda k: notlast[k])
+        print(f"\n★ BEST: {best}  不墊底 {notlast[best]*100:.1f}%  "
+              f"(vs att=0 {notlast['att=0']*100:.1f}% → {(notlast[best]-notlast['att=0'])*100:+.2f}pp)")
+        return
+
     policies = {
         'att=0':                  pol_neutral,
         'notlast m=8':            make_notlast(margin=8),
         'notlast m=12 gp=2':      make_notlast(margin=12, gp_pow=2.0),
-        'notlast m=20':           make_notlast(margin=20),
+        'v2 default':             make_notlast_v2(),
     }
     evaluate(policies, args.matches, args.rounds, args.seed, model, with_oracle=True)
 

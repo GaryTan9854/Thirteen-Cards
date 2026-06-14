@@ -1493,6 +1493,8 @@ export default function OnlinePage() {
             pre_dealt:    state.preDelt,
             overrides:    [{ player: 0, top, mid, bot, baodao: isBaodao !== false }],
             ai_attitudes,
+            cum_scores:   cumScores,                              // 傳說 不墊底決策：目前比分
+            rounds_left:  Math.max(1, totalRounds - gpRound + 1), // 含本局的剩餘局數
           }),
         })
         clearTimeout(tid)

@@ -60,6 +60,8 @@ class PlayRequest(BaseModel):
     pre_dealt:    Optional[List[List[str]]] = None   # [[cardstrs]*13]*4
     overrides:    Optional[List[ManualOverride]] = None  # manual arrangements
     ai_attitudes: Optional[List[float]]     = None   # per-seat dynamic attitude [-1, 1]
+    cum_scores:   Optional[List[float]]     = None   # 4 座目前累積分（傳說 不墊底決策用）
+    rounds_left:  Optional[int]             = None   # 含本局的剩餘局數（傳說 不墊底決策用）
 
 
 @app.post("/api/game/deal")
@@ -78,7 +80,10 @@ def game_play(req: PlayRequest = None):
     pre     = req.pre_dealt    if req else None
     ovs     = [o.dict() for o in req.overrides] if req and req.overrides else None
     atts    = req.ai_attitudes if req else None
-    result  = _play(names, strats, pre_dealt=pre, overrides=ovs, ai_attitudes=atts)
+    cums    = req.cum_scores  if req else None
+    rleft   = req.rounds_left if req else None
+    result  = _play(names, strats, pre_dealt=pre, overrides=ovs, ai_attitudes=atts,
+                    cum_scores=cums, rounds_left=rleft)
     return result
 
 

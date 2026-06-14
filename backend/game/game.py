@@ -165,16 +165,18 @@ def compute_dynamic_attitude(
     return max(-1.0, min(1.0, att))
 
 
-def _arrange(hand_cards, strategy: str, attitude_override: float = None) -> 'Hand13':
-    """Arrange a hand using the specified strategy. hand_cards = list of Card objects."""
+def _arrange(hand_cards, strategy: str, attitude_override: float = None,
+             notlast_ctx: tuple = None) -> 'Hand13':
+    """Arrange a hand using the specified strategy. hand_cards = list of Card objects.
+    notlast_ctx = (my_cum, opp_cums, rounds_left) → 傳說(ml2) 走 P(不墊底) 決策層。"""
     cardstrs = [c.cardstr() for c in hand_cards]
     if strategy == 'monte_carlo':
         from .evaluate import best_arrangement_mc
         result = best_arrangement_mc(cardstrs, top_k=20, n_sims=150)
         return result["arrangement"]
     elif strategy in ('ml_dist', 'ml_dist_aggressive', 'ml_dist_conservative', 'ml2'):
-        # DistNet（分布頭 ML，高階）。ml2（專家，att 優化版）尚未訓練，暫 fallback 同 DistNet。
-        from .arrange import best_arrangement_dist
+        # DistNet（分布頭 ML，高階）。傳說(ml2)+notlast_ctx → P(不墊底) 決策層；否則 att 旋鈕。
+        from .arrange import best_arrangement_dist, best_arrangement_notlast
         att = attitude_override if attitude_override is not None else \
               {'ml_dist_aggressive': 0.8, 'ml_dist_conservative': -0.8}.get(strategy, 0.0)
         h = Hand13(cardstrs)
@@ -182,7 +184,11 @@ def _arrange(hand_cards, strategy: str, attitude_override: float = None) -> 'Han
         h.specialhand = sp
         if sp != 'normal':
             return h
-        result = best_arrangement_dist(cardstrs, attitude=att)
+        if strategy == 'ml2' and notlast_ctx is not None:
+            my_cum, opp_cums, rounds_left = notlast_ctx
+            result = best_arrangement_notlast(cardstrs, my_cum, opp_cums, rounds_left)
+        else:
+            result = best_arrangement_dist(cardstrs, attitude=att)
         if result:
             h.htop, h.hmid, h.hbot = result
             h.ss = [h.htop.score, h.hmid.score, h.hbot.score]
@@ -292,7 +298,7 @@ def deal_game() -> list:
 
 def play_one_game(player_names=None, strategies=None,
                   pre_dealt=None, overrides=None,
-                  ai_attitudes=None):
+                  ai_attitudes=None, cum_scores=None, rounds_left=None):
     """
     pre_dealt   : [[cardstrs]*13]*4  – use these dealt hands instead of dealing fresh
     overrides   : [{player:int, top:[cs], mid:[cs], bot:[cs]}]
@@ -348,7 +354,14 @@ def play_one_game(player_names=None, strategies=None,
             else:
                 # Use dynamic attitude if provided for this seat
                 att_override = ai_attitudes[idx] if (ai_attitudes and idx < len(ai_attitudes)) else None
-                arranged = _arrange(hands[idx], strategy, attitude_override=att_override)
+                # 傳說(ml2)：以「目前比分 + 剩餘局數」走 P(不墊底) 決策層
+                notlast_ctx = None
+                if strategy == 'ml2' and cum_scores is not None and rounds_left:
+                    my_cum   = cum_scores[idx] if idx < len(cum_scores) else 0.0
+                    opp_cums = [cum_scores[j] for j in range(len(cum_scores)) if j != idx]
+                    notlast_ctx = (my_cum, opp_cums, rounds_left)
+                arranged = _arrange(hands[idx], strategy, attitude_override=att_override,
+                                    notlast_ctx=notlast_ctx)
                 h13.htop = arranged.htop
                 h13.hmid = arranged.hmid
                 h13.hbot = arranged.hbot
