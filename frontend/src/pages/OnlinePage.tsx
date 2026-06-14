@@ -499,9 +499,12 @@ const DIFFICULTY_OPTIONS: { value: string; label: string; sub: string; tint: str
   { value: 'expert',       label: '傳說', sub: '牌道至境，不可言說',           tint: 'text-fuchsia-300' },
 ]
 const DEFAULT_DIFFICULTY = 'advanced'
-// 傳說(ml2) 不墊底 attitude 曲線旋鈕（待 ml/match_sim.py 以「最大化 P(不墊底)」最佳化後更新）
-const NOTLAST_MARGIN = 12   // 領先當前最後一名 ≥ 此分數即轉守
-const NOTLAST_GP_POW = 1    // 賽程進度權重指數（>1 = 後段才放大攻守）
+// 傳說(ml2) attitude 旋鈕——目標：min P(成為嚴格最後一名)。參數待 match_sim 微調。
+const NOTLAST_SAFE_BASE     = 6    // 「完全安全」所需的領先 = BASE × √(剩餘局數)
+const NOTLAST_GP_POW        = 1    // 賽程進度權重指數
+const NOTLAST_AMP_BASE      = 0.4  // 攻/守基礎強度
+const NOTLAST_AMP_GP        = 0.4  // 賽程加成（終盤更用力）
+const NOTLAST_DEFICIT_BOOST = 0.3  // 落後越深，攻越猛
 
 function DifficultySelect({ value, onChange, accent = 'sky' }:
   { value: string; onChange: (v: string) => void; accent?: 'sky' | 'yellow' }) {
@@ -1421,20 +1424,29 @@ export default function OnlinePage() {
       return Math.max(-1.0, Math.min(1.0, att))
     }
 
-    // 傳說 (ml2) attitude curve — objective is 不墊底 (don't finish strict last),
-    // NOT total score. Shape mirrors ml/match_sim.py make_notlast:
-    //   • (temporarily) last        → attack, harder as the match nears its end
-    //   • safe by ≥ NOTLAST_MARGIN  → defend (lock the cushion, don't fall)
-    //   • in between                → neutral
-    // NOTLAST_MARGIN / NOTLAST_GP_POW are the knobs match_sim optimizes for max P(不墊底).
+    // 傳說 (ml2) attitude curve — objective is min P(成為嚴格最後一名), NOT total score.
+    // 邏輯（不靠 sim 即可推導）：
+    //   • 墊底/並列墊底 (cushion≤0) → 搏變異（唯一翻身路；已是底，犧牲 EV 無妨）。
+    //                                  落後越深 + 越終盤 → 攻越猛。
+    //   • 領先最後一名 (cushion>0)  → 變異純粹是下檔風險（往上不會「更不墊底」）→ 縮。
+    //                                  安全墊 S = BASE×√剩餘局數（早盤同樣領先較脆、晚盤較穩）；
+    //                                  越安全縮越多，薄墊→近中性（避免犧牲均值反掉到底）。
+    // 與 ml/match_sim.py 的 pol 形狀保持一致；參數 = 上方 NOTLAST_* 常數。
     function computeAttitudeNotLast(seatIdx: number): number {
-      const me     = cumScores[seatIdx] ?? 0
-      const gp     = Math.pow(totalRounds > 0 ? gpRound / totalRounds : 0, NOTLAST_GP_POW)
-      const others = seatNames.map((_, i) => cumScores[i] ?? 0).filter((_, i) => i !== seatIdx)
-      const worstOther = Math.min(...others)
-      if (me <= worstOther) return Math.min(1.0,  0.4 + 0.4 * gp)   // I'm last → search variance
-      if (me - worstOther >= NOTLAST_MARGIN) return Math.max(-1.0, -(0.4 + 0.4 * gp))  // safe → lock
-      return 0.0
+      const me        = cumScores[seatIdx] ?? 0
+      const others    = seatNames.map((_, i) => cumScores[i] ?? 0).filter((_, i) => i !== seatIdx)
+      const worst     = Math.min(...others)
+      const cushion   = me - worst
+      const gp        = Math.pow(totalRounds > 0 ? gpRound / totalRounds : 0, NOTLAST_GP_POW)
+      const remaining = Math.max(1, totalRounds - gpRound + 1)        // 含本局的剩餘局數
+      const S         = NOTLAST_SAFE_BASE * Math.sqrt(remaining)      // 安全墊（隨剩餘變異縮放）
+      const amp       = NOTLAST_AMP_BASE + NOTLAST_AMP_GP * gp        // 攻守強度（終盤放大）
+      if (cushion <= 0) {
+        const deficit = Math.min(1, -cushion / S)
+        return Math.min(1.0, amp + NOTLAST_DEFICIT_BOOST * deficit)   // 攻
+      }
+      const z = Math.min(1, cushion / S)
+      return Math.max(-1.0, -amp * z)                                  // 守（按安全程度比例）
     }
 
     // Only pass attitudes for AI seats with strategies that honor it.
