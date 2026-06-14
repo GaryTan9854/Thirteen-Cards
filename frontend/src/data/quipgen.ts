@@ -277,6 +277,48 @@ const TRASH: TrashLine[] = [
   // 從 Glory 招牌「甲殼蟲」genericize 出來的公開版：任何人/任何局都能講，
   // 不再綁特定玩家（solo 對美女時也能出現）。
   { id: '跨情境-9',  by: 'any', text: '甲殼蟲爬玻璃——看誰今晚腳滑溜得最順！' },
+
+  // ── 輸家短嗆篇（誰輸誰講，性別中性，punchy 一句）──
+  { id: '輸家嗆-1',  by: 'loser', text: '倒酒！倒酒！' },
+  { id: '輸家嗆-2',  by: 'loser', text: '不爽啦！' },
+  { id: '輸家嗆-3',  by: 'loser', text: '再來！' },
+  { id: '輸家嗆-4',  by: 'loser', text: '這什麼鬼牌！' },
+  { id: '輸家嗆-5',  by: 'loser', text: '不可能！' },
+  { id: '輸家嗆-6',  by: 'loser', text: '我不服！' },
+  { id: '輸家嗆-7',  by: 'loser', text: '重來！' },
+  { id: '輸家嗆-8',  by: 'loser', text: '有黑幕！' },
+  { id: '輸家嗆-9',  by: 'loser', text: '今天犯太歲是不是！' },
+  // ── 嘴硬篇 ──
+  { id: '嘴硬-1',  by: 'loser', text: '剛剛不算。' },
+  { id: '嘴硬-2',  by: 'loser', text: '我還沒熱身。' },
+  { id: '嘴硬-3',  by: 'loser', text: '運氣罷了。' },
+  { id: '嘴硬-4',  by: 'loser', text: '僥倖而已。' },
+  { id: '嘴硬-5',  by: 'loser', text: '算你狠。' },
+  { id: '嘴硬-6',  by: 'loser', text: '這局讓你的。' },
+  { id: '嘴硬-7',  by: 'loser', text: '下局見真章。' },
+  { id: '嘴硬-8',  by: 'loser', text: '先給你高興一下。' },
+  { id: '嘴硬-9',  by: 'loser', text: '牌神偏心。' },
+  // ── 酒桌篇 ──
+  { id: '酒桌-1',  by: 'loser', text: '滿上！' },
+  { id: '酒桌-2',  by: 'loser', text: '罰三杯！' },
+  { id: '酒桌-3',  by: 'loser', text: '喝！' },
+  { id: '酒桌-4',  by: 'loser', text: '不醉不歸！' },
+  { id: '酒桌-5',  by: 'loser', text: '今晚戒酒失敗！' },
+  { id: '酒桌-6',  by: 'loser', text: '酒拿來！' },
+  { id: '酒桌-7',  by: 'loser', text: '再喝就翻本了！' },
+  { id: '酒桌-8',  by: 'loser', text: '輸牌不輸酒！' },
+  { id: '酒桌-9',  by: 'loser', text: '酒呢？快上！' },
+  // ── 台灣牌咖篇 ──
+  { id: '台咖-1',  by: 'loser', text: '靠北喔！' },
+  { id: '台咖-2',  by: 'loser', text: '又放槍！' },
+  { id: '台咖-3',  by: 'loser', text: '衰到爆！' },
+  { id: '台咖-4',  by: 'loser', text: '今天邪門了！' },
+  { id: '台咖-5',  by: 'loser', text: '手氣有夠臭！' },
+  { id: '台咖-6',  by: 'loser', text: '運氣都被你吸走了！' },
+  { id: '台咖-7',  by: 'loser', text: '我懷疑你開掛！' },
+  { id: '台咖-8',  by: 'loser', text: '這也能贏？' },
+  { id: '台咖-9',  by: 'loser', text: '見鬼了！' },
+  { id: '台咖-10', by: 'loser', text: '不科學！' },
 ]
 
 // ── 4. 特殊 player 專屬台詞（在場時 40% 取代一般垃圾話）────────────────────
@@ -416,6 +458,31 @@ const BEAUTY_COAX: { id: string; at: 'winner' | 'loser'; text: string }[] = [
   { id: '美女輸牌-48', at: 'winner', text: '我接受失敗，但不接受輸成這樣。' },
   { id: '美女輸牌-49', at: 'winner', text: '很好，我的勝負欲被你喚醒了。' },
   { id: '美女輸牌-50', at: 'winner', text: '看來今晚有人要被我追殺了。' },
+  // 美女破防型（輸給人類贏家後的撒嬌/抓狂）
+  { id: '美女破防-1',  at: 'winner', text: '討厭！' },
+  { id: '美女破防-2',  at: 'winner', text: '哼！' },
+  { id: '美女破防-3',  at: 'winner', text: '欺負人！' },
+  { id: '美女破防-4',  at: 'winner', text: '{bro}壞死了！' },
+  { id: '美女破防-5',  at: 'winner', text: '不跟你玩了！' },
+  { id: '美女破防-6',  at: 'winner', text: '你作弊吧？' },
+  { id: '美女破防-7',  at: 'winner', text: '怎麼又是你贏！' },
+  { id: '美女破防-8',  at: 'winner', text: '氣到睡不著！' },
+  { id: '美女破防-9',  at: 'winner', text: '我的小金庫啊！' },
+  { id: '美女破防-10', at: 'winner', text: '今晚沒心情了！' },
+  { id: '美女破防-11', at: 'winner', text: '氣死本宮了！' },
+  { id: '美女破防-12', at: 'winner', text: '本姑娘大意了。' },
+  { id: '美女破防-13', at: 'winner', text: '{bro}陪一杯！' },
+  // 妖姬型（傲嬌/霸氣）
+  { id: '美女妖姬-1',  at: 'winner', text: '本宮記住你了。' },
+  { id: '美女妖姬-2',  at: 'winner', text: '放肆！' },
+  { id: '美女妖姬-3',  at: 'winner', text: '竟敢贏我？' },
+  { id: '美女妖姬-4',  at: 'winner', text: '好大的膽子。' },
+  { id: '美女妖姬-5',  at: 'winner', text: '你成功惹怒我了。' },
+  { id: '美女妖姬-6',  at: 'winner', text: '來人，拖出去！' },
+  { id: '美女妖姬-7',  at: 'winner', text: '賜酒！' },
+  { id: '美女妖姬-8',  at: 'winner', text: '此仇不報非女子。' },
+  { id: '美女妖姬-9',  at: 'winner', text: '風水輪流轉。' },
+  { id: '美女妖姬-10', at: 'winner', text: '你最好別落我手裡。' },
 ]
 
 // ── 5. 局勢評論台詞（給對話用，比 debug 描述口語）───────────────────────────
