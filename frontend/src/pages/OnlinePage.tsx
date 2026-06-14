@@ -496,9 +496,12 @@ const DIFFICULTY_OPTIONS: { value: string; label: string; sub: string; tint: str
   { value: 'beginner',     label: '菜鳥', sub: '誤闖叢林的小白兔',           tint: 'text-emerald-300' },
   { value: 'intermediate', label: '老仙', sub: '現職計程車司機，聽我的準沒錯', tint: 'text-amber-300' },
   { value: 'advanced',     label: '大神', sub: '小四開始打牌，從此未逢敵手',   tint: 'text-sky-300' },
-  { value: 'expert',       label: '傳說', sub: '牌道至境，不可言說',           tint: 'text-fuchsia-300', disabled: true },
+  { value: 'expert',       label: '傳說', sub: '牌道至境，不可言說',           tint: 'text-fuchsia-300' },
 ]
 const DEFAULT_DIFFICULTY = 'advanced'
+// 傳說(ml2) 不墊底 attitude 曲線旋鈕（待 ml/match_sim.py 以「最大化 P(不墊底)」最佳化後更新）
+const NOTLAST_MARGIN = 12   // 領先當前最後一名 ≥ 此分數即轉守
+const NOTLAST_GP_POW = 1    // 賽程進度權重指數（>1 = 後段才放大攻守）
 
 function DifficultySelect({ value, onChange, accent = 'sky' }:
   { value: string; onChange: (v: string) => void; accent?: 'sky' | 'yellow' }) {
@@ -1418,18 +1421,34 @@ export default function OnlinePage() {
       return Math.max(-1.0, Math.min(1.0, att))
     }
 
+    // 傳說 (ml2) attitude curve — objective is 不墊底 (don't finish strict last),
+    // NOT total score. Shape mirrors ml/match_sim.py make_notlast:
+    //   • (temporarily) last        → attack, harder as the match nears its end
+    //   • safe by ≥ NOTLAST_MARGIN  → defend (lock the cushion, don't fall)
+    //   • in between                → neutral
+    // NOTLAST_MARGIN / NOTLAST_GP_POW are the knobs match_sim optimizes for max P(不墊底).
+    function computeAttitudeNotLast(seatIdx: number): number {
+      const me     = cumScores[seatIdx] ?? 0
+      const gp     = Math.pow(totalRounds > 0 ? gpRound / totalRounds : 0, NOTLAST_GP_POW)
+      const others = seatNames.map((_, i) => cumScores[i] ?? 0).filter((_, i) => i !== seatIdx)
+      const worstOther = Math.min(...others)
+      if (me <= worstOther) return Math.min(1.0,  0.4 + 0.4 * gp)   // I'm last → search variance
+      if (me - worstOther >= NOTLAST_MARGIN) return Math.max(-1.0, -(0.4 + 0.4 * gp))  // safe → lock
+      return 0.0
+    }
+
     // Only pass attitudes for AI seats with strategies that honor it.
-    // RuleAlpha and RuleAlpha4 honor dynamic attitude.
-    // RuleAlpha3 explicitly ignores attitude (pure hand-based).
-    // RuleAlpha2 hard-codes attitude=0 internally.
-    const _attSupports = (s: string) =>
+    //   rulealpha / rulealpha4 → win-oriented computeAttitude
+    //   ml2 (傳說)             → 不墊底-oriented computeAttitudeNotLast (DistNet CVaR knob)
+    //   大神 (ml_dist) stays att=0 (proven on points); rulealpha3/2 ignore attitude.
+    const _attSupportsWin     = (s: string) =>
       s === 'rulealpha' || s.startsWith('rulealpha_') || s.startsWith('rulealpha4')
+    const _attSupportsNotLast = (s: string) => s === 'ml2'
     const ai_attitudes = seatNames.map((_, i) => {
       if (i === 0) return 0.0  // human player, attitude unused (they choose manually)
       const strat = state.strategies[i] ?? 'rulealpha'
-      if (_attSupports(strat)) {
-        return computeAttitude(i)
-      }
+      if (_attSupportsNotLast(strat)) return computeAttitudeNotLast(i)
+      if (_attSupportsWin(strat))     return computeAttitude(i)
       return 0.0
     })
 
