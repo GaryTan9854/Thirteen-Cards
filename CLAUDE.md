@@ -178,13 +178,18 @@ RA4 honors attitude；RA3 永遠傳 0；前端 `_attSupports()` 限制只有 RA 
 - 整合：`best_arrangement_dist(handstrs, attitude)` (arrange.py)，選定後套 `_canonicalize_fullhouse`（葫蘆最小對鐵則）。策略字串 `ml_dist`/`ml2`。
 
 ### 難易度 → 策略（前端 OnlinePage DIFFICULTY_TO_STRATEGY）
-- 菜鳥=rulealpha3、老仙=rulealpha4、**大神=ml_dist(default)**、傳說=ml2(未訓練，暫 fallback DistNet、UI 灰底「即將推出」)
+- 菜鳥=rulealpha3、老仙=rulealpha4、**大神=ml_dist(default, att=0)**、**傳說=ml2 = DistNet + 不墊底 attitude 曲線**（v2.9.0 啟用）
+- 傳說 att 曲線 = 前端 `computeAttitudeNotLast`（shape 同 `ml/match_sim.py make_notlast`：墊底→攻、安全(領先最後一名≥`NOTLAST_MARGIN`)→守、之間→中性）；旋鈕 `NOTLAST_MARGIN/NOTLAST_GP_POW` **待 match_sim 以最大化 P(不墊底) 最佳化後更新**。大神維持 att=0、老仙維持 win 曲線（`computeAttitude`）。
 
 ### 舊模型 (`ml/scoring_model.py`, `data_collector.py`)
 - ScoringNet μ/σ；已被 DistNet 取代（vs RA3 僅平手）。`ml`/`ml_*` 策略仍在但不是 default。MBP 無 torch → 這些會 fallback rule-based。
 
-### attitude 動態調整：實證無效，勿再投入（2026-06-13）
-- match_sim/headtohead 實測：動態 attitude 對「不墊底」~0、oracle 上限僅 +2.8pp、槓桿 0.17/2。十三支變異數由發牌主導，重排固定手牌造不出變異數。**傳說該做「DistNet+MC精算」而非 attitude。**
+### attitude：對「最勝」無用，對「不墊底」必要（2026-06-14 修正定調）
+- **正確框架（Gary）**：遊戲真正賭注是「最輸者請客」→ 真目標是 **P(不墊底)**（門檻/名次），非總分。
+  - 最勝（總分最大）→ **att=0 可證明最優**，attitude 無用。
+  - 不墊底（門檻目標）→ **attitude 是必要工具**（領先守、墊底搏）。存在性證明：同手牌「葫蘆 vs [對/三條/同花]」的正確選擇會因守/搏門檻而翻轉。
+- **誠實定標**：oracle（看穿未來）對不墊底上限僅 **+2.8pp**——attitude 必要但天花板有限（變異由發牌主導）。之前「實證無效」是指**平均/最勝目標**下，**非否定不墊底**。
+- **現況**：傳說(ml2)=DistNet+不墊底曲線已上線（v2.9.0）。**下一步：用 `ml/match_sim.py` 搜 `make_notlast` 參數(margin, gp_pow…) 最大化 P(不墊底)，把最優參數寫回前端 `NOTLAST_MARGIN/GP_POW`。**（heavy；等 shrink_table 跑完釋放 MBA 核心再跑，避免爭用。）
 
 ### 候選池與 fast-path（arrange.py）
 - `enumerate_arrangements` 啟發式產生 ~150-340 候選（全合法空間 ~2萬）；覆蓋測試初步顯示窮舉最優 100% 在池內（待完整確認，見 ml/eval_coverage.py）。
