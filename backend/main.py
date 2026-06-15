@@ -1332,6 +1332,10 @@ def api_players():
     return {"players": _load_allowed()}
 
 
+# AI 美女名（含 v2.4 前的錯字 妺喜 U+59BA）— 不納入公榜排行
+_AI_NAMES = {'妲己', '妹喜', '妺喜', '褒姒', '驪姬', '西施', '王昭君', '楊貴妃', '貂蟬'}
+
+
 @app.get("/api/log/stats")
 def api_stats(scope: str = "all", period: str = "all", player: str = ""):
     """
@@ -1425,8 +1429,12 @@ def api_stats(scope: str = "all", period: str = "all", player: str = ""):
             max_score = max(game_scores.values())
             min_score = min(game_scores.values())
 
-            # Count per player: games played, wins (1st only), losses (last only)
+            # Count per player: games played, wins (1st only), losses (last only).
+            # max/min above are over ALL seats (so a beauty winner/loser correctly
+            # affects real players); but AI beauty names never get their own row.
             for pname, s in game_scores.items():
+                if pname in _AI_NAMES:        # AI 美女(含舊錯字 妺喜)不上公榜
+                    continue
                 if pname not in stats:
                     stats[pname] = {"player": pname, "wins": 0, "losses": 0, "games": 0}
                 stats[pname]["games"] += 1
