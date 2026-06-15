@@ -1,4 +1,4 @@
-# SESSION_HANDOFF — ThirteenCards（最新：v2.4.0，2026-06-13/14）
+# SESSION_HANDOFF — ThirteenCards（最新：v2.10.2，2026-06-15）
 
 > Architecture / 通則 → 讀 `CLAUDE.md`。本檔記錄最近 session 的決策、debug 歷史、待辦。
 
@@ -6,6 +6,63 @@
 ```
 讀 /Users/user/documents/thirteencards/CLAUDE.md 和 SESSION_HANDOFF.md，接續 ThirteenCards 工作。
 ```
+
+---
+
+## ⭐ 下個 session 待辦（Gary 指定）
+
+### 1. RA4 的 attitude 要改對（現在運作跟 Gary 想要的不同）
+- **現況**：RA4 attitude = 舊純量旋鈕，唯一作用在 `arrange.py _ra3_select`：
+  `bot_edge = ±0.3` 死區的 **二選一開關**（best_def vs best_att），且失效條件多（無攻擊候選 / best_def==best_att / |att|≤0.3）。
+  attitude 值由 `compute_dynamic_attitude`（舊 win 曲線）算。
+- **問題**：實測同手牌 att −1.0~+1.0 排法完全不變（KKK66 例），切不動。Gary 要的不是這個。
+- **方向（待和 Gary 確認細節）**：把 RA4 的 attitude 改成「對」的語意——可能要對齊傳說的「不墊底」概念，但 RA4 是規則式、無分布，無法直接算 P(不墊底)。需釐清 Gary 真正要 RA4 做什麼（是要更大幅度的攻守切換？還是改用不墊底 scalar 曲線？還是其他）。**先記下，下個 session 開頭問清楚再動。**
+
+---
+
+## ★ 2026-06-15 Session（傳說驗證 + 候選池 + 縮推表 + 口訣 + 妹喜分身）
+
+### 版本：v2.10.0 → v2.10.2
+### 傳說 attitude（最終定調）
+- 「不墊底決策層」(`game/notlast.py` + `arrange.best_arrangement_notlast`)已上線(傳說 ml2)；單手樞紐局正確（KKK66 例：領先→arr1 縮、墊底→arr2 推切換）。
+- **但整季可量增幅 ≈ 0**：配對 match-sim `ml/eval_notlast.py`，對手三種場景全 ~0：
+  - strong(理想) Δ+0.15±0.27 / peer(同強度會犯錯) −0.10±0.17 / real(強弱混合) +0.15±0.23。
+  - 原因：對手會犯錯時「犯錯者自己墊底」→ seat0 不墊底基準衝到 ~92%，attitude 空間更小。
+- **結論**：attitude 微觀正確、宏觀稀有→平均 ~0。傳說保留(零成本、≥att=0)，別期待肉。真正 edge 在實力(EV)。
+- 純量旋鈕 vs 直接 P(不墊底) 的矛盾解法：DistNet 不重訓，只換決策層（用它輸出的分布直接算 P(不墊底) 取 argmin）。`ml/build_round_marginal.py`→`round_marginal.npz`(每局淨分邊際 M)。
+
+### 候選池覆蓋（`ml/eval_coverage.py` n=80）
+- enumerate 平均 167 候選 vs 全空間 22219；**窮舉最優 92% 在池內**、平均 gap +0.0033/手。
+- 8% miss **全是同牌型內踢腳差異**（`ml/show_coverage_misses.py` 列出實際牌面確認）→ **牌型 enumeration 完備**，踢腳交給 ML。Kicker 確認無關緊要（8000-sim 比 RA3-JJA vs 人類-JJQ = Δ−0.003）。
+
+### 縮/推決策表（`ml/shrink_table.py` n=4000，**改用 P1×P2**）
+- 舊表用「P2×最大單張」是錯維度；Gary 指正→改 [P1×P2]（kicker 無關），**raw 不用重跑**直接重樞紐。
+- 鐵則：**P1=AA→永遠推；P1=K→看 P2(大→推)；P1≤Q→幾乎全縮。** = 最大對夠強就推、否則縮。
+
+### Gary 兩條江湖口訣 → **都成立** ✓✓
+- ⚠ 先前 `ml/verify_folklore.py`「順都推」是**假象**（強迫小順入尾 + 縮/推建構不公平，兩者皆爛 EV~−7 vs 大神 −0.17）。已作廢。
+- 正確驗法 `ml/diag_god_choice.py`（不跑 MC，直接看大神≈最優的實際選擇，12000 手秒級）：
+  - **尾墩=順 → 偏縮**（縮39%>推29%，小~中順更明顯，只 A 持平）✓
+  - **尾墩=同花 → 偏推**（推27%>縮19%，大同花 K/A 更明顯）✓
+  - 「其他」占 32%/55%（頭對/中三條等第三結構）→ 口訣是「縮vs推二選一時」的好心法、非全部。
+- 教訓：**「讓已驗證為最優的大神直接示範」比自己重跑百萬 MC 快上千倍且更可信。**
+- A2345 = **次大順**（Gary 規則），verify_folklore 標籤已修(top=13.5)。
+
+### 妹喜分身（公榜）
+- **公榜要含美女**（不可排除——一度誤排除後已 revert）。
+- 根因：`妺喜`(U+59BA) 錯字（程式已於 v2.5 改正為妹喜，但歷史資料殘留）造兩個妹喜。
+- 修法：MBP 資料層**合併** `妺喜→妹喜`（games/rounds JSONL + DB quip_usage 共 644 列），已備份 `~/db-backups/thirteencards/merge_meixi_20260615_100012`。公榜現妹喜單列(games 481)。
+
+### 其他已修上線
+- 俏皮話擴充至 **260 句**（美女輸牌/破防/妖姬、輸家嗆/嘴硬/酒桌/台咖、BIG4 梗公開化）；權重(申訴30%/局勢30%/美女撒嬌70%)。完整清單匯出 `~/Documents/thirteencards_quips.csv|.txt`。
+- 跨裝置同步頭像+設定（`utils/prefs.ts` + 後端 `user_prefs` 表 + `/api/user/prefs`）。
+- 6 連修：妹喜頭像(妺→妹)、難易度配色/字級、玩家名字級、ManualArrange highlight(label fallback)、申訴停頓 voice-aware。
+
+### ⚠ 背景任務可靠性教訓（吃過 4 次虧）
+- **只用 `nohup … & disown` + 寫 log 檔**（shrink_table 本體這樣活了 9h+）。
+- **不要**：`setsid`(macOS 沒有)、harness `run_in_background`/Monitor 當長任務看守(會被砍)、`pkill -f`(會自我匹配把暫停指令一起凍)。
+- 暫停別的任務用**字面 PID**(`kill -STOP/-CONT <pid>`)，且務必確保會解凍；能不暫停就共用核心。
+- 長任務一律 `caffeinate -i` 包，提醒 Gary **別闔蓋**。
 
 ---
 

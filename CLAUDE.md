@@ -1,6 +1,7 @@
 # ThirteenCards — CLAUDE.md
 
-十三支 (Chinese Poker / Big Two Variant) 平台，**543 規則**（Jack/Glory/Gary 自訂，含 25 種報到牌型）。**當前版本 v2.4.0**。
+十三支 (Chinese Poker / Big Two Variant) 平台，**543 規則**（Jack/Glory/Gary 自訂，含 25 種報到牌型）。**當前版本 v2.10.2**。
+> A2345 = **次大順**（僅次於 10JQKA，非最小）。排牌心法（大神實證）：**尾順→偏縮、尾同花→偏推**。
 
 > Recent session 詳情 → `SESSION_HANDOFF.md`
 
