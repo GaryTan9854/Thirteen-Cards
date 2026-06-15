@@ -36,7 +36,8 @@ def find_straights(cards):
     out = []
     for seq in seqs:
         if all(r in by for r in seq):
-            top = 5 if seq == [14, 2, 3, 4, 5] else seq[-1]
+            # Gary 規則：A2345 是「次大順」（僅次於 10JQKA），不是最小。用 13.5 排在 K 與 A 之間。
+            top = 13.5 if seq == [14, 2, 3, 4, 5] else seq[-1]
             out.append(([by[r][0] for r in seq], top))
     return out
 
@@ -164,8 +165,8 @@ def main():
     for w in which: rc[w] += 1
     print(f"  RA3 預設選： 縮 {rc['縮']}  推 {rc['推']}  其他 {rc['其他']}")
     print(f"  依尾墩高張分桶：")
-    label = {5: 'A2345', 6: '~6', 7: '~7', 8: '~8', 9: '~9', 10: '~10',
-             11: '~J', 12: '~Q', 13: '~K', 14: '~A'}
+    label = {6: '~6', 7: '~7', 8: '~8', 9: '~9', 10: '~10',
+             11: '~J', 12: '~Q', 13: '~K', 13.5: 'A2345(次大)', 14: '~A'}
     for t in sorted(set(tops.tolist())):
         m = tops == t
         d = dl[m]
