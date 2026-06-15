@@ -112,16 +112,19 @@ _ATK_RANK5B = 3707  # bot ≥ 69.9%（sweep 不敏感，維持）
 - `_TOP_MON = {3}` (三條)，`_MID_MON = _BOT_MON = {7, 8}` (鐵支/同花順)
 - **顯示面板** (`main.py: manual_arrange_info`) 與 pool 用相同規則，保證 UI 一致
 
-### Dynamic Attitude (`compute_dynamic_attitude` + frontend `computeAttitude`)
-**設計洞察**：打槍 ×1.5/×2 是非線性 payoff，**gap 小時也該攻**（搶全壘打逆轉）。
+### Dynamic Attitude — RA4 不墊底式（`compute_dynamic_attitude` + 前端 `computeAttitude`，2026-06-15 改）
+**真目標 = P(不墊底)**，非總分。符號：**負=守、正=攻、0=EV**。
+令 `g = 我 − 最後一名`（領先緩衝）、`rl = 含本局剩餘局數`、`K≈10`：
 ```python
-if gap < 30:   # close game
-    att = 0.7 - 0.4 * gp        # gp=0→+0.7, gp=1→+0.3
-else:          # spread game
-    pos = (my - min) / gap      # 0=last, 1=first
-    att = (1 - 2*pos) * (0.4 + 0.6 * gp)
+if g < 0:        att = min(1, -g/(K*rl))      # 墊底 → 攻（搏變異翻身）
+elif g <= K*rl:  att = 0                       # 領先不夠安穩 → EV
+else:            att = -min(1,(g-K*rl)/(K*rl)) # 安穩領先 → 守（鎖局）
 ```
-RA4 honors attitude；RA3 永遠傳 0；前端 `_attSupports()` 限制只有 RA / RA4 傳動態值。
+- **門檻線性 ∝ rl**（單局 `ml/defense_vs_ev.py` 分布推導：守vs攻 ΔEV−0.26、Δ方差−13.3 → `g* ≈ 10·rl`）→ 保守幾乎只在**收尾局且確有領先**時觸發。
+- 消費端 `_ra3_select` 已改：`att<0`→best_def、`att>0`→best_att、`att==0`→EV 預設（與 RA3 等價）。舊 `bot_edge ±0.3` 死區（切不動）已刪。
+- `K` 待 `ml/match_sim.py` 以最大化 P(不墊底) 校準（即原 `NOTLAST_MARGIN`，現確定形狀為斜率×rl）。
+- 守的 candidate 不會掉：`best_def = max(pool, score_defensive)` 直接從池取，K葫蘆等強防守必在（會誤殺的 Step4 Category-Pareto 早已移除）。
+- RA3 永遠傳 0；前端 `_attSupportsWin()` 的 RA/RA4 用 `computeAttitude`（已改不墊底式）。
 
 ## 前端
 

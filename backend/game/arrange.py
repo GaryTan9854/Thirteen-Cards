@@ -773,6 +773,14 @@ def _ra3_filtered_pool(handstrs: list) -> list:
 def _ra3_select(pool: list, attitude: float):
     """Threshold-dependent selection step: defense vs attack + attitude.
 
+    Attitude 語意（真目標 = P(不墊底)，見 compute_dynamic_attitude）:
+      attitude < 0  守 → best_def（左尾最小；安穩領先時鎖局）
+      attitude > 0  攻 → best_att（上行最大；墊底時搏翻身）
+      attitude == 0 EV → ev_default（純牌型最佳，RA3 用此分支）
+
+    舊版用 bot_edge ±0.3 死區做二選一，實測切不動（att −1~+1 排法不變）；
+    已改為三區、依符號直接切。att==0 與舊 RA3 行為等價（已驗證）。
+
     Cheap relative to pool construction — the ATK threshold sweep re-runs only
     this step over a cached pool (see ml/sweep_atk.py)."""
     best_def = max(pool, key=lambda t: score_defensive(*t))
@@ -780,8 +788,13 @@ def _ra3_select(pool: list, attitude: float):
     if not attack_cands:
         return best_def
     best_att = max(attack_cands, key=lambda t: score_arrangement(*t))
-    bot_edge = 0.3 if best_def[2].handtype_val > best_att[2].handtype_val else -0.3
-    return best_att if attitude > bot_edge else best_def
+    # EV 中性預設 = 舊 RA3(att=0) 行為：攻擊尾不弱於防守尾才打 best_att
+    ev_default = best_def if best_def[2].handtype_val > best_att[2].handtype_val else best_att
+    if attitude < 0:
+        return best_def      # 守
+    if attitude > 0:
+        return best_att      # 攻
+    return ev_default        # EV
 
 
 def _ra3_candidate_pool(handstrs: list):

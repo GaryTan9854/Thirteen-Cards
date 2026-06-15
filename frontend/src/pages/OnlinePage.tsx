@@ -505,6 +505,7 @@ const NOTLAST_GP_POW        = 1    // 賽程進度權重指數
 const NOTLAST_AMP_BASE      = 0.4  // 攻/守基礎強度
 const NOTLAST_AMP_GP        = 0.4  // 賽程加成（終盤更用力）
 const NOTLAST_DEFICIT_BOOST = 0.3  // 落後越深，攻越猛
+const NOTLAST_K             = 10   // RA4 守的觸發斜率：領先最後一名 > K×剩餘局數 才轉守（待 match_sim 校準）
 
 function DifficultySelect({ value, onChange, accent = 'sky' }:
   { value: string; onChange: (v: string) => void; accent?: 'sky' | 'yellow' }) {
@@ -1405,23 +1406,21 @@ export default function OnlinePage() {
     const _maxS  = Math.max(..._allS)
     const _gap   = _maxS - _minS
 
+    // RA4 (老仙) attitude — 真目標 = P(不墊底)，非總分。負=守、正=攻、0=EV。
+    // 鏡像後端 game.py compute_dynamic_attitude（單局 defense_vs_ev 分布推導）：
+    //   令 g = 我 − 最後一名（領先緩衝）、rl = 含本局剩餘局數。
+    //   g<0 墊底→攻；0≤g≤K·rl 領先不夠→EV；g>K·rl 安穩領先→守。
+    //   門檻線性 ∝ rl，斜率 K≈10 → 保守幾乎只在收尾局且確有領先時觸發。
     function computeAttitude(seatIdx: number): number {
-      const myScore = cumScores[seatIdx] ?? 0
-      const gp      = totalRounds > 0 ? gpRound / totalRounds : 0
-
-      // Close game (gap < 30): keep moderate attack throughout.
-      // The gun-bonus (×1.5 / ×2) non-linearity rewards risk when scores
-      // are tight — one 全壘打 flips the game regardless of who's leading.
-      if (_gap < 30) {
-        return Math.max(-1.0, Math.min(1.0, 0.7 - 0.4 * gp))
-      }
-
-      // Spread game: position-based, urgency scales with progress.
-      // pos=0 (last) → attack ; pos=1 (leader) → defend
-      // (0.4 + 0.6·gp): early game muted; final round amplified.
-      const pos = (myScore - _minS) / _gap
-      const att = (1.0 - 2.0 * pos) * (0.4 + 0.6 * gp)
-      return Math.max(-1.0, Math.min(1.0, att))
+      const me        = cumScores[seatIdx] ?? 0
+      const others    = seatNames.map((_, i) => cumScores[i] ?? 0).filter((_, i) => i !== seatIdx)
+      if (others.length === 0) return 0.0
+      const g         = me - Math.min(...others)
+      const remaining = Math.max(1, totalRounds - gpRound + 1)   // 含本局剩餘局數
+      const trig      = NOTLAST_K * remaining
+      if (g < 0)       return Math.min(1.0, -g / trig)            // 墊底 → 攻
+      if (g <= trig)   return 0.0                                 // EV
+      return -Math.min(1.0, (g - trig) / trig)                    // 安穩領先 → 守
     }
 
     // 傳說 (ml2) attitude curve — objective is min P(成為嚴格最後一名), NOT total score.

@@ -9,14 +9,24 @@
 
 ---
 
-## ⭐ 下個 session 待辦（Gary 指定）
+## ⭐ 2026-06-15 PM Session（RA4 attitude 重寫 = 不墊底式 + 單局實驗）
 
-### 1. RA4 的 attitude 要改對（現在運作跟 Gary 想要的不同）
-- **現況**：RA4 attitude = 舊純量旋鈕，唯一作用在 `arrange.py _ra3_select`：
-  `bot_edge = ±0.3` 死區的 **二選一開關**（best_def vs best_att），且失效條件多（無攻擊候選 / best_def==best_att / |att|≤0.3）。
-  attitude 值由 `compute_dynamic_attitude`（舊 win 曲線）算。
-- **問題**：實測同手牌 att −1.0~+1.0 排法完全不變（KKK66 例），切不動。Gary 要的不是這個。
-- **方向（待和 Gary 確認細節）**：把 RA4 的 attitude 改成「對」的語意——可能要對齊傳說的「不墊底」概念，但 RA4 是規則式、無分布，無法直接算 P(不墊底)。需釐清 Gary 真正要 RA4 做什麼（是要更大幅度的攻守切換？還是改用不墊底 scalar 曲線？還是其他）。**先記下，下個 session 開頭問清楚再動。**
+### RA4 attitude 改對了（待辦 #1 完成）✓
+- **真目標定錨（Gary 拍板）**：遊戲目標是 **P(不墊底)**（最輸者請客），EV 最大只是工具、不全等。見 memory `thirteencards-true-objective-notlast`。
+- **單局實驗 `ml/defense_vs_ev.py`**（10k 副，A=EV最佳 vs B=防守最佳，門檻=請客區）：
+  - 全體 P(輸≥6) 25.6%→25.2%（**−0.42pp**），但**僅 12% 岔開的手** −3.47pp（EV 代價 −2.1）；門檻 −4 更大（−4.88pp）。
+  - 結論：防守的肉**條件化**（拚局顯著、整季稀釋≈0），**別再說「沒有肉」**。守vs攻實測 ΔEV=−0.26、Δ方差=−13.3/局。
+- **推導出 heuristic**：對 `P(墊底)=Φ(−g/√W)` 微分 → **守有利 ⇔ 領先最後一名 `g > K·rl`，K≈10**（線性 ∝ 剩餘局數）。保守只在收尾局且確有領先時觸發。
+- **改了三處（已測，未 deploy）**：
+  1. `game/arrange.py _ra3_select`：刪 `bot_edge ±0.3` 死區（切不動），改三區依符號（att<0 守 best_def / att>0 攻 best_att / att==0 EV 預設）。**att=0 與舊 RA3 等價，500 手 0 mismatch。**
+  2. `game/game.py compute_dynamic_attitude`：舊 win-curve 全刪，換 `g>K·rl` 式（保留簽名，headtohead 不壞）。
+  3. `frontend OnlinePage.tsx computeAttitude`：同步鏡像（live 老仙）。
+  - 驗證：att 守/攻在 5% 手牌產生不同排法（bug 修好）；attitude 函數抽查全對。
+- **誤會澄清**：防守 candidate 不會在 pool 消失——`best_def=max(pool,score_defensive)` 直接取，K葫蘆必在；會誤殺的 Step4 早移除。
+
+### 下一步
+- [ ] **校準 K**（默認 10）：用 `ml/match_sim.py` 以最大化 P(不墊底) 跑 RA4，把最優斜率寫回 `NOTLAST_K`（後端 game.py + 前端 OnlinePage.tsx 兩處常數）。這就是原 `NOTLAST_MARGIN` 待辦，現形狀已定為「斜率×rl」。
+- [ ] deploy（前端 build 必在 MBP）。
 
 ---
 

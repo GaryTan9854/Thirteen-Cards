@@ -100,69 +100,49 @@ def compete(h1, h2):
     return res
 
 
+NOTLAST_K = 10.0   # 守的觸發斜率：領先最後一名 > K×剩餘局數 才轉守（待 match_sim 校準）
+
+
 def compute_dynamic_attitude(
     rounds_played: int,
     total_rounds: int,
     my_score: float,
     all_scores: list,
+    K: float = NOTLAST_K,
 ) -> float:
     """
-    Dynamic attitude for RuleAlpha/RuleAlpha3 based on game progress and score position.
+    RuleAlpha4 的 attitude——真目標 = P(不墊底)（最輸者請客），非總分/最勝。
 
-    Parameters
-    ----------
-    rounds_played : int
-        Number of rounds already completed (0 = before round 1).
-    total_rounds : int
-        Total expected rounds (rounds_normal + appeal rounds used/expected).
-    my_score : float
-        This player's current cumulative score.
-    all_scores : list
-        Cumulative scores of all 4 players at this point.
+    符號約定：負 = 守（保守，選左尾最小的牌）；正 = 攻（搏變異）；0 = EV 最佳。
 
-    Attitude function (-1 = ultra conservative, 0 = neutral, +1 = ultra aggressive).
+    決策（2026-06-15 由單局 defense_vs_ev 分布推導）：
+      令 rl = 剩餘局數（含本局）、g = my_score − 最後一名分數（領先最後一名的緩衝）。
+      • g < 0（我正墊底）          → 攻：搏上行變異翻身，落後越深越凶（正，∝ −g/(K·rl)）。
+      • 0 ≤ g ≤ K·rl（領先不夠安穩）→ EV：守的變異收益還抵不過丟掉的 EV（≈0.26/局），照打 EV。
+      • g > K·rl（安穩領先）        → 守：鎖局，左尾風險才值得壓（負，線性升到 −1 @ 2·K·rl）。
 
-    Design insight (Gary, 2026):
-      gun bonus (×1.5/×2) is a *non-linear* payoff. When everyone is close,
-      attacking has positive EV regardless of who is leading — one 全壘打
-      can flip the game. Therefore "close gap" should NOT collapse to full
-      defense like the old version did.
-
-    Close game  (gap < 30):
-        # Mild-to-moderate attack throughout; taper slightly late to avoid
-        # blowing a tied game on the last round.
-        attitude = 0.7 − 0.4·gp        # gp=0 → +0.7 ; gp=1 → +0.3
-
-    Spread game (gap ≥ 30):
-        pos = (my − min) / gap         # 0 = last ; 1 = first
-        # Trailing pushes attack, leading pushes defense.
-        # Magnitude scales with gp so urgency grows toward the final rounds.
-        attitude = (1 − 2·pos) · (0.4 + 0.6·gp)
-            pos=0, gp=1  → +1.0   (last, final round → all-in)
-            pos=1, gp=1  → −1.0   (leader, final round → lock)
-            pos=0, gp=0  → +0.4   (last, early → moderate attack)
-            pos=1, gp=0  → −0.4   (leader, early → moderate defense)
+    推導要點：守(B) vs 攻(A) 實測 ΔEV=−0.26、Δ方差=−13.3/局；對 P(墊底)=Φ(−g/√W)
+    微分得「守有利 ⇔ g > (2·0.26/13.3)·σ_g²·rl ≈ 10·rl」。故門檻 **線性 ∝ 剩餘局數**，
+    斜率 K≈10——保守態度幾乎只在收尾局且確有領先時觸發。K 待 ml/match_sim.py 以
+    最大化 P(不墊底) 校準。
     """
-    if total_rounds <= 0:
+    if total_rounds <= 0 or not all_scores:
         return 0.0
-
-    gp = rounds_played / total_rounds   # 0.0 → 1.0
-
-    if not all_scores:
-        # No score info yet — treat as close game.
-        return max(-1.0, min(1.0, 0.7 - 0.4 * gp))
-
-    min_s = min(all_scores)
-    max_s = max(all_scores)
-    score_gap = max_s - min_s
-
-    if score_gap < 30:
-        # Close game: keep attack momentum, gun-bonus upside is real.
-        return max(-1.0, min(1.0, 0.7 - 0.4 * gp))
-
-    pos = (my_score - min_s) / score_gap   # 0.0 = last, 1.0 = first
-    att = (1.0 - 2.0 * pos) * (0.4 + 0.6 * gp)
-    return max(-1.0, min(1.0, att))
+    rl = max(1, total_rounds - rounds_played)   # 含本局的剩餘局數
+    others = list(all_scores)
+    try:
+        others.remove(my_score)                 # 去掉自己一席，取「其他人最低」
+    except ValueError:
+        pass
+    if not others:
+        return 0.0
+    g = my_score - min(others)                  # 領先最後一名的緩衝；<0 表示我就是最後一名
+    if g < 0:
+        return min(1.0, -g / (K * rl))          # 攻（正）
+    trig = K * rl
+    if g <= trig:
+        return 0.0                              # EV
+    return -min(1.0, (g - trig) / trig)         # 守（負）
 
 
 def _arrange(hand_cards, strategy: str, attitude_override: float = None,
