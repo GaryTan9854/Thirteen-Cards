@@ -1332,15 +1332,15 @@ export default function OnlinePage() {
       const _gap     = _maxS - _minS
       const _myScore = _cumS[0] ?? 0
       const _posRaw  = _gap > 0 ? (_myScore - _minS) / _gap * 100 : 50
+      // 不墊底式 attitude（鏡像 AI 的 computeAttitude）：g = 我 − 最後一名、rl = 含本局剩餘局數
+      const _others    = state.seatNames.map((_, i) => _cumS[i] ?? 0).filter((_, i) => i !== 0)
+      const _g         = _myScore - Math.min(..._others)
+      const _remaining = Math.max(1, _totalR - state.currentRound + 1)
+      const _trig      = NOTLAST_K * _remaining
       let _att: number
-      if (_gap < 30) {
-        _att = Math.max(-1.0, Math.min(1.0, 1.0 - 4.0 * _gp))
-      } else {
-        const _pos         = (_myScore - _minS) / _gap
-        const _attProgress = 1.0 - 2.0 * _gp
-        const _attPosition = 1.0 - 2.0 * _pos
-        _att = Math.max(-1.0, Math.min(1.0, (1.0 - _gp) * _attProgress + _gp * _attPosition))
-      }
+      if (_g < 0)           _att = Math.min(1.0, -_g / _trig)        // 墊底 → 攻
+      else if (_g <= _trig) _att = 0.0                               // EV
+      else                  _att = -Math.min(1.0, (_g - _trig) / _trig)  // 安穩領先 → 守
       setDebugAtt([{
         name: state.seatNames[0],
         att:  _att,
@@ -2378,7 +2378,7 @@ export default function OnlinePage() {
         {/* 各座玩家選擇 */}
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <div className="text-sm text-gray-400">各座玩家選擇</div>
+            <div className="text-sm text-gray-400">玩家</div>
             <div className="flex items-center gap-2">
               <LogToggle label="每局換人" value={cfgAutoReshuffle} onChange={setCfgAutoReshuffle} />
               <button
@@ -2684,7 +2684,7 @@ export default function OnlinePage() {
 
         {/* 各座玩家選擇 */}
         <div className="space-y-2">
-          <div className="text-sm text-gray-400">各座玩家選擇</div>
+          <div className="text-sm text-gray-400">玩家</div>
           <div className="grid grid-cols-4 gap-2">
             {/* 你 */}
             <div className="space-y-1.5">

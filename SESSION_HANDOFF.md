@@ -24,9 +24,19 @@
   - 驗證：att 守/攻在 5% 手牌產生不同排法（bug 修好）；attitude 函數抽查全對。
 - **誤會澄清**：防守 candidate 不會在 pool 消失——`best_def=max(pool,score_defensive)` 直接取，K葫蘆必在；會誤殺的 Step4 早移除。
 
-### 下一步
-- [ ] **校準 K**（默認 10）：用 `ml/match_sim.py` 以最大化 P(不墊底) 跑 RA4，把最優斜率寫回 `NOTLAST_K`（後端 game.py + 前端 OnlinePage.tsx 兩處常數）。這就是原 `NOTLAST_MARGIN` 待辦，現形狀已定為「斜率×rl」。
-- [ ] deploy（前端 build 必在 MBP）。
+### 已 deploy → v2.10.3（build 353）
+
+### 驗收：RA4 attitude 整季淨值 ≈ 0（三臂配對定案）
+`ml/pair_three.py`（10k 場×6 局，同牌、三家 RA3 背景，seat0 換 RA3/RA4/ML1 配對）：
+- **RA4 − RA3（attitude 純貢獻）= +0.04pp ± 0.06（統計=0）**；RA4 只在 **0.9% 的局**偏離 RA3 → 太稀疏，整季洗成 0。
+- **ML1 − RA3（底力差）= +1.94pp ± 0.25（t+7.8）**；**RA4 − ML1 = −1.90pp**（≈全是底力）。
+- 另 2v2 非配對版 RA4 vs ML1 = −1.81pp（較吵，已被配對版取代）。
+- **鐵結論：不墊底 = 100% 底力(EV 引擎)，attitude 是 season 級捨入誤差。** RA4 新 attitude 無害(+0.04 非負)、方向對(拚局選對守牌)、讓老仙更像人，但**不會追近大神**；想少請客 → 強引擎，非 attitude。
+
+### 下一步（attitude 線已收斂，低優先）
+- `NOTLAST_K=10` **不值得再 match_sim 校**（attitude 天花板 ~0，調 K 救不回 1.9pp 引擎洞）。
+- 真要提升老仙不墊底 → 給它更強引擎（如 ml_dist 的輕量版 / RA3 底力升級），非 attitude。
+- sims：`ml/defense_vs_ev.py`（單局縮推分布）、`ml/pair_three.py`（三臂配對）、`ml/match_ra4_vs_ml.py`（2v2）。
 
 ---
 

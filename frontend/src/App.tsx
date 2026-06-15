@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import LoginPage      from './pages/LoginPage'
-import DuelPage       from './pages/DuelPage'
 import OnlinePage     from './pages/OnlinePage'
 import LogsPage       from './pages/LogsPage'
 import LeaguePage     from './pages/LeaguePage'
@@ -71,7 +70,6 @@ function AppInner() {
     { id: 'logs',   label: '📋', fullLabel: '遊戲紀錄' },
     { id: 'music',  label: '🎵', fullLabel: '歌曲欣賞' },
     ...(isGary ? [
-      { id: 'duel',   label: '⚔️', fullLabel: '策略對決' },
       { id: 'league', label: '🏆', fullLabel: '聯盟賽'   },
     ] : []),
   ]
@@ -166,7 +164,6 @@ function AppInner() {
 
         {tab === 'rules'  && <RulesPage />}
         {tab === 'music'  && <MusicPage />}
-        {isGary && tab === 'duel'   && <DuelPage />}
         {tab === 'stats'  && <StatsPage />}
         {tab === 'logs'   && <LogsPage />}
         {isGary && tab === 'league' && <LeaguePage />}

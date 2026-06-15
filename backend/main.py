@@ -13,8 +13,8 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "2.10.3"
-APP_BUILD = "353"  # deploy.sh 自動寫入（= git commit 總數）
+APP_VERSION = "2.10.4"
+APP_BUILD = "354"  # deploy.sh 自動寫入（= git commit 總數）
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -839,117 +839,6 @@ def swap_top_mid(req: SwapTopMidRequest):
 
     return {"options": results}
 
-
-# ── Duel: compare two strategies ─────────────────────
-class DuelRequest(BaseModel):
-    strategy_a: str = "rule_base"
-    strategy_b: str = "random"
-    n_hands: int = 200
-
-
-_duel_status: dict = {}   # task_id → result or status string
-
-
-@app.post("/api/eval/duel")
-def start_duel(req: DuelRequest, background_tasks: BackgroundTasks):
-    """
-    Start a duel evaluation in the background.
-    Returns a task_id immediately.
-    Poll GET /api/eval/duel/{task_id} for results.
-    """
-    import time, uuid
-    task_id = str(uuid.uuid4())[:8]
-    _duel_status[task_id] = {"status": "running", "strategy_a": req.strategy_a,
-                              "strategy_b": req.strategy_b, "n_hands": req.n_hands}
-
-    def run_duel(tid):
-        try:
-            from eval_duel import duel
-
-            def on_progress(prog):
-                _duel_status[tid].update({"status": "running", "progress": prog})
-
-            result = duel(req.strategy_a, req.strategy_b,
-                          n_hands=req.n_hands, verbose=False,
-                          progress_callback=on_progress)
-            _duel_status[tid] = {"status": "done", **result}
-        except Exception as e:
-            _duel_status[tid] = {"status": "error", "message": str(e)}
-
-    background_tasks.add_task(run_duel, task_id)
-    return {"task_id": task_id, "status": "running"}
-
-
-@app.get("/api/eval/duel/{task_id}")
-def get_duel_result(task_id: str):
-    """Poll for duel results."""
-    return _duel_status.get(task_id, {"status": "not_found"})
-
-
-@app.get("/api/eval/strategies")
-def list_strategies():
-    """List available strategies and whether ML model is ready."""
-    try:
-        from ml.scoring_model import ScoringModel
-        ml_ready = ScoringModel.model_exists()
-    except Exception:
-        ml_ready = False
-    return {
-        "strategies": ["rulealpha", "rulealpha_aggressive", "rulealpha_conservative",
-                       "monte_carlo", "ml", "ml_aggressive", "ml_conservative", "random"],
-        "ml_model_ready": ml_ready,
-        "descriptions": {
-            "rulealpha":              "RuleAlpha：雙路徑候選池 + 精選前40 + 攻守切換，預設 AI",
-            "rulealpha_aggressive":   "RuleAlpha 激進模式（attitude=+0.8）",
-            "rulealpha_conservative": "RuleAlpha 保守模式（attitude=-0.8）",
-            "monte_carlo":            "對前 20 名候選各跑 150 次模擬，取期望得分最高者",
-            "ml":                     "ML Scoring Network 中性（attitude=0），預測期望得分",
-            "ml_aggressive":          "ML Scoring Network 激進（attitude=+0.8）",
-            "ml_conservative":        "ML Scoring Network 保守（attitude=-0.8）",
-            "random":                 "隨機選一個合法排列（基準線）",
-        },
-    }
-
-
-# ── Loss case study ──────────────────────────────────
-@app.get("/api/eval/loss_cases")
-def get_loss_cases():
-    """Return all loss cases logged from the last duel run."""
-    import json
-    path = os.path.join(os.path.dirname(__file__), "data", "loss_cases.jsonl")
-    if not os.path.exists(path):
-        return {"cases": []}
-    cases = []
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                cases.append(json.loads(line))
-    return {"cases": cases}
-
-
-# ── Dataset status ────────────────────────────────────
-@app.get("/api/ml/status")
-def ml_status():
-    """Check training data and ML model status."""
-    data_path  = os.path.join(os.path.dirname(__file__), "ml", "data", "train_10k.npz")
-    model_path = os.path.join(os.path.dirname(__file__), "ml", "data", "scoring_net.pt")
-    import numpy as np
-
-    n_samples = 0
-    if os.path.exists(data_path):
-        try:
-            d = np.load(data_path)
-            n_samples = int(d["X"].shape[0])
-        except Exception:
-            pass
-
-    return {
-        "dataset_exists": os.path.exists(data_path),
-        "dataset_samples": n_samples,
-        "model_exists": os.path.exists(model_path),
-        "model_path": model_path,
-    }
 
 
 # ── Online: allowed players ───────────────────────────
