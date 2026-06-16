@@ -11,6 +11,7 @@ export interface UserSettings {
   cfgAppeal?:        number
   cfgDifficulty?:    string
   cfgAutoReshuffle?: boolean
+  cfgQuickStart?:    boolean
   diffV2?:           boolean
 }
 
