@@ -104,6 +104,7 @@ rsync -az -e "ssh $SSH_OPTS" \
 echo "🔨 [3/5] Building frontend on MBP…"
 ssh $SSH_OPTS $REMOTE_USER@$REMOTE_HOST "
   zsh -lic '
+  set -e
   cd $REMOTE_DIR/frontend
 
   if [ \"$QUICK\" = false ]; then
@@ -114,7 +115,7 @@ ssh $SSH_OPTS $REMOTE_USER@$REMOTE_HOST "
   echo \"   → vite build → ../backend/static/\"
   npm run build
   ls -lh $REMOTE_DIR/backend/static/assets/ 2>/dev/null || true
-  '"
+  '" || { echo "❌ 前端 build 失敗（tsc/vite）— 已中止：PM2 未重啟、線上 bundle 未更新。修正後重跑 deploy（版本/commit 已先推進，無妨，下次 build 成功即同步）"; exit 1; }
 
 echo "🚀 [4/5] Installing Python deps + restarting PM2…"
 ssh $SSH_OPTS $REMOTE_USER@$REMOTE_HOST "
