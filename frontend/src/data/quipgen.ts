@@ -240,6 +240,7 @@ const TRASH: TrashLine[] = [
   { id: '酸輸家-5', by: 'other', at: 'loser', text: '曾幾何時？尼姑做滿月——{loser} 今晚難得輸成這樣！' },
   { id: '酸輸家-6', by: 'other', at: 'loser', text: '今晚 {winner} 在收錢，{loser} 在收心情。' },
   { id: '酸輸家-7', by: 'other', at: 'loser', text: '{loser} 輸到沒褲子穿下樓囉～賭博師父住二樓！' },
+  { id: '酸輸家-8', by: 'other', at: 'loser', text: '手氣若會傳染，我得趕緊戴口罩，免得被 {loser} 傳到！', need: s => s.loserScore <= -20 },
 
   // ── 贏家臭屁篇（贏家自己講）──
   { id: '贏家臭屁-1', by: 'winner', text: '這把本來要放水的哎。' },
@@ -261,7 +262,6 @@ const TRASH: TrashLine[] = [
   { id: '酸贏家-2', by: 'other', at: 'winner', text: '兵器千萬種，{winner} 你偏愛用劍（賤）哦！' },
   { id: '酸贏家-3', by: 'other', at: 'winner', text: '老太太下樓梯——{winner} 今晚讓人不得不服！' },
   { id: '酸贏家-4', by: 'other', at: 'winner', text: '人生如戲全靠演技，{winner} 一把爛牌演成世界名作！', need: s => s.winnerScore >= 20 },
-  { id: '酸贏家-5', by: 'other', at: 'winner', text: '{winner} 手氣若會傳染，我一定戴口罩！', need: s => s.winnerScore >= 30 },
   { id: '酸贏家-6', by: 'other', at: 'winner', text: '運來鐵成金——{winner} 今晚摸什麼都是金！' },
   { id: '酸贏家-7', by: 'other', at: 'winner', text: '甲殼蟲爬玻璃——{winner} 今晚滑溜得很，誰都攔不住！' },
 

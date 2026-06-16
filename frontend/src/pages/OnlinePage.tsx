@@ -616,6 +616,7 @@ export default function OnlinePage() {
   }
   const [cfgAiNames,      setCfgAiNames]      = useState<string[]>(() => randomBeauties())
   const [cfgAutoReshuffle, setCfgAutoReshuffle] = useState<boolean>(() => _savedSettings.cfgAutoReshuffle ?? false)
+  const [cfgQuickStart,   setCfgQuickStart]   = useState<boolean>(() => _savedSettings.cfgQuickStart ?? false)
   const [cfgStepByStep,   setCfgStepByStep]   = useState(false)
   const [cfgRecordGame,   setCfgRecordGame]   = useState(true)
   const [cfgRecordRounds, setCfgRecordRounds] = useState(false)
@@ -704,6 +705,7 @@ export default function OnlinePage() {
         if (typeof s.cfgNormal === 'number')        setCfgNormal(s.cfgNormal)
         if (typeof s.cfgAppeal === 'number')        setCfgAppeal(s.cfgAppeal)
         if (typeof s.cfgAutoReshuffle === 'boolean') setCfgAutoReshuffle(s.cfgAutoReshuffle)
+        if (typeof s.cfgQuickStart === 'boolean')   setCfgQuickStart(s.cfgQuickStart)
         if (s.diffV2 && s.cfgDifficulty)            applyDifficulty(s.cfgDifficulty)
       }
       // Avatar: only adopt the server copy when this device has none locally.
@@ -715,7 +717,7 @@ export default function OnlinePage() {
       // Seed the server from this device when it has nothing yet, so existing
       // local avatar/settings propagate to other devices without re-entering.
       if (!p?.settings) {
-        savePrefs(player, { settings: { cfgNormal, cfgAppeal, cfgDifficulty, cfgAutoReshuffle, diffV2: true } })
+        savePrefs(player, { settings: { cfgNormal, cfgAppeal, cfgDifficulty, cfgAutoReshuffle, cfgQuickStart, diffV2: true } })
       }
       if (!p?.avatar && localAvatar) {
         savePrefs(player, { avatar: localAvatar })
@@ -729,10 +731,10 @@ export default function OnlinePage() {
   // (cross-device) whenever they change.
   useEffect(() => {
     if (!player) return
-    const settings = { cfgNormal, cfgAppeal, cfgDifficulty, cfgAutoReshuffle, diffV2: true }
+    const settings = { cfgNormal, cfgAppeal, cfgDifficulty, cfgAutoReshuffle, cfgQuickStart, diffV2: true }
     localStorage.setItem(`tc_settings_${player}`, JSON.stringify({ ...settings, cfgStrategies }))
     if (prefsReadyRef.current) savePrefs(player, { settings })
-  }, [player, cfgNormal, cfgAppeal, cfgStrategies, cfgDifficulty, cfgAutoReshuffle])
+  }, [player, cfgNormal, cfgAppeal, cfgStrategies, cfgDifficulty, cfgAutoReshuffle, cfgQuickStart])
   const ttsGenRef          = useRef(0)
   const soloPhaseRef       = useRef<string>('lobby')
   const soloAppealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -2429,6 +2431,7 @@ export default function OnlinePage() {
           <div className="text-sm text-gray-400">顯示設定</div>
           <div className="flex flex-wrap gap-4 items-center">
             <LogToggle label="逐墩比牌" value={cfgStepByStep} onChange={setCfgStepByStep} />
+            <LogToggle label="快速新局" value={cfgQuickStart} onChange={setCfgQuickStart} />
           </div>
         </div>
 
@@ -2448,6 +2451,7 @@ export default function OnlinePage() {
 
         <button ref={startSoloBtnRef}
           onClick={() => {
+            if (cfgQuickStart) { quickStartSolo(); return }   // 快速新局：直接抽座位+開戰，跳過按鈕
             setSoloSetupMode(false)
             setPendingSoloConfig({ roundsNormal: cfgNormal, roundsAppeal: cfgAppeal, strategies: cfgStrategies, aiNames: cfgAiNames })
             setSoloDrawnSeats([])
@@ -2459,6 +2463,24 @@ export default function OnlinePage() {
         </button>
       </div>
     )
+  }
+
+  // 快速新局：依現在 setup 參數，一氣呵成 抽座位 + 開始戰鬥（等同連按三鍵），直接進排牌畫面
+  function quickStartSolo() {
+    const allNames     = [player!, ...cfgAiNames]
+    const shuffled     = [...allNames].sort(() => Math.random() - 0.5)
+    const playerIdx    = shuffled.indexOf(player!)
+    const reorderedAis = [
+      ...shuffled.slice(playerIdx + 1),
+      ...shuffled.slice(0, playerIdx),
+    ].filter(n => n !== player!)
+    const aiStratMap    = new Map(cfgAiNames.map((n, i) => [n, cfgStrategies[i + 1]]))
+    const newStrategies = [cfgStrategies[0], ...reorderedAis.map(n => aiStratMap.get(n) ?? 'rulealpha')]
+    setSoloSetupMode(false)
+    setSoloSeatingPending(false)
+    setPendingSoloConfig(null)
+    setSoloDrawnSeats([])
+    startSoloGame({ roundsNormal: cfgNormal, roundsAppeal: cfgAppeal, strategies: newStrategies, aiNames: reorderedAis, drawnOrder: shuffled })
   }
 
   // ── Solo seating (seat draw step before game start) ──────────────────────────
