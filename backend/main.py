@@ -13,8 +13,8 @@ from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
 
-APP_VERSION = "2.10.10"
-APP_BUILD = "360"  # deploy.sh 自動寫入（= git commit 總數）
+APP_VERSION = "2.10.11"
+APP_BUILD = "361"  # deploy.sh 自動寫入（= git commit 總數）
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
@@ -1221,6 +1221,9 @@ def api_players():
     return {"players": _load_allowed()}
 
 
+_RECENT_N = 100   # 「近 N 場」滾動窗大小（per-player）
+
+
 @app.get("/api/log/stats")
 def api_stats(scope: str = "all", period: str = "all", player: str = ""):
     """
@@ -1285,6 +1288,10 @@ def api_stats(scope: str = "all", period: str = "all", player: str = ""):
         if period == "month":
             utc_month = _dt.now(_tz.utc).strftime("%Y-%m")
             rows = [r for r in rows if (r.get("start_time") or "").startswith(utc_month)]
+        # 近 N 場滾動窗：最近優先排序，下方聚合迴圈再對「每位玩家」各取最近 N 場。
+        # （大分母下累積勝率/不敗率推不動，此窗讓近期手感即時反映。）
+        if period == "recent":
+            rows = sorted(rows, key=lambda r: (r.get("start_time") or ""), reverse=True)
         # Filter to games where the requesting player participated
         if player:
             rows = [r for r in rows if player in (r.get("participants") or [])]
@@ -1316,6 +1323,9 @@ def api_stats(scope: str = "all", period: str = "all", player: str = ""):
 
             # Count per player: games played, wins (1st only), losses (last only)
             for pname, s in game_scores.items():
+                # 近 N 場：rows 已最近優先，每位玩家累積到 N 場後即略過（per-player 滾動窗）
+                if period == "recent" and stats.get(pname, {}).get("games", 0) >= _RECENT_N:
+                    continue
                 if pname not in stats:
                     stats[pname] = {"player": pname, "wins": 0, "losses": 0, "games": 0}
                 stats[pname]["games"] += 1

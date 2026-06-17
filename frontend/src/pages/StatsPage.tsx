@@ -24,7 +24,7 @@ interface StatsResponse {
 }
 
 type Scope  = 'all' | 'league' | 'normal'
-type Period = 'all' | 'month'
+type Period = 'all' | 'month' | 'recent'
 
 function pct(n: number, d: number) {
   if (!d) return '—'
@@ -214,11 +214,11 @@ export default function StatsPage() {
         </div>
         {/* Period */}
         <div className="flex gap-2">
-          {(['all', 'month'] as Period[]).map(p => (
+          {(['all', 'recent', 'month'] as Period[]).map(p => (
             <button key={p} onClick={() => setPeriod(p)}
               className={`px-3 py-1 rounded-full text-xs font-semibold transition
                 ${period === p ? 'bg-gray-600 text-gray-100 border border-gray-400' : 'bg-gray-800 text-gray-500 hover:text-gray-300'}`}>
-              {p === 'all' ? '全期' : `本月 (${data?.month ?? ''})`}
+              {p === 'all' ? '全期' : p === 'recent' ? '近100場' : `本月 (${data?.month ?? ''})`}
             </button>
           ))}
         </div>
@@ -232,7 +232,7 @@ export default function StatsPage() {
         <div className="text-gray-500 text-sm">
           {isPublicLeaderboard
             ? `尚無玩家總場次達 ${PUBLIC_MIN_GAMES} 場`
-            : period === 'month' ? '本月尚無紀錄' : '尚無紀錄'}
+            : period === 'month' ? '本月尚無紀錄' : period === 'recent' ? '近期尚無紀錄' : '尚無紀錄'}
         </div>
       )}
 
