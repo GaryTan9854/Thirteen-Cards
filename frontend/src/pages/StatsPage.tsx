@@ -141,6 +141,14 @@ export default function StatsPage() {
     }
   }
 
+  // ESC 關閉「我的表現」
+  useEffect(() => {
+    if (!showPerf) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowPerf(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [showPerf])
+
   // Effective player filter: viewMode controls whether to show self or public leaderboard
   const effectivePlayer = viewMode === 'me' ? (player ?? '') : (isGary ? viewAs : '')
 
@@ -471,7 +479,7 @@ export default function StatsPage() {
 
             <button onClick={() => setShowPerf(false)}
               className="w-full py-2.5 rounded-xl bg-sky-600 text-white font-bold hover:bg-sky-500 transition">
-              收下這份榮耀
+              {perfErr ? '繼續努力，八大美女在等你哦！' : '收下這份榮耀'}
             </button>
           </div>
         </div>
