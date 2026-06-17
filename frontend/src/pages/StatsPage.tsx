@@ -45,6 +45,19 @@ function sysScore(r: PlayerStat): number {
   return Math.max(0, Math.min(0.85 + 0.5 * (c - 1), 1)) // 平均→0.85，強者90~95，100難達
 }
 
+function rankLabel(n: number): string {
+  return n === 1 ? '冠軍' : n === 2 ? '亞軍' : n === 3 ? '季軍' : `第 ${n} 名`
+}
+
+// 依「系統排行」名次給的鼓勵話（垃圾話其實是鼓勵 🥲），對應難易度命名 傳說/大神/老仙/小白兔
+function encourageBySysRank(rank: number): string {
+  if (rank === 1) return '你就是新的傳說！'
+  if (rank <= 3)  return '你絕對是大神級的玩家！'
+  if (rank <= 5)  return '老仙的實力！你白天在開計程車嗎？'
+  if (rank <= 10) return '已能在叢林中存活的小白兔！'
+  return '戰績加把勁，八大美女在等你哦！'
+}
+
 function fmtDate(iso: string) {
   try {
     return new Date(iso).toLocaleDateString('zh-TW', {
@@ -88,6 +101,38 @@ export default function StatsPage() {
   const [showReset,   setShowReset]   = useState(false)
   const [resetLabel,  setResetLabel]  = useState('')
   const [resetting,   setResetting]   = useState(false)
+
+  // 我的表現 popup
+  type PerfData = {
+    sysRank: number; winRank: number; undRank: number; total: number
+    monthGames: number; sys: number
+  }
+  const [showPerf, setShowPerf] = useState(false)
+  const [perf,     setPerf]     = useState<PerfData | null>(null)
+  const [perfErr,  setPerfErr]  = useState<string | null>(null)
+
+  async function openPerf() {
+    if (!player) return
+    setShowPerf(true); setPerf(null); setPerfErr(null)
+    try {
+      const [recentRes, monthRes] = await Promise.all([
+        fetch(`/api/log/stats?scope=${scope}&period=recent`).then(r => r.json()),
+        fetch(`/api/log/stats?scope=${scope}&period=month&player=${encodeURIComponent(player)}`).then(r => r.json()),
+      ])
+      const elig: PlayerStat[] = (recentRes.stats ?? []).filter(
+        (s: PlayerStat) => (s.total_games ?? 0) > PUBLIC_MIN_GAMES && s.games > 0)
+      const me = elig.find(s => s.player === player)
+      if (!me) { setPerfErr(`你在「近100場」公榜尚無足夠場次（需總場次 > ${PUBLIC_MIN_GAMES}）`); return }
+      const rankIn = (arr: PlayerStat[]) => arr.findIndex(s => s.player === player) + 1
+      const sysRank = rankIn([...elig].sort((a, b) => sysScore(b) - sysScore(a)))
+      const winRank = rankIn([...elig].sort((a, b) => (b.wins / b.games) - (a.wins / a.games)))
+      const undRank = rankIn([...elig].sort((a, b) => ((b.games - b.losses) / b.games) - ((a.games - a.losses) / a.games)))
+      const monthGames = ((monthRes.stats ?? []).find((s: PlayerStat) => s.player === player)?.games) ?? 0
+      setPerf({ sysRank, winRank, undRank, total: elig.length, monthGames, sys: sysScore(me) })
+    } catch (e) {
+      setPerfErr('讀取失敗，請稍後再試')
+    }
+  }
 
   // Effective player filter: viewMode controls whether to show self or public leaderboard
   const effectivePlayer = viewMode === 'me' ? (player ?? '') : (isGary ? viewAs : '')
@@ -216,8 +261,9 @@ export default function StatsPage() {
             </button>
           ))}
         </div>
-        {/* Period */}
-        <div className="flex gap-2">
+        {/* Period + 我的表現 */}
+        <div className="flex gap-2 items-center justify-between">
+          <div className="flex gap-2">
           {(['all', 'month', 'recent'] as Period[]).map(p => (
             <button key={p} onClick={() => setPeriod(p)}
               className={`px-3 py-1 rounded-full text-xs font-semibold transition
@@ -225,6 +271,14 @@ export default function StatsPage() {
               {p === 'all' ? '全期' : p === 'recent' ? '近100場' : `本月 (${data?.month ?? ''})`}
             </button>
           ))}
+          </div>
+          {player && (
+            <button onClick={openPerf}
+              className="px-3 py-1 rounded-full text-xs font-semibold transition
+                         bg-sky-500/20 text-sky-300 border border-sky-500/50 hover:bg-sky-500/30">
+              🎯 我的表現
+            </button>
+          )}
         </div>
       </div>
 
@@ -353,6 +407,59 @@ export default function StatsPage() {
                 取消
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showPerf && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+             onClick={() => setShowPerf(false)}>
+          <div className="bg-gray-900 border border-sky-500/40 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl"
+               onClick={e => e.stopPropagation()}>
+            <div className="text-lg font-bold text-sky-300">🎯 我的表現</div>
+
+            {!perf && !perfErr && (
+              <div className="text-sm text-gray-400 animate-pulse">統計中…</div>
+            )}
+            {perfErr && <div className="text-sm text-amber-300">{perfErr}</div>}
+
+            {perf && (
+              <>
+                <div className="text-base text-gray-100 leading-relaxed">
+                  {player}，你是「近100場」系統排行{' '}
+                  <span className="font-bold text-yellow-300">
+                    {perf.sysRank === 1 ? '榜首' : `第 ${perf.sysRank} 名`}
+                  </span>
+                  ！
+                </div>
+                <div className="text-xl font-bold text-center text-sky-300 py-1">
+                  {encourageBySysRank(perf.sysRank)}
+                </div>
+                <div className="bg-gray-800/60 rounded-xl p-3 space-y-1.5 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">近100場 最勝率</span>
+                    <span className="font-semibold text-yellow-300">{rankLabel(perf.winRank)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">近100場 不敗率</span>
+                    <span className="font-semibold text-sky-200">{rankLabel(perf.undRank)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">系統排行分數</span>
+                    <span className="font-semibold text-sky-300">{(perf.sys * 100).toFixed(0)} 分 / {perf.total} 人</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">本月參與場次</span>
+                    <span className="font-semibold text-gray-100">{perf.monthGames} 場</span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <button onClick={() => setShowPerf(false)}
+              className="w-full py-2.5 rounded-xl bg-sky-600 text-white font-bold hover:bg-sky-500 transition">
+              收下這份榮耀
+            </button>
           </div>
         </div>
       )}
