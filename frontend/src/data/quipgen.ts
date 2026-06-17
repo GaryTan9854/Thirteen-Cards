@@ -231,6 +231,15 @@ const TRASH: TrashLine[] = [
   { id: '運氣-4',  by: 'loser', text: '打牌靠三分技術七分命，我剛好缺那七分。' },
   { id: '台味-1',  by: 'loser', text: '別人摸牌像過年，我摸牌像普渡。' },
   { id: '台味-2',  by: 'loser', text: '賭博師父在 2 樓——沒有褲子可以穿下樓來啦！' },
+  // ── 逐玉劇 對白（樊長玉風，任何人可講）──輸牌
+  { id: '逐玉-輸-1', by: 'loser', text: '風雨廊亭夢已醒，從此牌桌無故人。' },
+  { id: '逐玉-輸-2', by: 'loser', text: '強扭的牌不胡，不用胡，解渴就行。' },
+  { id: '逐玉-輸-3', by: 'loser', text: '想要一家人整整齊齊，結果牌也死得整整齊齊。' },
+  { id: '逐玉-輸-4', by: 'loser', text: '侯爺，我今天吃錯陳皮糖了。' },
+  // ── 逐玉——被全壘打／大輸時 ──
+  { id: '逐玉-全壘打-1', by: 'loser', text: '別躲我，我只剩這點籌碼了。', need: s => s.loserScore <= -30 },
+  { id: '逐玉-全壘打-2', by: 'loser', text: '我不怕輸，只怕輸了還要倒酒。', need: s => s.loserScore <= -30 },
+  { id: '逐玉-全壘打-3', by: 'loser', text: '風雨如晦，雞鳴不已；牌運如晦，連輸不已。', need: s => s.loserScore <= -35 },
 
   // ── 酸輸家篇（別人調侃輸家）──
   { id: '酸輸家-1', by: 'other', at: 'loser', text: '{loser}，媽媽有交代：出門遊玩，千萬不要去賭博！' },
@@ -256,6 +265,17 @@ const TRASH: TrashLine[] = [
   { id: '贏家臭屁-10', by: 'winner', text: '早就說過，這遊戲我小學四年級就會了。' },
   { id: '贏家臭屁-11', by: 'winner', text: '兵器千萬種，我偏愛用劍！' },
   { id: '贏家臭屁-12', by: 'winner', text: '感覺……抓到訣竅了。' },
+  // ── 逐玉劇 對白（樊長玉風，任何人可講）──贏牌
+  { id: '逐玉-贏-1', by: 'winner', text: '侯爺，你若留下，我贏牌養你啊。' },
+  { id: '逐玉-贏-2', by: 'winner', text: '他是我的夫婿，我名正言順的提款機。' },
+  { id: '逐玉-贏-3', by: 'winner', text: '從此之後，事事聽從賢妻吩咐，把籌碼交出來。' },
+  { id: '逐玉-贏-4', by: 'winner', text: '{loser} 別躲我，我只有你這一家能贏。' },
+  { id: '逐玉-贏-5', by: 'winner', text: '我算盡天下牌局，你們卻算不過我。' },
+  // ── 逐玉——大勝（贏多時）──
+  { id: '逐玉-大勝-1', by: 'winner', text: '我不怕死，只怕我死了沒人輸給我。', need: s => s.winnerScore >= 30 },
+  { id: '逐玉-大勝-2', by: 'winner', text: '侯爺，今日侯府庫房歸我了。', need: s => s.winnerScore >= 30 },
+  { id: '逐玉-大勝-3', by: 'winner', text: '你不說話，我就當你認輸了。', need: s => s.winnerScore >= 30 },
+  { id: '逐玉-大勝-4', by: 'winner', text: '只要我還活著，這桌銀子都是我的。', need: s => s.winnerScore >= 30 },
 
   // ── 酸贏家篇（別人調侃贏家）──
   { id: '酸贏家-1', by: 'other', at: 'winner', text: '溪底無魚，蝦仔做大王——{winner} 你只是對手太弱啦！' },
@@ -358,6 +378,12 @@ const SPECIAL: SpecialLine[] = [
   { id: '特殊-驪姬-輸1', who: '驪姬', when: 'lose', text: '看來幾位不知道——當年晉國是怎麼大亂的，源頭就是我。' },
   { id: '特殊-驪姬-輸2', who: '驪姬', when: 'lose', text: '晉國的太子都倒在我手上，你們這點輸贏，留著吧。' },
   { id: '特殊-驪姬-輸3', who: '驪姬', when: 'lose', text: '晉獻公的後宮我都翻得了天，這副牌我會翻不回來？' },
+  // 逐玉劇——妲己／褒姒 贏牌時的專屬台詞（本人開口）
+  { id: '特殊-妲己-逐玉贏1', who: '妲己', when: 'win', text: '侯爺，你今天吃陳皮糖了嗎？怎麼嘴這麼甜。' },
+  { id: '特殊-妲己-逐玉贏2', who: '妲己', when: 'win', text: '給男人花錢，天打雷劈；給侯爺送分，更是天理不容。' },
+  { id: '特殊-褒姒-逐玉贏1', who: '褒姒', when: 'win', text: '無趣。' },
+  { id: '特殊-褒姒-逐玉贏2', who: '褒姒', when: 'win', text: '你們爭了半天，就這？' },
+  { id: '特殊-褒姒-逐玉贏3', who: '褒姒', when: 'win', text: '本宮還以為是謝征，原來是謝送分。' },
 ]
 
 const BIG4 = ['Gary', 'Glory', 'Ian', 'Jack']
