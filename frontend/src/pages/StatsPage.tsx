@@ -103,10 +103,10 @@ export default function StatsPage() {
   const [resetting,   setResetting]   = useState(false)
 
   // 我的表現 popup
-  type PerfData = {
-    sysRank: number; winRank: number; undRank: number; total: number
-    monthGames: number; sys: number
+  type PeriodPerf = {
+    sysRank: number; winRank: number; undRank: number; total: number; sys: number; games: number
   }
+  type PerfData = { recent: PeriodPerf | null; month: PeriodPerf | null }
   const [showPerf, setShowPerf] = useState(false)
   const [perf,     setPerf]     = useState<PerfData | null>(null)
   const [perfErr,  setPerfErr]  = useState<string | null>(null)
@@ -117,18 +117,25 @@ export default function StatsPage() {
     try {
       const [recentRes, monthRes] = await Promise.all([
         fetch(`/api/log/stats?scope=${scope}&period=recent`).then(r => r.json()),
-        fetch(`/api/log/stats?scope=${scope}&period=month&player=${encodeURIComponent(player)}`).then(r => r.json()),
+        fetch(`/api/log/stats?scope=${scope}&period=month`).then(r => r.json()),
       ])
-      const elig: PlayerStat[] = (recentRes.stats ?? []).filter(
-        (s: PlayerStat) => (s.total_games ?? 0) > PUBLIC_MIN_GAMES && s.games > 0)
-      const me = elig.find(s => s.player === player)
-      if (!me) { setPerfErr(`你在「近100場」公榜尚無足夠場次（需總場次 > ${PUBLIC_MIN_GAMES}）`); return }
-      const rankIn = (arr: PlayerStat[]) => arr.findIndex(s => s.player === player) + 1
-      const sysRank = rankIn([...elig].sort((a, b) => sysScore(b) - sysScore(a)))
-      const winRank = rankIn([...elig].sort((a, b) => (b.wins / b.games) - (a.wins / a.games)))
-      const undRank = rankIn([...elig].sort((a, b) => ((b.games - b.losses) / b.games) - ((a.games - a.losses) / a.games)))
-      const monthGames = ((monthRes.stats ?? []).find((s: PlayerStat) => s.player === player)?.games) ?? 0
-      setPerf({ sysRank, winRank, undRank, total: elig.length, monthGames, sys: sysScore(me) })
+      const computePerf = (res: { stats?: PlayerStat[] }): PeriodPerf | null => {
+        const elig = (res.stats ?? []).filter(
+          (s: PlayerStat) => (s.total_games ?? 0) > PUBLIC_MIN_GAMES && s.games > 0)
+        const me = elig.find(s => s.player === player)
+        if (!me) return null
+        const rankIn = (arr: PlayerStat[]) => arr.findIndex(s => s.player === player) + 1
+        return {
+          sysRank: rankIn([...elig].sort((a, b) => sysScore(b) - sysScore(a))),
+          winRank: rankIn([...elig].sort((a, b) => (b.wins / b.games) - (a.wins / a.games))),
+          undRank: rankIn([...elig].sort((a, b) => ((b.games - b.losses) / b.games) - ((a.games - a.losses) / a.games))),
+          total: elig.length, sys: sysScore(me), games: me.games,
+        }
+      }
+      const recent = computePerf(recentRes)
+      const month  = computePerf(monthRes)
+      if (!recent && !month) { setPerfErr(`你在公榜尚無足夠場次（需總場次 > ${PUBLIC_MIN_GAMES}）`); return }
+      setPerf({ recent, month })
     } catch (e) {
       setPerfErr('讀取失敗，請稍後再試')
     }
@@ -423,38 +430,44 @@ export default function StatsPage() {
             )}
             {perfErr && <div className="text-sm text-amber-300">{perfErr}</div>}
 
-            {perf && (
-              <>
-                <div className="text-base text-gray-100 leading-relaxed">
-                  {player}，你是「近100場」系統排行{' '}
-                  <span className="font-bold text-yellow-300">
-                    {perf.sysRank === 1 ? '榜首' : `第 ${perf.sysRank} 名`}
-                  </span>
-                  ！
+            {perf && (() => {
+              const r = perf.recent, m = perf.month
+              const bestRank = Math.min(r?.sysRank ?? Infinity, m?.sysRank ?? Infinity)
+              const bestLabel = (r && (!m || r.sysRank <= m.sysRank)) ? '近100場' : '本月'
+              const block = (title: string, p: PeriodPerf | null) => (
+                <div className="bg-gray-800/60 rounded-xl p-3 space-y-1 text-sm">
+                  <div className="font-semibold text-sky-300">{title}</div>
+                  {p ? (
+                    <div className="space-y-1">
+                      <div className="flex justify-between"><span className="text-gray-400">系統排行</span>
+                        <span className="font-semibold text-yellow-300">{rankLabel(p.sysRank)}（{(p.sys * 100).toFixed(0)} 分 / {p.total} 人）</span></div>
+                      <div className="flex justify-between"><span className="text-gray-400">最勝率</span>
+                        <span className="font-semibold text-yellow-200">{rankLabel(p.winRank)}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-400">不敗率</span>
+                        <span className="font-semibold text-sky-200">{rankLabel(p.undRank)}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-400">場次</span>
+                        <span className="text-gray-100">{p.games} 場</span></div>
+                    </div>
+                  ) : <div className="text-gray-500 text-xs">尚無足夠場次</div>}
                 </div>
-                <div className="text-xl font-bold text-center text-sky-300 py-1">
-                  {encourageBySysRank(perf.sysRank)}
-                </div>
-                <div className="bg-gray-800/60 rounded-xl p-3 space-y-1.5 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">近100場 最勝率</span>
-                    <span className="font-semibold text-yellow-300">{rankLabel(perf.winRank)}</span>
+              )
+              return (
+                <>
+                  <div className="text-base text-gray-100 leading-relaxed">
+                    {player}，你「{bestLabel}」系統排行{' '}
+                    <span className="font-bold text-yellow-300">
+                      {bestRank === 1 ? '榜首' : `第 ${bestRank} 名`}
+                    </span>
+                    ！
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">近100場 不敗率</span>
-                    <span className="font-semibold text-sky-200">{rankLabel(perf.undRank)}</span>
+                  <div className="text-xl font-bold text-center text-sky-300 py-1">
+                    {encourageBySysRank(bestRank)}
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">系統排行分數</span>
-                    <span className="font-semibold text-sky-300">{(perf.sys * 100).toFixed(0)} 分 / {perf.total} 人</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">本月參與場次</span>
-                    <span className="font-semibold text-gray-100">{perf.monthGames} 場</span>
-                  </div>
-                </div>
-              </>
-            )}
+                  {block('近100場', r)}
+                  {block('本月', m)}
+                </>
+              )
+            })()}
 
             <button onClick={() => setShowPerf(false)}
               className="w-full py-2.5 rounded-xl bg-sky-600 text-white font-bold hover:bg-sky-500 transition">
