@@ -56,7 +56,7 @@ export default function StatsPage() {
   const isGary = player === 'Gary'
 
   const [scope,   setScope]   = useState<Scope>('all')
-  const [period,  setPeriod]  = useState<Period>('all')
+  const [period,  setPeriod]  = useState<Period>('recent')   // 預設近100場（公榜即時反映近況）
   const [data,    setData]    = useState<StatsResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
@@ -214,7 +214,7 @@ export default function StatsPage() {
         </div>
         {/* Period */}
         <div className="flex gap-2">
-          {(['all', 'recent', 'month'] as Period[]).map(p => (
+          {(['all', 'month', 'recent'] as Period[]).map(p => (
             <button key={p} onClick={() => setPeriod(p)}
               className={`px-3 py-1 rounded-full text-xs font-semibold transition
                 ${period === p ? 'bg-gray-600 text-gray-100 border border-gray-400' : 'bg-gray-800 text-gray-500 hover:text-gray-300'}`}>
