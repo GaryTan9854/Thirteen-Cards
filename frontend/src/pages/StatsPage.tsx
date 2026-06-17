@@ -31,14 +31,17 @@ function pct(n: number, d: number) {
   return (n / d * 100).toFixed(0) + '%'
 }
 
-// 系統排行：期望值校準（勝率 + 不敗率加權）
+// 系統排行：期望值校準（勝率 + 不敗率加權，勝率權重 2、不敗率權重 1）
+// 定錨：四人局打到「最勝 25% / 不敗 75%」= 四人平均，但對手 AI 很強→這等於打平系統模型，
+//       故把該點定為 85 分；最強約 97（留頂部成長空間），上限 100（clamp 不破百）。
 // 公榜排行資格：有紀錄的總場次 > PUBLIC_MIN_GAMES 場
 const PUBLIC_MIN_GAMES = 60
 function sysScore(r: PlayerStat): number {
   if (!r.games) return 0
-  const w   = (r.wins / r.games) / 0.25
-  const u   = ((r.games - r.losses) / r.games) / 0.75
-  return Math.min((w * 2 + u) / 4.5, 1)
+  const w = (r.wins / r.games) / 0.25                  // 1.0 @ 最勝 25%（四人平均）
+  const u = ((r.games - r.losses) / r.games) / 0.75    // 1.0 @ 不敗 75%（四人平均）
+  const c = (w * 2 + u) / 3                             // 加權合成，平均點 = 1.0
+  return Math.max(0, Math.min(c - 0.15, 1))             // 平均→0.85，最強≲1.0
 }
 
 function fmtDate(iso: string) {
