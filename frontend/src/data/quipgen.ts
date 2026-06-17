@@ -402,6 +402,7 @@ const BEAUTY_COAX: { id: string; at: 'winner' | 'loser'; text: string }[] = [
   { id: '美女嬌-輸-5', at: 'loser',  text: '{loser} 哥哥，今夜給你鬆一下，妹妹幫你搥搥背～' },
   { id: '美女嬌-輸-6', at: 'loser',  text: '{loser} 你杯子是養金魚哦？快喝啦，輸牌就要認真喝！' },
   { id: '美女嬌-輸-7', at: 'loser',  text: '{loser}～輸了沒關係，陪妹妹喝通宵、不醉不歸！' },
+  { id: '美女嬌-輸-8', at: 'loser',  text: '{loser} 你儘管輸，我殺豬養你！' },
   // 對人類贏家：崇拜、撒嬌、討請客
   { id: '美女嬌-贏-1', at: 'winner', text: '哇～{winner} 哥哥好厲害，妹妹太崇拜了！' },
   { id: '美女嬌-贏-2', at: 'winner', text: '{winner}～走嘛，帶我出去吃宵夜！' },
