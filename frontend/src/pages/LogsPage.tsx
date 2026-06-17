@@ -230,6 +230,7 @@ export default function LogsPage() {
 
   const [tab,    setTab]    = useState<'games' | 'logins'>('games')
   const [period, setPeriod] = useState<'month' | 'all'>('month')   // default: 本月
+  const [excludeGary, setExcludeGary] = useState(true)   // Gary 是 programmer，測試局多→預設排除自己的紀錄
 
   const [logins,        setLogins]        = useState<LoginEntry[]>([])
   const [activePlayers, setActivePlayers] = useState<Set<string>>(new Set())
@@ -269,19 +270,20 @@ export default function LogsPage() {
     }
   }, [tab, isGary, player])
 
-  // Apply period filter locally
+  // Apply period (+ exclude-Gary) filter locally
   useEffect(() => {
-    if (period === 'month') {
-      setGames(allGames.filter(g => (g.start_time ?? '').startsWith(utcMonth)))
-    } else {
-      setGames(allGames)
-    }
-  }, [allGames, period, utcMonth])
+    let list = period === 'month'
+      ? allGames.filter(g => (g.start_time ?? '').startsWith(utcMonth))
+      : allGames
+    if (excludeGary && isGary) list = list.filter(g => !(g.participants ?? []).includes('Gary'))
+    setGames(list)
+  }, [allGames, period, utcMonth, excludeGary, isGary])
 
-  // Filter login entries by period
-  const displayLogins = period === 'month'
+  // Filter login entries by period (+ exclude-Gary)
+  let displayLogins = period === 'month'
     ? logins.filter(l => (l.timestamp ?? '').startsWith(utcMonth))
     : logins
+  if (excludeGary && isGary) displayLogins = displayLogins.filter(l => l.username !== 'Gary')
 
   return (
     <div className="space-y-4">
@@ -310,6 +312,17 @@ export default function LogsPage() {
               </button>
             ))}
           </div>
+        )}
+
+        {/* 排除 Gary 自己的測試紀錄（programmer 測試局多，多半無參考意義）*/}
+        {isGary && (
+          <button onClick={() => setExcludeGary(v => !v)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border
+              ${excludeGary
+                ? 'bg-rose-500/20 text-rose-300 border-rose-500/50'
+                : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-white'}`}>
+            {excludeGary ? '✓ 排除 Gary' : '排除 Gary'}
+          </button>
         )}
       </div>
 
