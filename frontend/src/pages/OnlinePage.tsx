@@ -116,10 +116,11 @@ const BEAUTY_DATA = [
 const BTN_PRIMARY = 'bg-sky-500 hover:bg-sky-400 text-white'
 // 首頁兩顆疊在輪播圖上的入口鈕 → 霜玻璃 + 取自左上 logo「Thirteen(橘)／Cards(藍)」兩色。
 //   bg 與 border 同色系，避免色相不一致。
+// 實心不透明（半透明會透出輪播圖 → 手機/桌機按鈕色不一致）。色相同 logo：Thirteen 橘 / Cards 藍。
 const HOME_ONLINE_CLS   = 'border border-orange-300/40'
-const HOME_ONLINE_STYLE = { background: 'rgba(234,88,12,0.78)', backdropFilter: 'blur(6px)' }
+const HOME_ONLINE_STYLE = { background: '#ea580c' }   // orange-600
 const HOME_SOLO_CLS     = 'border border-sky-300/40'
-const HOME_SOLO_STYLE   = { background: 'rgba(2,132,199,0.78)', backdropFilter: 'blur(6px)' }
+const HOME_SOLO_STYLE   = { background: '#0284c7' }   // sky-600
 
 function BeautyCarousel({ player, onEnterRoom, onSolo }: {
   player: string | null
