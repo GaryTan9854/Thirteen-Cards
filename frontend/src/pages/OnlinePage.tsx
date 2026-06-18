@@ -112,10 +112,8 @@ const BEAUTY_DATA = [
 ]
 
 // ── 動作按鈕配色（集中管理，改這裡全站跟著變）──────────────────────────────
-// 深層畫面（設定 / 抽座位 / 比牌結果）進程鈕：每個模式帶著自己首頁的顏色走完流程。
-//   獨自練功 = 藍(BTN_PRIMARY)、連線遊戲 = 橘(BTN_ONLINE)。比牌結果頁共用 → 依 soloActive 切。
-const BTN_PRIMARY = 'bg-sky-500 hover:bg-sky-400 text-white'      // 獨自練功 流程
-const BTN_ONLINE  = 'bg-orange-500 hover:bg-orange-400 text-white' // 連線遊戲 流程
+// 深層畫面（設定 / 抽座位 / 比牌結果）所有進程鈕：兩種模式一律用藍（橘色只用在首頁入口鈕）。
+const BTN_PRIMARY = 'bg-sky-500 hover:bg-sky-400 text-white'
 // 首頁兩顆疊在輪播圖上的入口鈕 → 霜玻璃 + 取自左上 logo「Thirteen(橘)／Cards(藍)」兩色。
 //   bg 與 border 同色系，避免色相不一致。
 const HOME_ONLINE_CLS   = 'border border-orange-300/40'
@@ -2273,7 +2271,7 @@ export default function OnlinePage() {
                         send({ type: 'new_game' })
                       }
                     }}
-                      className={`text-lg px-10 py-3 rounded-2xl ${soloActive ? BTN_PRIMARY : BTN_ONLINE} font-extrabold
+                      className={`text-lg px-10 py-3 rounded-2xl ${BTN_PRIMARY} font-extrabold
                                  active:scale-95 transition whitespace-nowrap animate-pulse shadow-lg`}>
                       再來一場
                     </button>
@@ -2283,7 +2281,7 @@ export default function OnlinePage() {
                       if (soloActive) startSoloRound()
                       else send({ type: 'next_round' })
                     }}
-                      className={`text-lg px-10 py-3 rounded-2xl ${soloActive ? BTN_PRIMARY : BTN_ONLINE} font-extrabold
+                      className={`text-lg px-10 py-3 rounded-2xl ${BTN_PRIMARY} font-extrabold
                                  active:scale-95 transition whitespace-nowrap animate-pulse shadow-lg`}>
                       下一局 →
                     </button>
@@ -2641,12 +2639,11 @@ export default function OnlinePage() {
           roundBadges={historyBadges}
           isEnded={false}
           myName={player ?? ''}
-          accent="orange"
           roundLabel={history.length === 0 ? '準備開始' : `上場共 ${history.length} 局`}
           actionButtons={<>
             <button
               onClick={() => send({ type: 'new_game' })}
-              className={`text-xs px-3 py-1 rounded-full ${BTN_ONLINE} font-bold
+              className={`text-xs px-3 py-1 rounded-full ${BTN_PRIMARY} font-bold
                          active:scale-95 transition whitespace-nowrap animate-pulse`}>
               ＋ 新一場比賽
             </button>
@@ -2695,7 +2692,7 @@ export default function OnlinePage() {
 
     return (
       <div className="bg-slate-800/30 rounded-xl p-6 space-y-5">
-        <div className="text-xl font-bold text-orange-300">⚙️ 設定新比賽</div>
+        <div className="text-xl font-bold text-sky-300">⚙️ 設定新比賽</div>
 
         <div className="grid grid-cols-3 gap-4">
           {[
@@ -2717,7 +2714,7 @@ export default function OnlinePage() {
         {/* 難易度設定 */}
         <div className="space-y-2">
           <div className="text-sm text-gray-400">難易度</div>
-          <DifficultySelect value={cfgDifficulty} onChange={applyDifficulty} accent="orange" />
+          <DifficultySelect value={cfgDifficulty} onChange={applyDifficulty} accent="sky" />
         </div>
 
         {/* 各座玩家選擇 */}
@@ -2779,8 +2776,8 @@ export default function OnlinePage() {
                   onClick={() => toggleInvite(p)}
                   className={`px-4 py-2 rounded-full border text-sm font-medium transition
                     ${cfgInvitees.includes(p)
-                      ? 'bg-orange-500 text-white border-orange-400'
-                      : 'bg-slate-700 text-sky-200 border-slate-600 hover:border-orange-400'}`}>
+                      ? 'bg-sky-500 text-white border-sky-400'
+                      : 'bg-slate-700 text-sky-200 border-slate-600 hover:border-sky-400'}`}>
                   {p}
                 </button>
               ))}
@@ -2831,7 +2828,7 @@ export default function OnlinePage() {
             }
           }}
           ref={startOnlineBtnRef}
-          className={`w-full py-3 rounded-xl ${BTN_ONLINE} font-bold
+          className={`w-full py-3 rounded-xl ${BTN_PRIMARY} font-bold
                      active:scale-95 transition-all`}
         >
           {cfgInvitees.length > 0 ? `發出邀請（${cfgInvitees.join('、')}）` : '開始連線遊戲'}
@@ -2846,7 +2843,7 @@ export default function OnlinePage() {
     const invites = room?.invites ?? {}
     return (
       <div className="bg-slate-800/30 rounded-xl p-6 space-y-4">
-        <div className="text-xl font-bold text-orange-300">📬 等待玩家回應</div>
+        <div className="text-xl font-bold text-sky-300">📬 等待玩家回應</div>
         <div className="space-y-2">
           {Object.entries(invites).map(([p, status]) => (
             <div key={p} className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-2">
@@ -2872,7 +2869,7 @@ export default function OnlinePage() {
     const seatNames = room?.seat_names ?? []
     return (
       <div className="bg-slate-800/30 rounded-xl p-6 space-y-5 text-center">
-        <div className="text-xl font-bold text-orange-300">🎲 抽座位</div>
+        <div className="text-xl font-bold text-sky-300">🎲 抽座位</div>
         <div className="text-sm text-gray-400">
           玩家：{(room?.players ?? []).join('、')}
           {(room?.players?.length ?? 0) < 4 && (
@@ -2882,7 +2879,7 @@ export default function OnlinePage() {
 
         {!hasSeats && (
           <button onClick={() => send({ type: 'draw_seats' })}
-            className={`px-8 py-3 rounded-xl ${BTN_ONLINE} font-bold
+            className={`px-8 py-3 rounded-xl ${BTN_PRIMARY} font-bold
                        active:scale-95 transition-all`}>
             🎲 抽座位
           </button>
@@ -2894,7 +2891,7 @@ export default function OnlinePage() {
               {seatNames.map((name, i) => (
                 <div key={i} className={`rounded-xl p-3 text-center
                   ${name === player
-                    ? 'bg-orange-500 text-white ring-2 ring-orange-300'
+                    ? 'bg-yellow-400 text-gray-900 ring-2 ring-yellow-300'
                     : (room?.players ?? []).includes(name)
                       ? 'bg-slate-700 text-white'
                       : 'bg-gray-700 text-gray-400'}`}>
@@ -2906,7 +2903,7 @@ export default function OnlinePage() {
 
             {isHost ? (
               <button onClick={() => send({ type: 'start_game' })}
-                className={`px-10 py-3 rounded-xl ${BTN_ONLINE} font-bold text-lg
+                className={`px-10 py-3 rounded-xl ${BTN_PRIMARY} font-bold text-lg
                            active:scale-95 transition-all mt-2`}>
                 ⚔️ 開始戰鬥！
               </button>
@@ -3018,7 +3015,6 @@ export default function OnlinePage() {
           isEnded={dispIsEnded}
           myName={player ?? ''}
           roundLabel={roundLabel}
-          accent={soloActive ? 'yellow' : 'orange'}
         />
 
         {gameResult && (
