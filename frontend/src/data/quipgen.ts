@@ -250,6 +250,41 @@ const TRASH: TrashLine[] = [
   { id: '輸感-7', by: 'loser', text: '有夠邪門。' },
   { id: '輸感-8', by: 'loser', text: '輸牌傷身又傷心。' },
   { id: '輸感-9', by: 'loser', text: '人生怎麼那麼難！' },
+  // ── 黑店 ──
+  { id: '黑店-1', by: 'loser', text: '你們這裡龍門客棧嗎！？' },
+  { id: '黑店-2', by: 'loser', text: '黑店！' },
+  { id: '黑店-3', by: 'loser', text: '太黑了吧！' },
+  { id: '黑店-4', by: 'loser', text: '還有王法嗎？' },
+  { id: '黑店-5', by: 'loser', text: '還有天理嗎？' },
+  { id: '黑店-6', by: 'loser', text: '掌櫃的出來！' },
+  // ── 陰謀論 ──
+  { id: '陰謀-1', by: 'loser', text: '我懷疑你們串通好了！' },
+  { id: '陰謀-2', by: 'loser', text: '這局不對勁！' },
+  { id: '陰謀-3', by: 'loser', text: '發牌的是不是你親戚？' },
+  { id: '陰謀-4', by: 'loser', text: '你們是不是認識？' },
+  { id: '陰謀-5', by: 'loser', text: '這局有詐！' },
+  { id: '陰謀-6', by: 'loser', text: '好個連環套！' },
+  { id: '陰謀-7', by: 'loser', text: '原來是請君入甕！' },
+  { id: '陰謀-8', by: 'loser', text: '你們合起來欺負我！' },
+  { id: '陰謀-9', by: 'loser', text: '此局必有蹊蹺！' },
+  // ── 江湖 ──
+  { id: '江湖-1', by: 'loser', text: '江湖險惡啊！' },
+  { id: '江湖-2', by: 'loser', text: '這是鴻門宴吧！' },
+  { id: '江湖-3', by: 'loser', text: '此地不宜久留！' },
+  { id: '江湖-4', by: 'loser', text: '有埋伏！' },
+  { id: '江湖-5', by: 'loser', text: '我中計了！' },
+  { id: '江湖-6', by: 'loser', text: '失算了！' },
+  { id: '江湖-7', by: 'loser', text: '老夫大意了！' },
+  // ── 驗牌（喊作弊）──
+  { id: '驗牌-1', by: 'loser', text: '莊家出老千！' },
+  { id: '驗牌-2', by: 'loser', text: '驗牌！' },
+  { id: '驗牌-3', by: 'loser', text: '我要驗牌！' },
+  // ── 台味 ──
+  { id: '台味-3', by: 'loser', text: '衝啥毀！' },
+  { id: '台味-4', by: 'loser', text: '有影無？' },
+  { id: '台味-5', by: 'loser', text: '騙肖欸！' },
+  { id: '台味-6', by: 'loser', text: '麥安捏啦！' },
+  { id: '台味-7', by: 'loser', text: '輸到連媽祖都搖頭。' },
   // ── 驚天光（輸到睡不著）──
   { id: '驚天光-1', by: 'loser', text: '唉，今晚輪到我驚天光了。' },
   { id: '驚天光-2', by: 'loser', text: '再輸下去，真的要驚天光了。' },
@@ -264,6 +299,9 @@ const TRASH: TrashLine[] = [
   { id: 'AI輸-3', by: 'loser', text: '我的演算法壞掉了嗎？', need: s => s.loserIsAI },
   { id: 'AI輸-4', by: 'loser', text: 'CPU 都快燒了。', need: s => s.loserIsAI },
   { id: 'AI輸-5', by: 'loser', text: '本宮今晚輸賭驚天光。', need: s => s.loserIsAI },
+  { id: 'AI輸-6', by: 'loser', text: '本宮不服！', need: s => s.loserIsAI },
+  { id: 'AI輸-7', by: 'loser', text: '本宮要告御狀！', need: s => s.loserIsAI },
+  { id: 'AI輸-8', by: 'loser', text: '本宮要求重賽！', need: s => s.loserIsAI },
 
   // ── 酸輸家篇（別人調侃輸家）──
   { id: '酸輸家-1', by: 'other', at: 'loser', text: '{loser}，媽媽有交代：出門遊玩，千萬不要去賭博！' },
