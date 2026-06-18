@@ -200,7 +200,7 @@ type TrashLine = {
   text: string                          // 可含 {loser} {winner}
   by: 'loser' | 'winner' | 'other' | 'any'
   at?: 'loser' | 'winner'
-  need?: (s: { winnerScore: number; loserScore: number }) => boolean
+  need?: (s: { winnerScore: number; loserScore: number; loserIsAI: boolean }) => boolean
 }
 
 const TRASH: TrashLine[] = [
@@ -240,6 +240,29 @@ const TRASH: TrashLine[] = [
   { id: '逐玉-全壘打-1', by: 'loser', text: '別躲我，我只剩這點籌碼了。', need: s => s.loserScore <= -30 },
   { id: '逐玉-全壘打-2', by: 'loser', text: '我不怕輸，只怕輸了還要倒酒。', need: s => s.loserScore <= -30 },
   { id: '逐玉-全壘打-3', by: 'loser', text: '風雨如晦，雞鳴不已；牌運如晦，連輸不已。', need: s => s.loserScore <= -35 },
+  // ── 輸家情緒 ──
+  { id: '輸感-1', by: 'loser', text: '輸到懷疑人生。' },
+  { id: '輸感-2', by: 'loser', text: '蒼天誤我！' },
+  { id: '輸感-3', by: 'loser', text: '豈有此理！' },
+  { id: '輸感-4', by: 'loser', text: '氣煞我也！' },
+  { id: '輸感-5', by: 'loser', text: '這把輸得有教育意義。' },
+  { id: '輸感-6', by: 'loser', text: '今天衰到脫褲。' },
+  { id: '輸感-7', by: 'loser', text: '有夠邪門。' },
+  { id: '輸感-8', by: 'loser', text: '輸牌傷身又傷心。' },
+  // ── 驚天光（輸到睡不著）──
+  { id: '驚天光-1', by: 'loser', text: '唉，今晚輪到我驚天光了。' },
+  { id: '驚天光-2', by: 'loser', text: '再輸下去，真的要驚天光了。' },
+  { id: '驚天光-3', by: 'loser', text: '輸到開始驚天光。' },
+  { id: '驚天光-4', by: 'loser', text: '輸到連天亮都不想看。' },
+  { id: '驚天光-5', by: 'loser', text: '輸到公雞叫都心驚。' },
+  { id: '驚天光-6', by: 'loser', text: '輸到早餐都不香了。' },
+  { id: '驚天光-7', by: 'loser', text: '輸到想直接跳過明天。' },
+  // ── AI 輸家專屬（只在 AI/美女輸時講；人類不講「本宮/演算法」）──
+  { id: 'AI輸-1', by: 'loser', text: '本宮的道心亂了。', need: s => s.loserIsAI },
+  { id: 'AI輸-2', by: 'loser', text: 'AI 算半天，還是輸。', need: s => s.loserIsAI },
+  { id: 'AI輸-3', by: 'loser', text: '我的演算法壞掉了嗎？', need: s => s.loserIsAI },
+  { id: 'AI輸-4', by: 'loser', text: 'CPU 都快燒了。', need: s => s.loserIsAI },
+  { id: 'AI輸-5', by: 'loser', text: '本宮今晚輸賭驚天光。', need: s => s.loserIsAI },
 
   // ── 酸輸家篇（別人調侃輸家）──
   { id: '酸輸家-1', by: 'other', at: 'loser', text: '{loser}，媽媽有交代：出門遊玩，千萬不要去賭博！' },
@@ -294,6 +317,7 @@ const TRASH: TrashLine[] = [
   { id: '跨情境-6', by: 'any', text: '這桌臥虎藏龍，我先敬大家一杯！' },
   { id: '跨情境-7', by: 'any', text: '運氣這東西，今天不來，明天總會來的。' },
   { id: '跨情境-8', by: 'any', text: '牌局如人生，起起落落才有意思嘛。' },
+  { id: '跨情境-驚天光', by: 'any', text: '贏賭驚食飯，輸賭驚天光啊！' },
   // 從 Glory 招牌「甲殼蟲」genericize 出來的公開版：任何人/任何局都能講，
   // 不再綁特定玩家（solo 對美女時也能出現）。
   { id: '跨情境-9',  by: 'any', text: '甲殼蟲爬玻璃——看誰今晚腳滑溜得最順！' },
@@ -447,6 +471,7 @@ const BEAUTY_COAX: { id: string; at: 'winner' | 'loser'; text: string }[] = [
   { id: '美女嬌-贏-40', at: 'winner', text: '{bro}再贏下去，妹妹可要收學費拜師了～' },
   { id: '美女嬌-贏-41', at: 'winner', text: '{bro}今天運氣這麼好，要不要順便去買彩票？' },
   { id: '美女嬌-贏-42', at: 'winner', text: '{bro}負責贏牌，妹妹負責喊厲害～' },
+  { id: '美女嬌-贏-43', at: 'winner', text: '{bro}今天是贏賭驚食飯呢～' },
   // 美女輸牌系列：美女輸給人類贏家後的傲嬌/不服/嗆聲（仍對贏家講，at:'winner'）
   { id: '美女輸牌-1',  at: 'winner', text: '這局不算，我剛剛分心了。' },
   { id: '美女輸牌-2',  at: 'winner', text: '運氣也是實力的一部分？哼。' },
@@ -577,7 +602,7 @@ export function generateScript(summary: GameSummary): GeneratedScript {
   const winner = ps[0]
   const loser  = ps[3]
   const others = ps.slice(1, 3)   // 中間兩位，當主要評論員
-  const scores = { winnerScore: winner.score, loserScore: loser.score }
+  const scores = { winnerScore: winner.score, loserScore: loser.score, loserIsAI: !loser.isHuman }
   const situation = analyzeSituation(ps)
 
   const sub = (t: string) => t.replace(/\{winner\}/g, winner.name).replace(/\{loser\}/g, loser.name)
