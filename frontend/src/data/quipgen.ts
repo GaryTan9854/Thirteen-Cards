@@ -162,8 +162,8 @@ export function appealComments(appeals: AppealResult[], loser: string): IdText[]
   const [a1, a2] = appeals
   const out: IdText[] = []
   if (!a1.success) {
-    // 申訴失敗不必每局都講（30% 提及，騰空間給垃圾話/美女撒嬌），講法也有變化
-    if (chance(0.30)) out.push(pickFresh([
+    // 申訴失敗不必每局都講（15% 提及，騰空間給垃圾話/美女撒嬌），講法也有變化
+    if (chance(0.15)) out.push(pickFresh([
       { id: '申訴失敗-1', text: `哎呀，${a1.player} 沒申訴成功，功虧一簣！` },
       { id: '申訴失敗-2', text: `${a1.player} 申訴了個寂寞，越申越輸……` },
       { id: '申訴失敗-3', text: `${a1.player} 想翻盤結果翻車，這就是人生啊。` },
@@ -171,13 +171,14 @@ export function appealComments(appeals: AppealResult[], loser: string): IdText[]
     ], t => t.id))
     return out
   }
-  out.push(pickFresh([
+  // 申訴成功原本無條件講 → 改 45% 機率，壓低申訴占比
+  if (chance(0.45)) out.push(pickFresh([
     { id: '申訴成功-1', text: `哇！${a1.player} 逆轉成功耶！太猛了！` },
     { id: '申訴成功-2', text: `${a1.player} 大難不死必有後福，申訴翻身！` },
     { id: '申訴成功-3', text: `絕地大反攻！${a1.player} 申訴申到起死回生！` },
     { id: '申訴成功-4', text: `${a1.player} 這手申訴漂亮，從鬼門關前走回來了！` },
   ], t => t.id))
-  if (a2) {
+  if (a2 && chance(0.40)) {   // 申訴二原本無條件 → 40% 機率
     if (!a2.success) {
       out.push({ id: '申訴二-代請客', text: `${a2.player} 真倒楣，替 ${a1.player} 請客了！` })
     } else if (loser === a1.player) {
