@@ -390,8 +390,9 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
         {onEnterRoom && onSolo && (
           <div className="flex gap-4 pointer-events-auto">
             <button onClick={onEnterRoom}
-              className="px-10 py-3 rounded-2xl bg-yellow-400 text-gray-900 font-bold text-base
-                         hover:bg-yellow-300 active:scale-95 transition-all shadow-2xl border border-yellow-200/40">
+              className="px-10 py-3 rounded-2xl font-bold text-base text-white
+                         hover:opacity-90 active:scale-95 transition-all shadow-xl border border-violet-400/40"
+              style={{ background: 'rgba(91,33,182,0.75)', backdropFilter: 'blur(6px)' }}>
               連線遊戲
             </button>
             <button autoFocus onClick={onSolo}

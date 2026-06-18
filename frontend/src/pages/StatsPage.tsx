@@ -316,12 +316,12 @@ export default function StatsPage() {
               <tr className="text-gray-400 text-xs border-b border-gray-700 select-none">
                 {([
                   ['player',     '玩家',   'text-left   pr-4', ''],
-                  ['games',      '場',     'text-right px-2',  ''],
-                  ['wins',       '勝',     'text-right px-2 text-yellow-300', ''],
-                  ['losses',     '負',     'text-right px-2 text-red-400', ''],
                   ['winRate',    '最勝率', 'text-right px-2',  ''],
                   ['undefeated', '不敗率', 'text-right px-2',  ''],
-                  ['system',     '系統排行', 'text-right pl-2 text-sky-300', ''],
+                  ['system',     '系統排行', 'text-right px-2 text-sky-300', ''],
+                  ['wins',       '勝',     'text-right px-2 text-yellow-300', ''],
+                  ['losses',     '負',     'text-right px-2 text-red-400', ''],
+                  ['games',      '場',     'text-right px-2',  ''],
                 ] as [SortCol, string, string, string][])
                 .filter(([col]) => !(col === 'games' && viewMode === 'public' && !isGary))
                 .map(([col, label, cls]) => (
@@ -348,11 +348,6 @@ export default function StatsPage() {
                       {r.player}
                       {isMe && <span className="ml-1 text-sky-400 text-xs">(你)</span>}
                     </td>
-                    {(isGary || viewMode !== 'public') && (
-                      <td className="py-2 px-2 text-right text-gray-300 tabular-nums">{r.games}</td>
-                    )}
-                    <td className="py-2 px-2 text-right text-yellow-300 font-bold tabular-nums">{r.wins}</td>
-                    <td className="py-2 px-2 text-right text-red-400 tabular-nums">{r.losses}</td>
                     <td className="py-2 px-2 text-right tabular-nums">
                       <span className={net > 0 ? 'text-yellow-300 font-semibold'
                                                : net < 0 ? 'text-red-400' : 'text-gray-400'}>
@@ -368,11 +363,16 @@ export default function StatsPage() {
                         {pct(r.games - r.losses, r.games)}
                       </span>
                     </td>
-                    <td className="py-2 pl-2 text-right tabular-nums">
+                    <td className="py-2 px-2 text-right tabular-nums">
                       <span className={sortCol === 'system' ? 'text-sky-300 font-semibold' : 'text-gray-300'}>
                         {r.games ? (sysScore(r) * 100).toFixed(0) + '%' : '—'}
                       </span>
                     </td>
+                    <td className="py-2 px-2 text-right text-yellow-300 font-bold tabular-nums">{r.wins}</td>
+                    <td className="py-2 px-2 text-right text-red-400 tabular-nums">{r.losses}</td>
+                    {(isGary || viewMode !== 'public') && (
+                      <td className="py-2 px-2 text-right text-gray-300 tabular-nums">{r.games}</td>
+                    )}
                   </tr>
                 )
               })}
