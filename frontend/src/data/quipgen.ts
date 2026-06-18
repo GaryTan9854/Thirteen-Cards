@@ -249,6 +249,7 @@ const TRASH: TrashLine[] = [
   { id: '輸感-6', by: 'loser', text: '今天衰到脫褲。' },
   { id: '輸感-7', by: 'loser', text: '有夠邪門。' },
   { id: '輸感-8', by: 'loser', text: '輸牌傷身又傷心。' },
+  { id: '輸感-9', by: 'loser', text: '人生怎麼那麼難！' },
   // ── 驚天光（輸到睡不著）──
   { id: '驚天光-1', by: 'loser', text: '唉，今晚輪到我驚天光了。' },
   { id: '驚天光-2', by: 'loser', text: '再輸下去，真的要驚天光了。' },
