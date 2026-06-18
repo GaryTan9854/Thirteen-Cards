@@ -111,6 +111,16 @@ const BEAUTY_DATA = [
     poem: ['閉月羞花之貌，', '聰慧巧計之心。', '連環計策亂董卓，', '義薄雲天美名揚。'] },
 ]
 
+// ── 動作按鈕配色（集中管理，改這裡全站跟著變）──────────────────────────────
+// 深層畫面（設定 / 抽座位 / 比牌結果）所有「進程」動作鈕，兩種模式統一同色。
+const BTN_PRIMARY = 'bg-sky-500 hover:bg-sky-400 text-white'
+// 首頁兩顆疊在輪播圖上的入口鈕 → 霜玻璃 + 取自左上 logo「Thirteen(橘)／Cards(藍)」兩色。
+//   bg 與 border 同色系，避免色相不一致。
+const HOME_ONLINE_CLS   = 'border border-orange-300/40'
+const HOME_ONLINE_STYLE = { background: 'rgba(234,88,12,0.78)', backdropFilter: 'blur(6px)' }
+const HOME_SOLO_CLS     = 'border border-sky-300/40'
+const HOME_SOLO_STYLE   = { background: 'rgba(2,132,199,0.78)', backdropFilter: 'blur(6px)' }
+
 function BeautyCarousel({ player, onEnterRoom, onSolo }: {
   player: string | null
   onEnterRoom?: () => void
@@ -390,15 +400,15 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
         {onEnterRoom && onSolo && (
           <div className="flex gap-4 pointer-events-auto">
             <button onClick={onEnterRoom}
-              className="px-10 py-3 rounded-2xl font-bold text-base text-white
-                         hover:opacity-90 active:scale-95 transition-all shadow-xl border border-violet-400/40"
-              style={{ background: 'rgba(91,33,182,0.75)', backdropFilter: 'blur(6px)' }}>
+              className={`px-10 py-3 rounded-2xl font-bold text-base text-white
+                         hover:opacity-90 active:scale-95 transition-all shadow-xl ${HOME_ONLINE_CLS}`}
+              style={HOME_ONLINE_STYLE}>
               連線遊戲
             </button>
             <button autoFocus onClick={onSolo}
-              className="px-10 py-3 rounded-2xl font-bold text-base text-white
-                         hover:opacity-90 active:scale-95 transition-all shadow-xl border border-sky-400/40"
-              style={{ background: 'rgba(22,101,52,0.75)', backdropFilter: 'blur(6px)' }}>
+              className={`px-10 py-3 rounded-2xl font-bold text-base text-white
+                         hover:opacity-90 active:scale-95 transition-all shadow-xl ${HOME_SOLO_CLS}`}
+              style={HOME_SOLO_STYLE}>
               獨自練功
             </button>
           </div>
@@ -2259,8 +2269,8 @@ export default function OnlinePage() {
                         send({ type: 'new_game' })
                       }
                     }}
-                      className="text-lg px-10 py-3 rounded-2xl bg-orange-400 text-gray-900 font-extrabold
-                                 hover:bg-orange-300 active:scale-95 transition whitespace-nowrap animate-pulse shadow-lg">
+                      className={`text-lg px-10 py-3 rounded-2xl ${BTN_PRIMARY} font-extrabold
+                                 active:scale-95 transition whitespace-nowrap animate-pulse shadow-lg`}>
                       再來一場
                     </button>
                   </>) : isHost ? (
@@ -2269,8 +2279,8 @@ export default function OnlinePage() {
                       if (soloActive) startSoloRound()
                       else send({ type: 'next_round' })
                     }}
-                      className="text-lg px-10 py-3 rounded-2xl bg-orange-400 text-gray-900 font-extrabold
-                                 hover:bg-orange-300 active:scale-95 transition whitespace-nowrap animate-pulse shadow-lg">
+                      className={`text-lg px-10 py-3 rounded-2xl ${BTN_PRIMARY} font-extrabold
+                                 active:scale-95 transition whitespace-nowrap animate-pulse shadow-lg`}>
                       下一局 →
                     </button>
                   ) : (
@@ -2458,8 +2468,8 @@ export default function OnlinePage() {
             setSoloDrawnSeats([])
             setSoloSeatingPending(true)
           }}
-          className="w-full py-3 rounded-xl bg-sky-500 text-white font-bold text-lg
-                     hover:bg-sky-400 active:scale-95 transition-all shadow-lg">
+          className={`w-full py-3 rounded-xl ${BTN_PRIMARY} font-bold text-lg
+                     active:scale-95 transition-all shadow-lg`}>
           🥋 開始練功
         </button>
       </div>
@@ -2511,8 +2521,8 @@ export default function OnlinePage() {
               const shuffled = [...allNames].sort(() => Math.random() - 0.5)
               setSoloDrawnSeats(shuffled)
             }}
-            className="px-8 py-3 rounded-xl bg-yellow-400 text-gray-900 font-bold
-                       hover:bg-yellow-300 active:scale-95 transition-all">
+            className={`px-8 py-3 rounded-xl ${BTN_PRIMARY} font-bold
+                       active:scale-95 transition-all`}>
             🎲 抽座位
           </button>
         )}
@@ -2555,8 +2565,8 @@ export default function OnlinePage() {
                   setPendingSoloConfig(null)
                   startSoloGame({ roundsNormal: cfg.roundsNormal, roundsAppeal: cfg.roundsAppeal, strategies: newStrategies, aiNames: reorderedAis, drawnOrder: soloDrawnSeats })
                 }}
-                className="px-10 py-3 rounded-xl bg-sky-500 text-white font-bold text-lg
-                           hover:bg-sky-400 active:scale-95 transition-all">
+                className={`px-10 py-3 rounded-xl ${BTN_PRIMARY} font-bold text-lg
+                           active:scale-95 transition-all`}>
                 ⚔️ 開始戰鬥！
               </button>
             </div>
@@ -2631,8 +2641,8 @@ export default function OnlinePage() {
           actionButtons={<>
             <button
               onClick={() => send({ type: 'new_game' })}
-              className="text-xs px-3 py-1 rounded-full bg-orange-400 text-gray-900 font-bold
-                         hover:bg-orange-300 active:scale-95 transition whitespace-nowrap animate-pulse">
+              className={`text-xs px-3 py-1 rounded-full ${BTN_PRIMARY} font-bold
+                         active:scale-95 transition whitespace-nowrap animate-pulse`}>
               ＋ 新一場比賽
             </button>
           </>}
@@ -2816,8 +2826,8 @@ export default function OnlinePage() {
             }
           }}
           ref={startOnlineBtnRef}
-          className="w-full py-3 rounded-xl bg-yellow-400 text-gray-900 font-bold
-                     hover:bg-yellow-300 active:scale-95 transition-all"
+          className={`w-full py-3 rounded-xl ${BTN_PRIMARY} font-bold
+                     active:scale-95 transition-all`}
         >
           {cfgInvitees.length > 0 ? `發出邀請（${cfgInvitees.join('、')}）` : '開始連線遊戲'}
         </button>
@@ -2867,8 +2877,8 @@ export default function OnlinePage() {
 
         {!hasSeats && (
           <button onClick={() => send({ type: 'draw_seats' })}
-            className="px-8 py-3 rounded-xl bg-yellow-400 text-gray-900 font-bold
-                       hover:bg-yellow-300 active:scale-95 transition-all">
+            className={`px-8 py-3 rounded-xl ${BTN_PRIMARY} font-bold
+                       active:scale-95 transition-all`}>
             🎲 抽座位
           </button>
         )}
