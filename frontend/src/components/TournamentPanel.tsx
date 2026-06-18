@@ -40,12 +40,14 @@ interface Props {
   onToggleVoice?: () => void
   actionButtons?: React.ReactNode
   myName?:        string
+  accent?:        'yellow' | 'orange'   // 連線=橘、其餘=黃（badge/小鈕色）
 }
 
 export default function TournamentPanel({
   names, history, multipliers = [], circleMarks = {}, roundBadges = [],
-  isEnded, roundLabel, voiceOn, onToggleVoice, actionButtons, myName = '',
+  isEnded, roundLabel, voiceOn, onToggleVoice, actionButtons, myName = '', accent = 'yellow',
 }: Props) {
+  const accentBg = accent === 'orange' ? 'bg-orange-400 hover:bg-orange-300' : 'bg-yellow-400 hover:bg-yellow-300'
   const [historyView,  setHistoryView]  = useState<0 | 1 | 2>(0)
   const [pressedBadge, setPressedBadge] = useState<{r: number; j: number} | null>(null)
 
@@ -54,7 +56,7 @@ export default function TournamentPanel({
   const winnerIdx    = totalScores.indexOf(Math.max(...totalScores))
   const roundCount   = history.length
 
-  const BTN = "text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold hover:bg-yellow-300 active:scale-95 transition whitespace-nowrap"
+  const BTN = `text-xs px-3 py-1 rounded-full ${accentBg} text-gray-900 font-bold active:scale-95 transition whitespace-nowrap`
 
   // ── HistoryPanel ──────────────────────────────────────────────────────────
   const SPLIT = 10
@@ -185,7 +187,7 @@ export default function TournamentPanel({
         )}
         {/* roundLabel + ▸成績表 + optional 🔊 */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-xs px-3 py-1 rounded-full bg-yellow-400 text-gray-900 font-bold whitespace-nowrap select-none">
+          <span className={`text-xs px-3 py-1 rounded-full ${accentBg} text-gray-900 font-bold whitespace-nowrap select-none`}>
             {roundLabel}
           </span>
           <div className="flex-1" />
