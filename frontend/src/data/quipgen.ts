@@ -124,12 +124,7 @@ export function analyzeSituation(playersIn: GamePlayer[]): Situation {
     tags.push('close_game')
     desc.push('局勢很接近——四家分數咬得很緊')
   }
-  // Dog Fight（電影 Maverick 梗）：最後兩名的纏鬥。一盤可來回上百分，
-  // 所以分差門檻放很寬——只要最後兩名差距在 60 以內都算纏鬥過。
-  if (Math.abs(p3.score - p4.score) <= 60) {
-    tags.push('dogfight')
-    desc.push(`最後兩名 ${p3.name}/${p4.name} 上演 Dog Fight 纏鬥`)
-  }
+  // Dog Fight 不再當情境 tag（幾乎每場都成立會洗版）；台詞改放一般輪替池（TRASH，by:other）。
   if (p1.score - p2.score >= 30) {
     tags.push('runaway_winner')
     desc.push(`冠軍 ${p1.name} 遙遙領先`)
@@ -313,6 +308,10 @@ const TRASH: TrashLine[] = [
   { id: '酸輸家-6', by: 'other', at: 'loser', text: '今晚 {winner} 在收錢，{loser} 在收心情。' },
   { id: '酸輸家-7', by: 'other', at: 'loser', text: '{loser} 輸到沒褲子穿下樓囉～賭博師父住二樓！' },
   { id: '酸輸家-8', by: 'other', at: 'loser', text: '手氣若會傳染，我得趕緊戴口罩，免得被 {loser} 傳到！', need: s => s.loserScore <= -20 },
+  // Dog Fight（電影 Maverick 梗）——改放一般輪替池，依正常機率出現
+  { id: '局勢-DogFight-1', by: 'other', at: 'loser', text: '最後兩名上演 Dog Fight 空中纏鬥——{loser} 還是被擊落了！' },
+  { id: '局勢-DogFight-2', by: 'other', at: 'loser', text: '這場 Dog Fight 打得精彩，可惜 {loser} 最後墊底！' },
+  { id: '局勢-DogFight-3', by: 'other', at: 'loser', text: 'Dog Fight 纏鬥到最後一秒，{loser} 被鎖定、擊落、請客！' },
 
   // ── 贏家臭屁篇（贏家自己講）──
   { id: '贏家臭屁-1', by: 'winner', text: '這把本來要放水的哎。' },
@@ -604,11 +603,6 @@ const SITUATION_LINES: Record<string, IdText[]> = {
   close_bottom: [
     { id: '局勢-墊底之爭-1', text: '最後幾名分數超接近，{loser} 就差那麼一點點！' },
     { id: '局勢-墊底之爭-2', text: '墊底之爭好刺激，{loser} 惜敗！' },
-  ],
-  dogfight: [
-    { id: '局勢-DogFight-1', text: '最後兩名上演 Dog Fight 空中纏鬥——{loser} 還是被擊落了！' },
-    { id: '局勢-DogFight-2', text: '這場 Dog Fight 打得精彩，可惜 {loser} 最後墊底！' },
-    { id: '局勢-DogFight-3', text: 'Dog Fight 纏鬥到最後一秒，{loser} 被鎖定、擊落、請客！' },
   ],
   big_loser: [
     { id: '局勢-大輸-1', text: '{loser} 這次輸得有點重啊……' },
