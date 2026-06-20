@@ -8,6 +8,12 @@ interface LoginEntry {
   timestamp: string
 }
 
+interface QuipStat {
+  quip_id:   string
+  count:     number
+  last_used: string
+}
+
 interface LoginSession {
   username: string
   login:    LoginEntry | null
@@ -228,7 +234,8 @@ export default function LogsPage() {
   const { player } = useAuth()
   const isGary = player === 'Gary'
 
-  const [tab,    setTab]    = useState<'games' | 'logins'>('games')
+  const [tab,    setTab]    = useState<'games' | 'logins' | 'quips'>('games')
+  const [quipStats, setQuipStats] = useState<{ stats: QuipStat[]; total_events: number } | null>(null)
   const [period, setPeriod] = useState<'month' | 'all'>('month')   // default: 本月
   const [excludeGary, setExcludeGary] = useState(true)   // Gary 是 programmer，測試局多→預設排除自己的紀錄
 
@@ -243,7 +250,13 @@ export default function LogsPage() {
   const utcMonth = new Date().toISOString().slice(0, 7)   // "YYYY-MM"
 
   useEffect(() => {
-    if (tab === 'logins' && isGary) {
+    if (tab === 'quips' && isGary) {
+      setLoading(true)
+      fetch('/api/log/quip/stats')
+        .then(r => r.json())
+        .then(d => { setQuipStats({ stats: d.stats ?? [], total_events: d.total_events ?? 0 }); setLoading(false) })
+        .catch(() => setLoading(false))
+    } else if (tab === 'logins' && isGary) {
       setLoading(true)
       Promise.all([
         fetch('/api/log/logins?limit=200').then(r => r.json()),
@@ -290,7 +303,8 @@ export default function LogsPage() {
       <div className="flex items-center gap-3 flex-wrap">
         <div className="text-xl font-bold text-sky-300">📋 遊戲紀錄</div>
 
-        {/* Period filter — default: 本月 */}
+        {/* Period filter — default: 本月（俏皮話統計為全域，不套用）*/}
+        {tab !== 'quips' && (
         <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
           {(['month', 'all'] as const).map(p => (
             <button key={p} onClick={() => setPeriod(p)}
@@ -300,22 +314,23 @@ export default function LogsPage() {
             </button>
           ))}
         </div>
+        )}
 
         {/* Login tab: Gary only */}
         {isGary && (
           <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
-            {(['games', 'logins'] as const).map(t => (
+            {(['games', 'logins', 'quips'] as const).map(t => (
               <button key={t} onClick={() => setTab(t)}
                 className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition
                   ${tab === t ? 'bg-yellow-400 text-gray-900 shadow' : 'text-gray-400 hover:text-white'}`}>
-                {t === 'games' ? '🃏 遊戲' : '🔑 登入'}
+                {t === 'games' ? '🃏 遊戲' : t === 'logins' ? '🔑 登入' : '💬 俏皮話'}
               </button>
             ))}
           </div>
         )}
 
         {/* 排除 Gary 自己的測試紀錄（programmer 測試局多，多半無參考意義）*/}
-        {isGary && (
+        {isGary && tab !== 'quips' && (
           <button onClick={() => setExcludeGary(v => !v)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border
               ${excludeGary
@@ -329,6 +344,68 @@ export default function LogsPage() {
       {loading && (
         <div className="text-center text-gray-500 animate-pulse py-8">載入中…</div>
       )}
+
+      {!loading && tab === 'quips' && quipStats && (() => {
+        const stats = [...quipStats.stats].sort((a, b) => b.count - a.count)
+        const catMap = new Map<string, number>()
+        for (const s of stats) {
+          const c = s.quip_id.replace(/[-－]\d+$/, '')
+          catMap.set(c, (catMap.get(c) ?? 0) + s.count)
+        }
+        const cats = [...catMap.entries()].sort((a, b) => b[1] - a[1])
+        return (
+          <div className="space-y-4">
+            <div className="flex gap-3 flex-wrap">
+              <div className="bg-gray-800/60 rounded-xl px-4 py-2">
+                <div className="text-xs text-gray-400">總出現次數</div>
+                <div className="text-xl font-bold text-sky-300 tabular-nums">{quipStats.total_events}</div>
+              </div>
+              <div className="bg-gray-800/60 rounded-xl px-4 py-2">
+                <div className="text-xs text-gray-400">不同梗</div>
+                <div className="text-xl font-bold text-sky-300 tabular-nums">{stats.length} 句</div>
+              </div>
+            </div>
+
+            <details open>
+              <summary className="cursor-pointer text-sm font-semibold text-gray-300 select-none">
+                類別彙總（{cats.length} 類，依次數排序）
+              </summary>
+              <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-1 text-xs">
+                {cats.map(([c, n]) => (
+                  <div key={c} className="flex justify-between gap-2 bg-gray-800/40 rounded px-2 py-1">
+                    <span className="text-gray-400 truncate">{c}</span>
+                    <span className="font-semibold text-sky-200 tabular-nums">{n}</span>
+                  </div>
+                ))}
+              </div>
+            </details>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="text-gray-500 border-b border-gray-700 text-xs">
+                    <th className="px-3 py-2 text-left font-normal">梗編號</th>
+                    <th className="px-3 py-2 text-right font-normal">次數</th>
+                    <th className="px-3 py-2 text-left font-normal">最後出現</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.length === 0 && (
+                    <tr><td colSpan={3} className="px-3 py-6 text-center text-gray-500">尚無紀錄</td></tr>
+                  )}
+                  {stats.map(s => (
+                    <tr key={s.quip_id} className="border-b border-gray-800 hover:bg-gray-800/30">
+                      <td className="px-3 py-1.5 text-sky-200">{s.quip_id}</td>
+                      <td className="px-3 py-1.5 text-right font-semibold tabular-nums">{s.count}</td>
+                      <td className="px-3 py-1.5 text-gray-500 text-xs">{(s.last_used ?? '').slice(0, 10)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      })()}
 
       {!loading && tab === 'logins' && (
         <div className="overflow-x-auto">
