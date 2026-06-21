@@ -1,6 +1,6 @@
 # ThirteenCards — CLAUDE.md
 
-十三支 (Chinese Poker / Big Two Variant) 平台，**543 規則**（Jack/Glory/Gary 自訂，含 25 種報到牌型）。**當前版本 v2.10.2**。
+十三支 (Chinese Poker / Big Two Variant) 平台，**543 規則**（Jack/Glory/Gary 自訂，含 25 種報到牌型）。**當前版本 v2.11.0**（成熟里程碑）。
 > A2345 = **次大順**（僅次於 10JQKA，非最小）。排牌心法（大神實證）：**尾順→偏縮、尾同花→偏推**。
 
 > Recent session 詳情 → `SESSION_HANDOFF.md`
@@ -10,6 +10,7 @@
 - **MBP** = production 跑時 (`gary@192.168.1.11`)，**2015 Intel Monterey 12.7.6**，PM2 id 10/12，port 3013。CPU 慢，不要拿來跑重 ML，會卡線上玩家。
 - URL: <https://thirteencards.visadelab.xyz>
 - Deploy: `cd ~/Documents/thirteencards && ./deploy.sh`（自動 bump 版本、sync MBA→MBP、SSH MBP build、PM2 restart）
+- ⚠ **deploy 前必跑 `cd frontend && npx tsc --noEmit`，deploy 後 grep 線上 bundle 驗證**（deploy.sh 已加 build 失敗即 abort，但仍養成習慣）。新增持久化設定欄位記得同步 `frontend/src/utils/prefs.ts` 的 `UserSettings`。
 - Vite build **必須在 MBP 跑**（MBA 的 Node 跑會 crash，deploy.sh --quick 已透過 SSH 處理）
 - **MBP Python venv**: `~/thirteencards-dist/backend/venv`，**必須用 `/usr/local/bin/python3.10`**（系統 3.9 不支援 `tuple | None` 等語法）
 

@@ -1,4 +1,4 @@
-# SESSION_HANDOFF — ThirteenCards（最新：v2.10.2，2026-06-15）
+# SESSION_HANDOFF — ThirteenCards（最新：v2.11.0，2026-06-16）
 
 > Architecture / 通則 → 讀 `CLAUDE.md`。本檔記錄最近 session 的決策、debug 歷史、待辦。
 
@@ -6,6 +6,44 @@
 ```
 讀 /Users/user/documents/thirteencards/CLAUDE.md 和 SESSION_HANDOFF.md，接續 ThirteenCards 工作。
 ```
+
+---
+
+## ⭐ 2026-06-16 Session（v2.10.3 → v2.11.0：UI/俏皮話/戰績一輪打磨，里程碑）
+
+**v2.11.0 = 各方面相當成熟的里程碑。** 本輪全部已 deploy + 驗 bundle。重點：
+
+### RA4 attitude（延續上一 session，已定案）
+- RA4 = 不墊底式 `g>K·rl`（K=10），已上線。**三臂配對 `ml/pair_three.py`(10k場) 定案：attitude 整季淨值 = +0.04pp（=0）**；不墊底 = 100% 底力(EV)，attitude 是捨入誤差。詳見下方 06-15 段 + memory `thirteencards-true-objective-notlast`。**別再投資校 K。**
+
+### 戰績系統（StatsPage）
+- **「近100場」滾動窗**：後端 `/api/log/stats?period=recent`（main.py `_RECENT_N=100`，per-player 最近N場）；前端切換「全期/本月/近100場」，**公榜預設 = 近100場**。
+- **系統排行公式改**（StatsPage `sysScore`）：四人平均(25%/75%=打平模型)定錨 **85 分**，slope 0.5，強者 90~95，100 分要 c≈1.3(勝率~37%)幾乎不可能 → 永遠留進步空間。
+- **「我的表現」popup**（🎯 按鈕，系統排行上方）：同時顯示近100場+本月名次，總評語取較佳者；依排行給鼓勵語（榜首=新傳說/2-3=大神/4-5=老仙/6-10=小白兔/外=加把勁）。ESC 或點背景關。
+- **「全體玩家」toggle**（公榜資格說明旁）：on=全體上榜、off(預設)=僅總場次>60。
+- 欄位順序改「玩家·最勝率·不敗率·系統排行·勝·負·場」。
+
+### 俏皮話（quipgen.ts）
+- 新增大量輸家台詞（輸感/驚天光/黑店/陰謀/江湖/驗牌/台味系列）、逐玉劇對白（贏/大勝/輸/全壘打/妲己/褒姒）、四大妖姬最輸狠話、殺豬養你(美女嬌-輸-8)、口罩改掛輸家(酸輸家-8)。
+- **`need` context 加 `loserIsAI`**：可寫「只給 AI/美女」的台詞（本宮/演算法/CPU 那些），人類不會講。
+- **申訴台詞調低**：申訴失敗 30→15%、申訴成功(原無條件)→45%、申訴二(原無條件)→40%。
+- **DogFight 不再當情境 tag**（原「最後兩名差≤60」幾乎每場成立→洗版）；3 句改放一般輪替池(by:other)依正常機率出現。
+- **LogsPage 加「💬 俏皮話」分頁**（Gary 專用）：總覽+類別彙總+完整列表，即時抓 `/api/log/quip/stats`。Gary 隨時自查。
+
+### UI / 配色
+- **首頁兩顆入口鈕 = logo 兩色實心**：連線=橘(#ea580c)、獨自=藍(#0284c7)。**實心不透明**（霜玻璃半透明會透出輪播圖→手機/桌機色不一致，已踩雷修正）。
+- **深層畫面（設定/抽座位/比牌結果）一律藍 `BTN_PRIMARY`**（橘只用在首頁）；曾試「連線流程全橘」但太刺眼已 revert。
+- 「玩家」rename、debug HUD 公式改不墊底式。
+
+### 工程/流程
+- **移除「策略對決」**（DuelPage + 後端 `/api/eval/*`、`/api/ml/status` 孤兒 endpoint）——改用 CLI 模擬。
+- **`deploy.sh` 加固**：前端 build(tsc) 失敗即 abort（原本會靜默 serve 舊 bundle、誤報成功）。見 memory `thirteencards-deploy-build-fail-silent`。**流程：deploy 前 `cd frontend && npx tsc --noEmit`、deploy 後 grep 線上 bundle 驗證。**
+- Gary 偏好：寫完直接 deploy 不必問（memory `deploy-without-asking`）。
+
+### 待辦 / 下一步候選
+- 累積幾天新 log 後再撈 `/api/log/quip/stats` 看調整後分布（DogFight/申訴是否降下來）。
+- ml2(傳說) 不墊底決策層保留但別期待肉；真 edge 在引擎(EV)。
+- 老仙若要更強 → 給更強引擎（非 attitude）。
 
 ---
 
