@@ -74,6 +74,7 @@ export default function StatsPage() {
 
   const [scope,   setScope]   = useState<Scope>('all')
   const [period,  setPeriod]  = useState<Period>('recent')   // 預設近100場（公榜即時反映近況）
+  const [showAllPlayers, setShowAllPlayers] = useState(false) // on=全體玩家上榜；off=僅總場次>60（預設）
   const [data,    setData]    = useState<StatsResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
@@ -187,7 +188,7 @@ export default function StatsPage() {
   // 公榜排行：只顯示有紀錄總場次 > PUBLIC_MIN_GAMES 的玩家
   const isPublicLeaderboard = viewMode === 'public' && !effectivePlayer
   const baseRows = (data?.stats ?? []).filter(
-    r => !isPublicLeaderboard || r.total_games > PUBLIC_MIN_GAMES)
+    r => !isPublicLeaderboard || showAllPlayers || r.total_games > PUBLIC_MIN_GAMES)
   const rows = [...baseRows].sort((a, b) => {
     let va = 0, vb = 0
     if (sortCol === 'player')     { va = a.player.localeCompare(b.player); vb = 0 }
@@ -245,10 +246,21 @@ export default function StatsPage() {
         </div>
       </div>
 
-      {/* 公榜排行資格說明 */}
+      {/* 公榜排行資格說明 + 全體玩家開關 */}
       {isPublicLeaderboard && (
-        <div className="text-xs text-gray-500">
-          有紀錄的總場次 &gt; {PUBLIC_MIN_GAMES} 場即具備參與公榜排行之資格。
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-xs text-gray-500">
+            {showAllPlayers
+              ? '全體玩家皆列入公榜排行（含場次較少者）。'
+              : <>有紀錄的總場次 &gt; {PUBLIC_MIN_GAMES} 場即具備參與公榜排行之資格。</>}
+          </div>
+          <button onClick={() => setShowAllPlayers(v => !v)}
+            className={`px-3 py-1 rounded-full text-xs font-semibold transition border
+              ${showAllPlayers
+                ? 'bg-sky-500/20 text-sky-300 border-sky-500/50'
+                : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-white'}`}>
+            {showAllPlayers ? '✓ 全體玩家' : '全體玩家'}
+          </button>
         </div>
       )}
 
