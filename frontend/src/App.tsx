@@ -46,12 +46,22 @@ function AppInner() {
   const { player, logout } = useAuth()
   const [tab, setTab]       = useState('online')
   const [version, setVersion] = useState('')
+  const [newVersion, setNewVersion] = useState('')  // 偵測到新 deploy → 右下角提示
 
+  // 版本偵測（Gary 2026-07-10）：以載入時第一次抓到的 build 為基準，
+  // 每 5 分鐘＋切回前景時再抓；build 變了＝有新 deploy → 提示（點了才 reload）。
   useEffect(() => {
-    fetch('/api/health')
-      .then(r => r.json())
-      .then(d => setVersion(d.version))
-      .catch(() => {})
+    let baseBuild: string | null = null
+    const check = () => fetch('/api/health').then(r => r.json()).then(d => {
+      if (baseBuild == null) { baseBuild = String(d.build ?? ''); setVersion(d.version); return }
+      if (String(d.build ?? '') !== baseBuild) setNewVersion(d.version)
+    }).catch(() => {})
+    check()
+    const iv = setInterval(check, 5 * 60_000)
+    const onVis = () => { if (document.visibilityState === 'visible') check() }
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('focus', onVis)
+    return () => { clearInterval(iv); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onVis) }
   }, [])
 
   // Fire synthetic resize so BeautyCarousel remeasures after tab switch
@@ -169,6 +179,15 @@ function AppInner() {
         {tab === 'logs'   && <LogsPage />}
         {isGary && tab === 'league' && <LeaguePage />}
       </main>
+
+      {/* 有新版本 → 右下角提示（點了才 reload，不打斷牌局） */}
+      {newVersion && (
+        <button onClick={() => window.location.reload()}
+          className="fixed bottom-4 right-4 z-[100] bg-yellow-400 text-gray-900 font-bold text-sm
+            px-4 py-2.5 rounded-xl shadow-lg hover:bg-yellow-300 transition animate-pulse">
+          🔄 有新版本 v{newVersion} — 點此更新
+        </button>
+      )}
     </div>
   )
 }
