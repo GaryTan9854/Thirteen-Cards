@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import CardFanLogo from '../components/CardFanLogo'
 import { GameResult } from '../types/game'
 import ManualArrange from '../components/ManualArrange'
 import GameResultDisplay from '../components/GameResultDisplay'
@@ -454,7 +455,7 @@ export default function GamePage({ embedded = false }: Props) {
 
       {!embedded && (
         <div className="px-6 py-3 bg-slate-800 shadow">
-          <h1 className="text-lg font-bold tracking-wide">🃏 Thirteen Cards
+          <h1 className="text-lg font-bold tracking-wide flex items-center gap-1.5"><CardFanLogo size={22} /> Thirteen Cards
             <span className="text-xs font-normal text-sky-400 ml-2">十三支 AI 排牌模擬器</span>
           </h1>
         </div>

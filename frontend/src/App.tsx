@@ -8,6 +8,7 @@ import RulesPage      from './pages/RulesPage'
 import StatsPage      from './pages/StatsPage'
 import MusicPage      from './pages/MusicPage'
 import ErrorBoundary  from './components/ErrorBoundary'
+import CardFanLogo    from './components/CardFanLogo'
 import { useMusicOn, toggleMusic } from './utils/music'
 import { useVoiceOn, toggleVoice } from './utils/voice'
 
@@ -88,8 +89,8 @@ function AppInner() {
             }}
             className="flex items-baseline gap-2 hover:opacity-80 transition-opacity active:scale-95"
           >
-            <h1 className="text-lg font-bold tracking-wide leading-none font-cinzel">
-              🃏 <span className="text-orange-500">Thirteen</span> <span className="text-sky-400">Cards</span>
+            <h1 className="text-lg font-bold tracking-wide leading-none font-cinzel flex items-center gap-1.5">
+              <CardFanLogo size={22} /> <span className="text-orange-500">Thirteen</span> <span className="text-sky-400">Cards</span>
             </h1>
             {version && (
               <span className="text-xs font-normal text-sky-400 leading-none">v{version}</span>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import CardFanLogo from '../components/CardFanLogo'
 
 // ── Passkey helpers (frontend-only; platform authenticator = Touch ID / Face ID) ──
 
@@ -178,7 +179,7 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="text-5xl mb-3 select-none">🃏</div>
+          <div className="mb-3 select-none flex justify-center"><CardFanLogo size={64} /></div>
           <h1 className="text-3xl font-bold tracking-tight">
             <span className="text-orange-500">Thirteen</span>
             <span className="text-sky-400"> Cards</span>
