@@ -49,7 +49,7 @@ function AppInner() {
   const [newVersion, setNewVersion] = useState('')  // 偵測到新 deploy → 右下角提示
 
   // 版本偵測（Gary 2026-07-10）：以載入時第一次抓到的 build 為基準，
-  // 每 5 分鐘＋切回前景時再抓；build 變了＝有新 deploy → 提示（點了才 reload）。
+  // 每 60 秒＋切回前景時再抓（對齊西遊記/三國慣例）；build 變了＝有新 deploy → 提示（點了才 reload）。
   useEffect(() => {
     let baseBuild: string | null = null
     const check = () => fetch('/api/health').then(r => r.json()).then(d => {
@@ -57,7 +57,7 @@ function AppInner() {
       if (String(d.build ?? '') !== baseBuild) setNewVersion(d.version)
     }).catch(() => {})
     check()
-    const iv = setInterval(check, 5 * 60_000)
+    const iv = setInterval(check, 60_000)
     const onVis = () => { if (document.visibilityState === 'visible') check() }
     document.addEventListener('visibilitychange', onVis)
     window.addEventListener('focus', onVis)
