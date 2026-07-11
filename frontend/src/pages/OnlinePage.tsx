@@ -24,6 +24,8 @@ import { setScene, stopMusic } from '../utils/music'
 import { useVoiceOn } from '../utils/voice'
 import QuipPanel from '../components/QuipPanel'
 import AvatarPicker from '../components/AvatarPicker'
+import LiveStream from '../components/LiveStream'
+import type { RtcPayload } from '../utils/voicechat'
 import { fetchPrefs, savePrefs, setLocalAvatar } from '../utils/prefs'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -597,6 +599,7 @@ export default function OnlinePage() {
 
   // ── WebSocket ──
   const wsRef               = useRef<WebSocket | null>(null)
+  const rtcHandlerRef       = useRef<((from: string, p: RtcPayload) => void) | null>(null)
   const autoNewGameRef      = useRef(false)   // true when entering via "連線遊戲" direct button
   const [waitingForOnlineSetup, setWaitingForOnlineSetup] = useState(false)  // suppress lobby flash
   const [connected, setConnected] = useState(false)
@@ -900,6 +903,9 @@ export default function OnlinePage() {
 
   function handleMsg(msg: any) {
     switch (msg.type) {
+      case 'rtc':
+        rtcHandlerRef.current?.(msg.from, msg.payload as RtcPayload)
+        return
       case 'welcome':
         setOnlinePlayers(msg.online_players ?? [])
         setRoom(msg.room ?? null)
@@ -2190,6 +2196,12 @@ export default function OnlinePage() {
       )}
 
       <div className="space-y-4">
+        {/* 現場直播（online-kit）：牌局成立即出現 toggle（渲染進 header live-slot） */}
+        <LiveStream me={player ?? ''} members={room?.players ?? []}
+          active={inRoom && !!room && (room.players?.length ?? 0) > 0}
+          send={(p, to) => send({ type: 'rtc', to, payload: p })}
+          bindRtc={h => { rtcHandlerRef.current = h }}
+          slotId="live-slot" />
         {/* Pre-lobby entry screen */}
         {!inRoom && !soloActive && !soloSetupMode && !soloSeatingPending
           ? renderEnterLobby()

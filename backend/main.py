@@ -1058,6 +1058,16 @@ async def ws_endpoint(player_name: str, websocket: WebSocket):
                     })
                     await manager.broadcast({"type": "room_update", "room": room.snapshot()})
 
+            # ── rtc (現場直播 WebRTC 訊令定向 relay，online-kit) ────────────────
+            elif t == "rtc":
+                to = data.get("to")
+                if to and manager.is_online(to):
+                    await manager.send(to, {
+                        "type":    "rtc",
+                        "from":    player_name,
+                        "payload": data.get("payload"),
+                    })
+
             # ── leave_game ────────────────────────────────────────────────────
             elif t == "leave_game":
                 if player_name in room.players:

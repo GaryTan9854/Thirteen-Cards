@@ -132,6 +132,8 @@ function AppInner() {
                 : 'bg-slate-600 text-sky-100'}`}>
               {player}
             </span>
+            {/* LiveStream renders 現場直播 toggle here via portal */}
+            <div id="live-slot" className="flex items-center" />
             {/* TournamentPanel renders 成績表 toggle here via portal */}
             <div id="tournament-header-slot" className="flex items-center" />
             <button
