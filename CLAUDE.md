@@ -1,6 +1,6 @@
 # ThirteenCards — CLAUDE.md
 
-十三支 (Chinese Poker / Big Two Variant) 平台，**543 規則**（Jack/Glory/Gary 自訂，含 25 種報到牌型）。**當前版本 v2.11.0**（成熟里程碑）。
+十三支 (Chinese Poker / Big Two Variant) 平台，**543 規則**（Jack/Glory/Gary 自訂，含 25 種報到牌型）。**當前版本 v2.13.0**（連線✅＋現場直播✅ via visadelab online kit）。
 > A2345 = **次大順**（僅次於 10JQKA，非最小）。排牌心法（大神實證）：**尾順→偏縮、尾同花→偏推**。
 
 > Recent session 詳情 → `SESSION_HANDOFF.md`
@@ -35,6 +35,7 @@ frontend/src/
   pages/LogsPage.tsx         # Gary 專用：登入紀錄 + 遊戲紀錄
   pages/LeaguePage.tsx       # Gary 專用：聯盟賽
   components/
+    LiveStream.tsx           # 現場直播（online kit，copy 自 FourColors 零改動）
     ManualArrange.tsx        # 手動排牌彈窗 + 牌型排法面板
     BattleLog.tsx            # 比牌結果（含打槍倍率顯示）
     TournamentPanel.tsx      # 累積比分（dedup initial）
@@ -126,6 +127,12 @@ else:            att = -min(1,(g-K*rl)/(K*rl)) # 安穩領先 → 守（鎖局�
 - `K` 待 `ml/match_sim.py` 以最大化 P(不墊底) 校準（即原 `NOTLAST_MARGIN`，現確定形狀為斜率×rl）。
 - 守的 candidate 不會掉：`best_def = max(pool, score_defensive)` 直接從池取，K葫蘆等強防守必在（會誤殺的 Step4 Category-Pareto 早已移除）。
 - RA3 永遠傳 0；前端 `_attSupportsWin()` 的 RA/RA4 用 `computeAttitude`（已改不墊底式）。
+
+## 現場直播（v2.13.0，visadelab online kit）
+- copy 自 FourColors：`utils/voicechat.ts`（WebRTC mesh）＋ `components/LiveStream.tsx`（toggle UI），零改動。
+- 接點：App.tsx header `<div id="live-slot"/>`；OnlinePage `rtcHandlerRef` + handleMsg `case 'rtc'` 分流；
+  `<LiveStream>` send 走既有 WS `{type:'rtc', to, payload}`；後端 main.py WS loop 一條 rtc 定向 relay（`manager.send`）。
+- 只掛 STUN；跨嚴格 NAT 要補 TURN。指南＝`~/Documents/FourColors/docs/ONLINE-KIT.md`。
 
 ## 前端
 

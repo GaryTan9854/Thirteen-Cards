@@ -1,4 +1,4 @@
-# SESSION_HANDOFF — ThirteenCards（最新：v2.11.0，2026-06-16）
+# SESSION_HANDOFF — ThirteenCards（最新：v2.13.0，2026-07-11）
 
 > Architecture / 通則 → 讀 `CLAUDE.md`。本檔記錄最近 session 的決策、debug 歷史、待辦。
 
@@ -6,6 +6,18 @@
 ```
 讀 /Users/user/documents/thirteencards/CLAUDE.md 和 SESSION_HANDOFF.md，接續 ThirteenCards 工作。
 ```
+
+---
+
+## ⭐ 2026-07-11 Session（v2.11.0 → v2.13.0：現場直播上線，online kit）
+
+- **現場直播（語音）上線**：照 `visadelab-online-kit`（指南 `~/Documents/FourColors/docs/ONLINE-KIT.md`）：
+  - copy FourColors `utils/voicechat.ts` + `components/LiveStream.tsx`（零改動）。
+  - 接點：App.tsx header `live-slot`、OnlinePage `rtcHandlerRef`＋handleMsg `case 'rtc'`、
+    `<LiveStream>` send=`{type:'rtc',to,payload}`；後端 main.py WS loop 加一條 rtc 定向 relay。
+  - 十三支後端非房主權威 → 只接 LiveStream＋voicechat（kit 指南預告的路徑），連線遊戲本體不動。
+  - tsc 綠、deploy ✅（v2.13.0 build 386）。**待雙機實測互聽**（FourColors 同 kit 已實測過）。
+  - 限制：只掛 STUN，跨嚴格 NAT 要補 TURN。
 
 ---
 
