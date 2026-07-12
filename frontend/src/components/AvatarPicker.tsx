@@ -2,7 +2,7 @@
  * AvatarPicker — one-time avatar setup screen shown when a player has no
  * custom avatar saved.  Lets the player choose from:
  *   • System male portraits   (/assets/males/*.png)
- *   • System female portraits (/assets/beauties/v2/*.png)
+ *   • System female portraits (/assets/beauties/v3/*.png)
  *   • Custom photo upload     (same crop+store logic as BeautyAvatar)
  */
 
@@ -27,7 +27,7 @@ const FEMALES = [
   { file: '貂蟬',   label: '閉月' },
 ]
 
-const BEAUTY_DIR = '/assets/beauties/v2'
+const BEAUTY_DIR = '/assets/beauties/v3'
 
 function cropToSquare(file: File, maxPx: number): Promise<string> {
   return new Promise((resolve, reject) => {

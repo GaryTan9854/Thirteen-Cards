@@ -44,7 +44,7 @@ export function playerBeautyIndex(name: string): number {
 }
 
 const STORAGE_KEY = (name: string) => `tc_avatar_${name}`
-const BEAUTY_DIR = '/assets/beauties/v2'   // versioned dir — change folder name when replacing PNGs
+const BEAUTY_DIR = '/assets/beauties/v3'   // versioned dir — change folder name when replacing PNGs
 
 // ── Canvas helper: center-crop + resize to square base64 JPEG ─────────────────
 

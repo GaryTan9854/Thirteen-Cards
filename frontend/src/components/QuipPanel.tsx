@@ -15,7 +15,7 @@ primeQuipStats()
 
 const BEAUTY_NAMES = new Set(['妲己','妹喜','褒姒','驪姬','西施','王昭君','楊貴妃','貂蟬'])
 const MALE_FILES   = ['秀才', '大儒', '帝王', '將軍']
-const BEAUTY_DIR   = '/assets/beauties/v2'   // versioned dir — change folder name when replacing PNGs
+const BEAUTY_DIR   = '/assets/beauties/v3'   // versioned dir — change folder name when replacing PNGs
 
 function djb2mod(name: string, mod: number): number {
   let h = 5381
