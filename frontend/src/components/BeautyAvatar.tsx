@@ -10,6 +10,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
+import TunaIcon from './TunaIcon'
 import { savePrefs, setLocalAvatar, AVATAR_EVENT } from '../utils/prefs'
 
 // ── Beauty config ──────────────────────────────────────────────────────────────
@@ -129,59 +130,42 @@ export default function BeautyAvatar({ name, size = 80, isMe = false, className 
       : `${BEAUTY_DIR}/${b.file}.png`
   const altText  = customSrc ? name : isMe ? `${m.name} ‧ ${m.label}` : `${b.name} ‧ ${b.label}`
 
-  const wrapStyle: React.CSSProperties = {
-    width:        size,
-    height:       size,
-    borderRadius: '50%',
-    overflow:     'hidden',
-    flexShrink:   0,
-    position:     'relative',
-    cursor:       isMe ? 'pointer' : 'default',
-    display:      'inline-block',
-  }
-
-  const imgStyle: React.CSSProperties = {
-    width:      '100%',
-    height:     '100%',
-    objectFit:  'cover',
-    display:    'block',
-  }
-
   return (
-    <div
-      className={className}
-      style={wrapStyle}
-      title={altText}
-      onMouseEnter={() => isMe && setHovering(true)}
-      onMouseLeave={() => isMe && setHovering(false)}
-      onClick={() => isMe && inputRef.current?.click()}
-    >
-      {/* Portrait: male icon (isMe, no custom) / beauty (AI) / custom photo */}
-      <img
+    <>
+      {/* isMe → click uploads a custom photo (camera overlay on hover).
+          AI beauty → click zooms the portrait full-screen to admire (TunaIcon). */}
+      <TunaIcon
         src={src}
         alt={altText}
-        style={imgStyle}
-      />
-
-      {/* Camera overlay — only when isMe and hovering */}
-      {isMe && hovering && (
-        <div style={{
-          position:      'absolute', inset: 0,
-          background:    'rgba(0,0,0,0.52)',
-          display:       'flex', alignItems: 'center', justifyContent: 'center',
-          borderRadius:  '50%',
-          fontSize:      size * 0.38,
-          pointerEvents: 'none',
-        }}>
-          📷
-        </div>
-      )}
+        size={size}
+        circular
+        className={className}
+        title={altText}
+        zoomable={!isMe}
+        onClick={isMe ? () => inputRef.current?.click() : undefined}
+        onMouseEnter={() => isMe && setHovering(true)}
+        onMouseLeave={() => isMe && setHovering(false)}
+      >
+        {/* Camera overlay — only when isMe and hovering */}
+        {isMe && hovering && (
+          <div style={{
+            position:      'absolute', inset: 0,
+            background:    'rgba(0,0,0,0.52)',
+            display:       'flex', alignItems: 'center', justifyContent: 'center',
+            borderRadius:  '50%',
+            fontSize:      size * 0.38,
+            pointerEvents: 'none',
+          }}>
+            📷
+          </div>
+        )}
+      </TunaIcon>
 
       {/* Hidden file input */}
       {isMe && (
         <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }}
                onChange={handleFileChange} />
       )}
-    </div>
+    </>
   )
 }
