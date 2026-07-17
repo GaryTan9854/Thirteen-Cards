@@ -510,10 +510,10 @@ const DIFFICULTY_OPTIONS: { value: string; label: string; sub: string; tint: str
   { value: 'beginner',     label: '菜鳥', sub: '誤闖叢林的小白兔',           tint: 'text-emerald-300' },
   { value: 'intermediate', label: '老仙', sub: '現職計程車司機，聽我的準沒錯', tint: 'text-amber-300' },
   { value: 'advanced',     label: '大神', sub: '小四開始打牌，從此未逢敵手',   tint: 'text-sky-300' },
-  { value: 'expert',       label: '傳說', sub: '牌道至境，不可言說',           tint: 'text-fuchsia-300' },
+  { value: 'expert',       label: '傳奇', sub: '牌道至境，不可言說',           tint: 'text-fuchsia-300' },
 ]
 const DEFAULT_DIFFICULTY = 'advanced'
-// 傳說(ml2) attitude 旋鈕——目標：min P(成為嚴格最後一名)。參數待 match_sim 微調。
+// 傳奇(ml2) attitude 旋鈕——目標：min P(成為嚴格最後一名)。參數待 match_sim 微調。
 const NOTLAST_SAFE_BASE     = 6    // 「完全安全」所需的領先 = BASE × √(剩餘局數)
 const NOTLAST_GP_POW        = 1    // 賽程進度權重指數
 const NOTLAST_AMP_BASE      = 0.4  // 攻/守基礎強度
@@ -1445,7 +1445,7 @@ export default function OnlinePage() {
       return -Math.min(1.0, (g - trig) / trig)                    // 安穩領先 → 守
     }
 
-    // 傳說 (ml2) attitude curve — objective is min P(成為嚴格最後一名), NOT total score.
+    // 傳奇 (ml2) attitude curve — objective is min P(成為嚴格最後一名), NOT total score.
     // 邏輯（不靠 sim 即可推導）：
     //   • 墊底/並列墊底 (cushion≤0) → 搏變異（唯一翻身路；已是底，犧牲 EV 無妨）。
     //                                  落後越深 + 越終盤 → 攻越猛。
@@ -1472,7 +1472,7 @@ export default function OnlinePage() {
 
     // Only pass attitudes for AI seats with strategies that honor it.
     //   rulealpha / rulealpha4 → win-oriented computeAttitude
-    //   ml2 (傳說)             → 不墊底-oriented computeAttitudeNotLast (DistNet CVaR knob)
+    //   ml2 (傳奇)             → 不墊底-oriented computeAttitudeNotLast (DistNet CVaR knob)
     //   大神 (ml_dist) stays att=0 (proven on points); rulealpha3/2 ignore attitude.
     const _attSupportsWin     = (s: string) =>
       s === 'rulealpha' || s.startsWith('rulealpha_') || s.startsWith('rulealpha4')
@@ -1514,7 +1514,7 @@ export default function OnlinePage() {
             pre_dealt:    state.preDelt,
             overrides:    [{ player: 0, top, mid, bot, baodao: isBaodao !== false }],
             ai_attitudes,
-            cum_scores:   cumScores,                              // 傳說 不墊底決策：目前比分
+            cum_scores:   cumScores,                              // 傳奇 不墊底決策：目前比分
             rounds_left:  Math.max(1, totalRounds - gpRound + 1), // 含本局的剩餘局數
           }),
         })

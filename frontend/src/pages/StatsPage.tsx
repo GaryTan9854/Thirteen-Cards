@@ -49,9 +49,9 @@ function rankLabel(n: number): string {
   return n === 1 ? '冠軍' : n === 2 ? '亞軍' : n === 3 ? '季軍' : `第 ${n} 名`
 }
 
-// 依「系統排行」名次給的鼓勵話（垃圾話其實是鼓勵 🥲），對應難易度命名 傳說/大神/老仙/小白兔
+// 依「系統排行」名次給的鼓勵話（垃圾話其實是鼓勵 🥲），對應難易度命名 傳奇/大神/老仙/小白兔
 function encourageBySysRank(rank: number): string {
-  if (rank === 1) return '你就是新的傳說！'
+  if (rank === 1) return '你就是新的傳奇！'
   if (rank <= 3)  return '你絕對是大神級的玩家！'
   if (rank <= 5)  return '老仙的實力！你白天在開計程車嗎？'
   if (rank <= 10) return '已能在叢林中存活的小白兔！'
