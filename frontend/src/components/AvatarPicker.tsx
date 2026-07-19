@@ -92,8 +92,9 @@ export default function AvatarPicker({ playerName, onDone }: Props) {
       savePrefs(playerName, { avatar: dataUrl })   // sync across devices
       setSelected(dataUrl)
       setTimeout(onDone, 300)
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error('[avatar] 圖片處理失敗：', err)
+      alert('這張圖片無法讀取（格式可能不支援，例如 HEIC）。請改用一般 JPG 或 PNG 圖檔。')
     } finally {
       setUploading(false)
       e.target.value = ''

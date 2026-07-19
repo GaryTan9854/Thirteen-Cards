@@ -107,8 +107,9 @@ export default function BeautyAvatar({ name, size = 80, isMe = false, className 
       setLocalAvatar(name, dataUrl)
       savePrefs(name, { avatar: dataUrl })   // sync across devices
       setCustomSrc(dataUrl)
-    } catch {
-      // silently ignore errors
+    } catch (err) {
+      console.error('[avatar] 圖片處理失敗：', err)
+      alert('這張圖片無法讀取（格式可能不支援，例如 HEIC）。請改用一般 JPG 或 PNG 圖檔。')
     }
     e.target.value = ''  // reset so the same file can be re-selected
   }
