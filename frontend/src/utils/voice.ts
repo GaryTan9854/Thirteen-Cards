@@ -7,6 +7,7 @@
  * callbacks); UI hooks subscribe via useVoiceOn() / useTaiwanese().
  */
 import { useEffect, useState } from 'react'
+import { saveSharedPref } from './sso'
 
 let _on   = localStorage.getItem('tc_voice_on')   === 'true'
 let _twan = localStorage.getItem('tc_voice_lang') === 'nan'
@@ -14,12 +15,19 @@ const listeners    = new Set<(b: boolean) => void>()
 const langListeners = new Set<(b: boolean) => void>()
 
 export function isVoiceOn(): boolean { return _on }
-export function toggleVoice(): boolean {
-  _on = !_on
+function applyVoiceOn(v: boolean) {
+  if (v === _on) return
+  _on = v
   localStorage.setItem('tc_voice_on', String(_on))
   listeners.forEach(l => l(_on))
+}
+export function toggleVoice(): boolean {
+  applyVoiceOn(!_on)
+  saveSharedPref({ voiceOn: _on })   // 使用者主動切換才上雲
   return _on
 }
+/** 登入時從雲端 prefs 還原（不回寫雲端，避免舊值刷成最新） */
+export function applyCloudVoice(v: boolean) { applyVoiceOn(v) }
 export function useVoiceOn(): boolean {
   const [s, set] = useState(_on)
   useEffect(() => { listeners.add(set); return () => { listeners.delete(set) } }, [])

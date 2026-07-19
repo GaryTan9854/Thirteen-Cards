@@ -1,4 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { setSsoCookie, clearSsoCookie, readSsoCookie } from '../utils/sso'
+import { fetchPrefs } from '../utils/prefs'
+import { applyCloudMusic } from '../utils/music'
+import { applyCloudVoice } from '../utils/voice'
 
 interface AuthCtx {
   player: string | null
@@ -94,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('tc_player', name)
     sessionStorage.setItem('tc_auth_logged', '1')
     setPlayer(name)
+    setSsoCookie(name)   // SSO：通知全網域各站「已登入」
     _logAuth(name, 'login')
   }
 
@@ -102,8 +107,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (p) _logAuth(p, 'logout')
     localStorage.removeItem('tc_player')
     sessionStorage.removeItem('tc_auth_logged')
+    clearSsoCookie()     // 明確登出＝全網域總登出（auto-logout 不清，回來自動再登入）
     setPlayer(null)
   }
+
+  // SSO：本機沒登入但 vd_player cookie 在（曾在本網域任一站登入）→ 驗白名單後自動登入
+  useEffect(() => {
+    if (player) return
+    const sso = readSsoCookie()
+    if (!sso) return
+    fetch('/api/online/players')
+      .then(r => r.json())
+      .then(d => {
+        const canonical = (d.players as string[] | undefined)
+          ?.find(n => n.toLowerCase() === sso.toLowerCase())
+        if (canonical) login(canonical)
+      })
+      .catch(() => {})
+  // 只在初次載入判斷一次
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 雲端共用鍵（musicOn/voiceOn）還原：登入後抓 prefs 套用（不回寫）
+  useEffect(() => {
+    if (!player) return
+    fetchPrefs(player).then(p => {
+      const st = p?.settings as Record<string, unknown> | null | undefined
+      if (typeof st?.musicOn === 'boolean') applyCloudMusic(st.musicOn)
+      if (typeof st?.voiceOn === 'boolean') applyCloudVoice(st.voiceOn)
+    })
+  }, [player])
 
   return <Ctx.Provider value={{ player, login, logout }}>{children}</Ctx.Provider>
 }

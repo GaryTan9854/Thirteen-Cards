@@ -360,8 +360,17 @@ def save_user_prefs(player: str,
             "SELECT avatar, settings FROM user_prefs WHERE player = ?", (player,)
         ).fetchone()
         new_avatar   = avatar if avatar is not None else (cur["avatar"] if cur else None)
-        new_settings = (json.dumps(settings, ensure_ascii=False) if settings is not None
-                        else (cur["settings"] if cur else None))
+        # settings 淺合併：部分更新（如只送 musicOn）不得蓋掉其他鍵（543 共用鍵雲端化）
+        new_settings = cur["settings"] if cur else None
+        if settings is not None:
+            base: Dict[str, Any] = {}
+            if cur and cur["settings"]:
+                try:
+                    base = json.loads(cur["settings"])
+                except (ValueError, TypeError):
+                    base = {}
+            base.update(settings)
+            new_settings = json.dumps(base, ensure_ascii=False)
         c.execute(
             "INSERT OR REPLACE INTO user_prefs (player, avatar, settings, updated_at) "
             "VALUES (?, ?, ?, ?)",

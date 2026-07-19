@@ -12,6 +12,7 @@
  * Handles autoplay policy by deferring play to first user gesture.
  */
 import { useEffect, useState } from 'react'
+import { saveSharedPref } from './sso'
 
 const M = (f: string) => `/assets/music/${f}`
 
@@ -94,8 +95,9 @@ export function setScene(scene: string) {
 
 export function isMusicOn(): boolean { return _enabled }
 
-export function toggleMusic(): boolean {
-  _enabled = !_enabled
+function applyMusicOn(v: boolean) {
+  if (v === _enabled) return
+  _enabled = v
   localStorage.setItem('tc_music_on', String(_enabled))
   if (_enabled) {
     if      (_scene === 'lobby')   tryPlay(makeAudio(LOBBY_TRACK, true))
@@ -105,8 +107,16 @@ export function toggleMusic(): boolean {
     audio?.pause()
   }
   listeners.forEach(l => l(_enabled))
+}
+
+export function toggleMusic(): boolean {
+  applyMusicOn(!_enabled)
+  saveSharedPref({ musicOn: _enabled })   // 使用者主動切換才上雲
   return _enabled
 }
+
+/** 登入時從雲端 prefs 還原（不回寫雲端，避免舊值刷成最新） */
+export function applyCloudMusic(v: boolean) { applyMusicOn(v) }
 
 export function stopMusic() {
   _scene = ''
