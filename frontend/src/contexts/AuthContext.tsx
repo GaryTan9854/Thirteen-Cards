@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { setSsoCookie, clearSsoCookie, readSsoCookie } from '../utils/sso'
+import { setSsoCookie, clearSsoCookie, readSsoCookie, gotoPortal } from '../utils/sso'
 import { fetchPrefs } from '../utils/prefs'
 import { applyCloudMusic } from '../utils/music'
 import { applyCloudVoice } from '../utils/voice'
@@ -109,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.removeItem('tc_auth_logged')
     clearSsoCookie()     // 明確登出＝全網域總登出（auto-logout 不清，回來自動再登入）
     setPlayer(null)
+    gotoPortal()         // 遊戲登出＝回 543 大廳（543 的登出才是總登出）
   }
 
   // SSO：本機沒登入但 vd_player cookie 在（曾在本網域任一站登入）→ 驗白名單後自動登入

@@ -28,6 +28,13 @@ export function readSsoCookie(): string | null {
   return m ? decodeURIComponent(m[1]) : null
 }
 
+export const PORTAL_URL = 'https://543.visadelab.xyz'
+
+/** 遊戲明確登出後回 543 首頁（登出＝回大廳；543 的登出才是總登出）。dev/localhost 不跳。 */
+export function gotoPortal() {
+  if (DOMAIN_OK) window.location.href = PORTAL_URL
+}
+
 /** 共用鍵寫入雲端（fire-and-forget）。只在使用者主動切換時呼叫；
  *  登入還原（hydrate）絕不能呼叫——那會把舊值刷成「最新」，弄壞跨庫同步的新舊判定。 */
 export function saveSharedPref(partial: { musicOn?: boolean; voiceOn?: boolean }) {

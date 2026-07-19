@@ -186,6 +186,7 @@ export default function LoginPage() {
           </h1>
           <p className="text-sky-400 text-sm mt-1">十三支線上對戰</p>
           {version && <p className="text-sky-400 text-xs mt-1">v{version}{build && ` (${build})`}</p>}
+          <p className="text-xs mt-3"><a href="https://543.visadelab.xyz" style={{ color: '#e2b45f' }}>← 543 遊戲大廳</a></p>
         </div>
 
         {/* ── Passkey quick-login ── */}
