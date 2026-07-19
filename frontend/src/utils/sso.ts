@@ -35,6 +35,21 @@ export function gotoPortal() {
   if (DOMAIN_OK) window.location.href = PORTAL_URL
 }
 
+// ── 來路標記：只有「這一趟是從 543 點進來的」，登出才跳回 543；
+//    直接打遊戲網址進來的，登出留在原遊戲登入頁（那裡有回大廳連結）。──
+const VIA_KEY = 'vd_via_543'
+
+/** 進站（AuthContext mount）時呼叫：referrer 是 543 才標記（per-tab sessionStorage）。 */
+export function markVia543IfReferred() {
+  try {
+    if (document.referrer.startsWith(PORTAL_URL)) sessionStorage.setItem(VIA_KEY, '1')
+  } catch {}
+}
+
+export function cameVia543(): boolean {
+  return sessionStorage.getItem(VIA_KEY) === '1'
+}
+
 /** 共用鍵寫入雲端（fire-and-forget）。只在使用者主動切換時呼叫；
  *  登入還原（hydrate）絕不能呼叫——那會把舊值刷成「最新」，弄壞跨庫同步的新舊判定。 */
 export function saveSharedPref(partial: { musicOn?: boolean; voiceOn?: boolean }) {
