@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { setSsoCookie, clearSsoCookie, readSsoCookie, gotoPortal, markVia543IfReferred, cameVia543 } from '../utils/sso'
-import { fetchPrefs } from '../utils/prefs'
+import { fetchPrefs, setLocalAvatar } from '../utils/prefs'
 import { applyCloudMusic } from '../utils/music'
 import { applyCloudVoice } from '../utils/voice'
 
@@ -134,6 +134,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!player) return
     fetchPrefs(player).then(p => {
+      // 伺服器頭像＝跨裝置/跨遊戲真相：有就一律覆蓋本機快取（543 sync 後的新頭像才會到裝置）
+      if (p?.avatar) setLocalAvatar(player, p.avatar)
       const st = p?.settings as Record<string, unknown> | null | undefined
       if (typeof st?.musicOn === 'boolean') applyCloudMusic(st.musicOn)
       if (typeof st?.voiceOn === 'boolean') applyCloudVoice(st.voiceOn)
