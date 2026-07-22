@@ -109,6 +109,11 @@ function AppInner() {
 
           {/* Desktop tabs (hidden on small screens — shown below on mobile) */}
           <div className="hidden sm:flex bg-slate-700 rounded-xl p-1 gap-1">
+            <a href="https://543.visadelab.xyz" title="回 543 遊戲大廳"
+              className="px-3 py-1.5 rounded-lg text-sm font-semibold transition text-sky-300 hover:text-white"
+              style={{ textDecoration: 'none' }}>
+              🏠 543
+            </a>
             {TABS.map(t => (
               <button
                 key={t.id}
@@ -148,6 +153,12 @@ function AppInner() {
 
         {/* Row 2: Mobile tab bar */}
         <div className="flex sm:hidden bg-slate-700/60 border-t border-slate-600/40 overflow-x-auto">
+          <a href="https://543.visadelab.xyz"
+            className="flex-1 min-w-[4rem] py-2 text-xs font-semibold transition flex flex-col items-center gap-0.5 shrink-0 text-sky-400 hover:text-white"
+            style={{ textDecoration: 'none' }}>
+            <span className="text-base leading-none">🏠</span>
+            <span className="whitespace-nowrap">543</span>
+          </a>
           {TABS.map(t => (
             <button
               key={t.id}
