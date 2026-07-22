@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { readSsoCookie } from '../utils/sso'
 import CardFanLogo from '../components/CardFanLogo'
 
 // ── Passkey helpers (frontend-only; platform authenticator = Touch ID / Face ID) ──
@@ -85,10 +86,11 @@ export default function LoginPage() {
   const [error,         setError]         = useState('')
   const [version,       setVersion]       = useState('')
   const [build,         setBuild]         = useState('')
+  const [password,      setPassword]      = useState('')
   const [bioName,       setBioName]       = useState<string | null>(null)  // saved passkey name
   const [bioLoading,    setBioLoading]    = useState(false)
   const [showBioOffer,  setShowBioOffer]  = useState(false)   // offer after first name-login
-  const [pendingPlayer, setPendingPlayer] = useState<string | null>(null)
+  const [pendingAuth,   setPendingAuth]   = useState<{ player: string; token: string } | null>(null)
 
   useEffect(() => {
     fetch('/api/online/players')
@@ -107,34 +109,52 @@ export default function LoginPage() {
     }
   }, [])
 
+  async function serverLogin(playerName: string, pw: string) {
+    const r = await fetch('/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ player: playerName, password: pw }),
+    })
+    return r.json() as Promise<{ ok: boolean; player?: string; token?: string; error?: string }>
+  }
+
   async function handlePasskeyLogin() {
     setBioLoading(true)
     const playerName = await verifyPasskey()
-    setBioLoading(false)
-    if (playerName) {
-      login(playerName)
-    } else {
-      setError('指紋驗證失敗，請用名字登入')
-    }
+    if (!playerName) { setBioLoading(false); setError('指紋驗證失敗，請用名字登入'); return }
+    // 無密碼帳號指紋直接取 token；有密碼帳號指紋只當「續期」——cookie token 仍有效才放行
+    try {
+      const d = await serverLogin(playerName, '')
+      if (d.ok && d.token) { login(playerName, d.token); return }
+      const token = readSsoCookie()
+      if (token) {
+        const v = await (await fetch('/api/auth/verify', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        })).json()
+        if (v?.ok && v.player === playerName) { login(playerName); return }
+      }
+      setError('此帳號已設密碼，請輸入名字＋密碼登入')
+    } catch { setError('連線失敗，請再試一次') }
+    finally { setBioLoading(false) }
   }
 
   async function handleBioOffer(accept: boolean) {
     setShowBioOffer(false)
-    if (accept && pendingPlayer) {
-      const ok = await registerPasskey(pendingPlayer)
-      if (ok) setBioName(pendingPlayer)
+    if (accept && pendingAuth) {
+      const ok = await registerPasskey(pendingAuth.player)
+      if (ok) setBioName(pendingAuth.player)
     }
-    if (pendingPlayer) login(pendingPlayer)
-    setPendingPlayer(null)
+    if (pendingAuth) login(pendingAuth.player, pendingAuth.token)
+    setPendingAuth(null)
   }
 
-  function doLogin(canonical: string) {
+  function doLogin(auth: { player: string; token: string }) {
     // If passkey supported and not yet registered, offer to register
     if (passkeySupported() && !hasSavedPasskey()) {
-      setPendingPlayer(canonical)
+      setPendingAuth(auth)
       setShowBioOffer(true)
     } else {
-      login(canonical)
+      login(auth.player, auth.token)
     }
   }
 
@@ -144,21 +164,21 @@ export default function LoginPage() {
     const trimmed = name.trim()
     if (!trimmed) return
 
+    // 本遊戲白名單先擋（543 名單是聯集，不能放行不在本遊戲的玩家）
     const match = allowed.find(p => p === trimmed.toLowerCase())
-    if (!match) {
+    if (allowed.length && !match) {
       setError('找不到此玩家，請確認名字')
       return
     }
 
-    fetch('/api/online/players')
-      .then(r => r.json())
+    serverLogin(trimmed, password)
       .then(d => {
-        const canonical = (d.players as string[]).find(
-          p => p.toLowerCase() === trimmed.toLowerCase()
-        ) ?? trimmed
-        doLogin(canonical)
+        if (d.ok && d.player && d.token) doLogin({ player: d.player, token: d.token })
+        else if (d.error === 'bad_password') setError(password ? '密碼錯誤' : '此帳號已設密碼，請輸入密碼')
+        else if (d.error === 'auth_upstream_down') setError('登入服務暫時無法使用，請稍後再試')
+        else setError('找不到此玩家，請確認名字')
       })
-      .catch(() => doLogin(trimmed))
+      .catch(() => setError('連線失敗，請再試一次'))
   }
 
   return (
@@ -251,6 +271,21 @@ export default function LoginPage() {
                              focus:outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400
                              transition"
                 />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">
+                  密碼 <span className="text-gray-600">（未設定密碼者留空）</span>
+                </label>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="輸入密碼（選填）"
+                  value={password}
+                  onChange={e => { setPassword(e.target.value); setError('') }}
+                  className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5
+                             text-white placeholder-slate-600 focus:outline-none transition"
+                />
+                <p className="text-[11px] text-gray-600 mt-1">密碼可在 543 遊戲大廳（右上角設定）設定或修改</p>
               </div>
               {error && <p className="text-sm text-red-400">{error}</p>}
               <button

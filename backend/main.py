@@ -41,6 +41,27 @@ app.add_middleware(
 
 
 # ── Health ────────────────────────────────────────────
+# ── Auth 轉發：密碼只存在 543（唯一簽發者）；內網轉問 127.0.0.1:3019 ──
+from fastapi import Request as _AuthReq
+from fastapi.responses import Response as _AuthResp
+import urllib.request as _authurl, urllib.error as _autherr
+
+@app.post("/api/auth/{rest:path}")
+async def auth_proxy(rest: str, request: _AuthReq):
+    body = await request.body()
+    req = _authurl.Request("http://127.0.0.1:3019/api/auth/" + rest,
+                           data=body or b"{}",
+                           headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with _authurl.urlopen(req, timeout=5) as r:
+            return _AuthResp(content=r.read(), media_type="application/json", status_code=r.status)
+    except _autherr.HTTPError as e:
+        return _AuthResp(content=e.read(), media_type="application/json", status_code=e.code)
+    except Exception:
+        return _AuthResp(content=b'{"ok":false,"error":"auth_upstream_down"}',
+                         media_type="application/json", status_code=502)
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok", "app": "ThirteenCards", "version": APP_VERSION, "build": APP_BUILD}

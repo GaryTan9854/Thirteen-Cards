@@ -6,7 +6,7 @@ import { applyCloudVoice } from '../utils/voice'
 
 interface AuthCtx {
   player: string | null
-  login:  (name: string) => void
+  login:  (name: string, token?: string) => void
   logout: () => void
 }
 
@@ -94,11 +94,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [player])
 
-  function login(name: string) {
+  function login(name: string, token?: string) {
     localStorage.setItem('tc_player', name)
     sessionStorage.setItem('tc_auth_logged', '1')
     setPlayer(name)
-    setSsoCookie(name)   // SSO：通知全網域各站「已登入」
+    if (token) setSsoCookie(token)   // SSO：cookie 存 543 簽發的 token（登入回應帶來）
     _logAuth(name, 'login')
   }
 
@@ -116,14 +116,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     markVia543IfReferred()   // 記下這一趟是否從 543 點進來（登出跳轉依據）
     if (player) return
-    const sso = readSsoCookie()
-    if (!sso) return
-    fetch('/api/online/players')
+    const token = readSsoCookie()
+    if (!token) return
+    fetch('/api/auth/verify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
       .then(r => r.json())
-      .then(d => {
-        const canonical = (d.players as string[] | undefined)
-          ?.find(n => n.toLowerCase() === sso.toLowerCase())
-        if (canonical) login(canonical)
+      .then(v => {
+        if (!v?.ok || !v.player) return
+        // token 驗真後仍須在「本遊戲」名單內（543 名單是四遊戲聯集）
+        return fetch('/api/online/players').then(r => r.json()).then(d => {
+          const canonical = (d.players as string[] | undefined)
+            ?.find(n => n.toLowerCase() === String(v.player).toLowerCase())
+          if (canonical) login(canonical)
+        })
       })
       .catch(() => {})
   // 只在初次載入判斷一次
