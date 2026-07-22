@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { readSsoCookie } from '../utils/sso'
 import CardFanLogo from '../components/CardFanLogo'
@@ -87,6 +87,7 @@ export default function LoginPage() {
   const [version,       setVersion]       = useState('')
   const [build,         setBuild]         = useState('')
   const [password,      setPassword]      = useState('')
+  const passwordRef = useRef<HTMLInputElement>(null)
   const [bioName,       setBioName]       = useState<string | null>(null)  // saved passkey name
   const [bioLoading,    setBioLoading]    = useState(false)
   const [showBioOffer,  setShowBioOffer]  = useState(false)   // offer after first name-login
@@ -266,6 +267,7 @@ export default function LoginPage() {
                   placeholder="輸入你的名字"
                   value={name}
                   onChange={e => { setName(e.target.value); setError('') }}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); passwordRef.current?.focus() } }}
                   className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5
                              text-white placeholder-slate-600
                              focus:outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400
@@ -277,6 +279,7 @@ export default function LoginPage() {
                   密碼 <span className="text-gray-600">（未設定密碼者留空）</span>
                 </label>
                 <input
+                  ref={passwordRef}
                   type="password"
                   autoComplete="current-password"
                   placeholder="輸入密碼（選填）"
