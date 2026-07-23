@@ -1,12 +1,26 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { readSsoCookie } from '../utils/sso'
 import CardFanLogo from '../components/CardFanLogo'
 
 // ── Passkey helpers (frontend-only; platform authenticator = Touch ID / Face ID) ──
 
-const PASSKEY_ID_KEY   = 'tc_passkey_id'
-const PASSKEY_NAME_KEY = 'tc_passkey_name'
+const PASSKEY_ID_KEY   = 'tc_passkey2_id'
+const PASSKEY_NAME_KEY = 'tc_passkey2_name'
+const RP_ID = location.hostname.endsWith('visadelab.xyz') ? 'visadelab.xyz' : location.hostname
+
+function bufToB64url(b: ArrayBuffer): string {
+  return btoa(String.fromCharCode(...new Uint8Array(b)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+function bufToB64(b: ArrayBuffer): string {
+  return btoa(String.fromCharCode(...new Uint8Array(b)))
+}
+function b64urlToBuf(s: string): Uint8Array<ArrayBuffer> {
+  const bin = atob(s.replace(/-/g, '+').replace(/_/g, '/'))
+  const buf = new Uint8Array(new ArrayBuffer(bin.length))
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i)
+  return buf
+}
 
 function isMobileDevice(): boolean {
   // Only offer biometric on touch-primary devices (phones/tablets), not desktop
@@ -25,13 +39,26 @@ function getSavedPasskeyName(): string | null {
   return localStorage.getItem(PASSKEY_NAME_KEY)
 }
 
-async function registerPasskey(playerName: string): Promise<boolean> {
+function clearSavedPasskey() {
+  localStorage.removeItem(PASSKEY_ID_KEY)
+  localStorage.removeItem(PASSKEY_NAME_KEY)
+}
+
+async function fetchChallenge(): Promise<string | null> {
   try {
-    const challenge = crypto.getRandomValues(new Uint8Array(32))
+    const d = await (await fetch('/api/auth/passkey/challenge', { method: 'POST' })).json()
+    return d?.challenge ?? null
+  } catch { return null }
+}
+
+async function registerPasskey(playerName: string, token: string): Promise<boolean> {
+  try {
+    const challenge = await fetchChallenge()
+    if (!challenge) return false
     const cred = (await navigator.credentials.create({
       publicKey: {
-        challenge,
-        rp:   { name: 'Thirteen Cards', id: location.hostname },
+        challenge: b64urlToBuf(challenge),
+        rp:   { name: 'Thirteen Cards', id: RP_ID },
         user: { id: new TextEncoder().encode(playerName), name: playerName, displayName: playerName },
         pubKeyCredParams: [
           { type: 'public-key', alg: -7   },   // ES256 (Touch ID / Secure Enclave)
@@ -46,8 +73,21 @@ async function registerPasskey(playerName: string): Promise<boolean> {
       },
     })) as PublicKeyCredential | null
     if (!cred) return false
-    const raw = Array.from(new Uint8Array(cred.rawId))
-    localStorage.setItem(PASSKEY_ID_KEY,   btoa(String.fromCharCode(...raw)))
+    const resp = cred.response as AuthenticatorAttestationResponse
+    const spki = resp.getPublicKey?.()
+    if (!spki) return false
+    const credId = bufToB64url(cred.rawId)
+    const r = await (await fetch('/api/auth/passkey/register', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token, credId,
+        publicKey: bufToB64(spki),
+        alg: resp.getPublicKeyAlgorithm(),
+        clientDataJSON: bufToB64url(resp.clientDataJSON),
+      }),
+    })).json()
+    if (!r?.ok) return false
+    localStorage.setItem(PASSKEY_ID_KEY, credId)
     localStorage.setItem(PASSKEY_NAME_KEY, playerName)
     return true
   } catch {
@@ -55,22 +95,31 @@ async function registerPasskey(playerName: string): Promise<boolean> {
   }
 }
 
-async function verifyPasskey(): Promise<string | null> {
+type PasskeyAssertion = { credId: string; clientDataJSON: string; authenticatorData: string; signature: string }
+
+async function passkeyAssert(): Promise<PasskeyAssertion | null> {
   try {
-    const storedId   = localStorage.getItem(PASSKEY_ID_KEY)
-    const storedName = localStorage.getItem(PASSKEY_NAME_KEY)
-    if (!storedId || !storedName) return null
-    const credId  = Uint8Array.from(atob(storedId), c => c.charCodeAt(0))
-    const challenge = crypto.getRandomValues(new Uint8Array(32))
-    const assertion = await navigator.credentials.get({
+    const storedId = localStorage.getItem(PASSKEY_ID_KEY)
+    if (!storedId) return null
+    const challenge = await fetchChallenge()
+    if (!challenge) return null
+    const assertion = (await navigator.credentials.get({
       publicKey: {
-        challenge,
-        allowCredentials: [{ type: 'public-key', id: credId }],
+        challenge: b64urlToBuf(challenge),
+        rpId: RP_ID,
+        allowCredentials: [{ type: 'public-key', id: b64urlToBuf(storedId) }],
         userVerification: 'required',
         timeout: 60000,
       },
-    })
-    return assertion ? storedName : null
+    })) as PublicKeyCredential | null
+    if (!assertion) return null
+    const resp = assertion.response as AuthenticatorAssertionResponse
+    return {
+      credId: bufToB64url(assertion.rawId),
+      clientDataJSON: bufToB64url(resp.clientDataJSON),
+      authenticatorData: bufToB64url(resp.authenticatorData),
+      signature: bufToB64url(resp.signature),
+    }
   } catch {
     return null
   }
@@ -104,6 +153,9 @@ export default function LoginPage() {
       .then(d => { setVersion(d.version ?? ''); setBuild(d.build ?? '') })
       .catch(() => {})
 
+    // 舊版（前端-only、綁子網域）passkey 已無用，清掉；新版 key=tc_passkey2_*
+    localStorage.removeItem('tc_passkey_id')
+    localStorage.removeItem('tc_passkey_name')
     // Check for saved passkey
     if (passkeySupported() && hasSavedPasskey()) {
       setBioName(getSavedPasskeyName())
@@ -120,21 +172,28 @@ export default function LoginPage() {
 
   async function handlePasskeyLogin() {
     setBioLoading(true)
-    const playerName = await verifyPasskey()
-    if (!playerName) { setBioLoading(false); setError('指紋驗證失敗，請用名字登入'); return }
-    // 無密碼帳號指紋直接取 token；有密碼帳號指紋只當「續期」——cookie token 仍有效才放行
+    setError('')
+    // 伺服器端 WebAuthn（543 驗簽）：指紋驗過＝等同密碼，直接拿 SSO token（不必查密碼）
     try {
-      const d = await serverLogin(playerName, '')
-      if (d.ok && d.token) { login(playerName, d.token); return }
-      const token = readSsoCookie()
-      if (token) {
-        const v = await (await fetch('/api/auth/verify', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
-        })).json()
-        if (v?.ok && v.player === playerName) { login(playerName); return }
+      const a = await passkeyAssert()
+      if (!a) { setError('指紋驗證失敗，請用名字登入'); return }
+      const d = await (await fetch('/api/auth/passkey/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(a),
+      })).json()
+      if (d?.ok && d.player && d.token) {
+        // 本遊戲白名單仍要擋（543 名單是聯集）
+        if (allowed.length && !allowed.includes(d.player.toLowerCase())) {
+          setError('此玩家不在本遊戲名單'); return
+        }
+        login(d.player, d.token)
+        return
       }
-      setError('此帳號已設密碼，請輸入名字＋密碼登入')
+      if (d?.error === 'unknown_credential') {
+        clearSavedPasskey()
+        setBioName(null)
+        setError('指紋登入已升級，請先用名字＋密碼登入一次重新開啟')
+      } else setError('指紋登入失敗，請用名字登入')
     } catch { setError('連線失敗，請再試一次') }
     finally { setBioLoading(false) }
   }
@@ -142,7 +201,7 @@ export default function LoginPage() {
   async function handleBioOffer(accept: boolean) {
     setShowBioOffer(false)
     if (accept && pendingAuth) {
-      const ok = await registerPasskey(pendingAuth.player)
+      const ok = await registerPasskey(pendingAuth.player, pendingAuth.token)
       if (ok) setBioName(pendingAuth.player)
     }
     if (pendingAuth) login(pendingAuth.player, pendingAuth.token)
