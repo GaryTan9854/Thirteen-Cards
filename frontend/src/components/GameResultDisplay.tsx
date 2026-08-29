@@ -154,6 +154,7 @@ export default function GameResultDisplay({
   useEffect(() => {
     if (!stepByStep || globalPhase >= 3) return
     const onKey = (e: KeyboardEvent) => {
+      if (e.isComposing || e.keyCode === 229) return   // 中文輸入法組字中：Enter 是選字
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault()
         advanceRevealRef.current?.()
