@@ -141,13 +141,11 @@ ssh $SSH_OPTS $REMOTE_USER@$REMOTE_HOST "
   '
 "
 
-echo "🗄️  [5/5] Pulling data backup MBP → MBA…"
-mkdir -p "$HOME/Documents/.db-backups/thirteencards"
-rsync -az -e "ssh $SSH_OPTS" \
-  $REMOTE_USER@$REMOTE_HOST:~/db/thirteencards/ \
-  "$HOME/Documents/.db-backups/thirteencards/"
-NFILES=$(find "$HOME/Documents/.db-backups/thirteencards" -type f 2>/dev/null | wc -l | tr -d ' ')
-echo "   ✓ $NFILES file(s) → $HOME/Documents/.db-backups/thirteencards/"
+# ── DB 備份 ────────────────────────────────────────────────────
+# 2026-08-29：拉回 MBA 這條線已停用。災難復原改由 MBP 自己每天 03:00 備份到 NAS
+# （MBP:~/bin/backup-to-nas.sh，launchd com.gary.backup-to-nas）。
+# deploy 前的回滾保護留在 MBP 本機，見下。
+# MBP 本機已在部署前留了 5 份輪替快照（見上面的 BACKUP_DIR），回滾夠用。
 
 echo ""
 echo "✅ Deploy complete → ThirteenCards v$NEXT_VER → https://thirteencards.visadelab.xyz"
