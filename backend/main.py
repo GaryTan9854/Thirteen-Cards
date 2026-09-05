@@ -12,6 +12,7 @@ from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
 import game_log as gl
+import roster
 
 APP_VERSION = "2.18.1"
 APP_BUILD = "415"  # deploy.sh 自動寫入（= git commit 總數）
@@ -25,10 +26,11 @@ _HEARTBEAT_TIMEOUT = timedelta(minutes=20)
 
 _ALLOWED_FILE = os.path.join(os.path.dirname(__file__), "allowed_players.txt")
 
+# 名冊以 543 為準（背景每 60 秒同步；抓不到才退回 txt）——細節見 roster.py。
+roster.start(_ALLOWED_FILE)
+
 def _load_allowed() -> List[str]:
-    if os.path.exists(_ALLOWED_FILE):
-        return [l.strip() for l in open(_ALLOWED_FILE) if l.strip()]
-    return ["Gary", "Jack", "Ian", "Glory", "Shawn", "Dan", "Eugene", "Guest"]
+    return roster.names()
 
 app = FastAPI(title="ThirteenCards", version=APP_VERSION)
 
