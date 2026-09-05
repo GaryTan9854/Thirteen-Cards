@@ -14,8 +14,8 @@ from online.room import room, Phase
 import game_log as gl
 import roster
 
-APP_VERSION = "2.18.1"
-APP_BUILD = "415"  # deploy.sh 自動寫入（= git commit 總數）
+APP_VERSION = "2.18.2"
+APP_BUILD = "418"  # deploy.sh 自動寫入（= git commit 總數）
 
 # ── Online singletons ─────────────────────────────────────────────────────────
 manager = ConnectionManager()
