@@ -24,6 +24,7 @@ eval_attack(h3,hm,hb) → bool  三墩同時達攻擊門檻
 
 from __future__ import annotations
 import os, sqlite3
+from .rules import flush_beats_fullhouse
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _DB   = os.path.join(_HERE, '..', 'data', 'hand_ranks.db')
@@ -56,6 +57,37 @@ def _load():
 
 
 _D3, _D5M, _D5B, _WR3, _WR5M, _WR5B = _load()
+
+
+# ── 5/6 人桌：同花整塊移到葫蘆之上 ─────────────────────────────────────────────
+# 位階表裡這兩塊是**相鄰**的（實測：中墩 同花 5864–7140、葫蘆 7141–7296；
+# 尾墩 同花 3707–4983、葫蘆 4984–5139），所以對調是精確的平移：
+#   同花 += 葫蘆的列數、葫蘆 −= 同花的列數。其他牌型的名次一個都不動。
+# ⚠ 百分位仍是 52 張牌窮舉出來的（見 CLAUDE.md 待辦）；這裡只保證「順序」照裁決。
+def _block(d: dict, cat: str) -> tuple:
+    ranks = [r for k, r in d.items() if k.startswith(cat + ":")]
+    return (min(ranks), max(ranks), len(ranks)) if ranks else (0, -1, 0)
+
+
+def _swap_offsets(d: dict) -> tuple:
+    f_lo, f_hi, f_n = _block(d, "5")
+    h_lo, h_hi, h_n = _block(d, "6")
+    assert f_n and h_n and f_hi + 1 == h_lo, "位階表的同花/葫蘆不相鄰，對調公式不成立"
+    return h_n, f_n        # (同花要往上加的, 葫蘆要往下減的)
+
+
+_SWAP5M = _swap_offsets(_D5M)
+_SWAP5B = _swap_offsets(_D5B)
+
+
+def _reorder(h, rank, swap):
+    if rank is None or not flush_beats_fullhouse():
+        return rank
+    if h.handtype_val == 5:
+        return rank + swap[0]
+    if h.handtype_val == 6:
+        return rank - swap[1]
+    return rank
 
 
 # ── Key 建構 ──────────────────────────────────────────────────────────────────
@@ -127,13 +159,13 @@ def rank5_mid(h) -> int:
     q = _quint_rank(h, _TOT5M)
     if q is not None:
         return q
-    return _D5M.get(_key5(h), 1)
+    return _reorder(h, _D5M.get(_key5(h), 1), _SWAP5M)
 
 def rank5_bot(h) -> int | None:
     q = _quint_rank(h, _TOT5B)
     if q is not None:
         return q
-    return _D5B.get(_key5(h))
+    return _reorder(h, _D5B.get(_key5(h)), _SWAP5B)
 
 
 # ── 名次% 查詢（0.0 – 1.0）────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import itertools
 from datetime import datetime
 from .cards import Deck, SpecialHand, SpecialCharge, SpecialChargeByName, Suits, Values
 from .hands import Hand13, Hand3, Hand5
+from .rules import table
 
 
 def splevel(h):
@@ -335,6 +336,19 @@ def deal_game(players: int = DEFAULT_PLAYERS) -> list:
 def play_one_game(player_names=None, strategies=None,
                   pre_dealt=None, overrides=None,
                   ai_attitudes=None, cum_scores=None, rounds_left=None):
+    """跑一局。★ 整局包在 `table(人數)` 裡——排牌、倒水判定、比牌、位階查表
+    全部依這一桌的牌型順序（5/6 人桌同花 > 葫蘆）。見 game/rules.py。"""
+    n = (len(player_names) if player_names else
+         len(pre_dealt) if pre_dealt else DEFAULT_PLAYERS)
+    with table(n):
+        return _play_one_game(player_names, strategies, pre_dealt=pre_dealt,
+                              overrides=overrides, ai_attitudes=ai_attitudes,
+                              cum_scores=cum_scores, rounds_left=rounds_left)
+
+
+def _play_one_game(player_names=None, strategies=None,
+                   pre_dealt=None, overrides=None,
+                   ai_attitudes=None, cum_scores=None, rounds_left=None):
     """
     pre_dealt   : [[cardstrs]*13]*4  – use these dealt hands instead of dealing fresh
     overrides   : [{player:int, top:[cs], mid:[cs], bot:[cs]}]

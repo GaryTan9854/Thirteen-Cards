@@ -21,6 +21,7 @@ score_defensive(h3, hm, hb)     → float  防守分（被打槍機率取負，�
 from collections import Counter, defaultdict
 from itertools import combinations as _comb
 from .hands import Hand3, Hand5
+from .rules import cat_strength
 from .pct_score import pct_score3, pct_score5
 from .hand_lookup import (pct3, pct5_mid, pct5_bot, rank5_bot, eval_attack,
                           winrate3, winrate5_mid, winrate5_bot)
@@ -637,7 +638,7 @@ def best_arrangement_rulealpha(handstrs: list, attitude: float = 0.0):
     best_att = max(attack_cands, key=lambda t: score_arrangement(*t))
 
     # bot_edge：防守尾更強時偏守（+0.3），攻擊尾不弱時偏攻（-0.3）
-    bot_edge = 0.3 if best_def[2].handtype_val > best_att[2].handtype_val else -0.3
+    bot_edge = 0.3 if cat_strength(best_def[2].handtype_val) > cat_strength(best_att[2].handtype_val) else -0.3
     return best_att if attitude > bot_edge else best_def
 
 
@@ -797,7 +798,7 @@ def _ra3_select(pool: list, attitude: float):
         return best_def
     best_att = max(attack_cands, key=lambda t: score_arrangement(*t))
     # EV 中性預設 = 舊 RA3(att=0) 行為：攻擊尾不弱於防守尾才打 best_att
-    ev_default = best_def if best_def[2].handtype_val > best_att[2].handtype_val else best_att
+    ev_default = best_def if cat_strength(best_def[2].handtype_val) > cat_strength(best_att[2].handtype_val) else best_att
     if attitude < 0:
         return best_def      # 守
     if attitude > 0:
@@ -1127,7 +1128,7 @@ def best_arrangement_rulealpha2(handstrs: list, attitude: float = 0.0):
         return best_def
 
     best_att = max(attack_cands, key=lambda t: score_arrangement(*t))
-    bot_edge = 0.3 if best_def[2].handtype_val > best_att[2].handtype_val else -0.3
+    bot_edge = 0.3 if cat_strength(best_def[2].handtype_val) > cat_strength(best_att[2].handtype_val) else -0.3
     return best_att if attitude > bot_edge else best_def
 
 
@@ -1607,7 +1608,10 @@ def enumerate_arrangements(handstrs: list) -> list:
         for mid_cards in generate_5card_options(remaining):
             hm_tmp  = Hand5(mid_cards); hm_tmp.score_hand()
             mid_cat = _norm_cat(hm_tmp.handtype_val)
-            if mid_cat > bot_cat:
+            # ★ 比「誰大」一律問 cat_strength，不能拿 HandCat 數字直接比——
+            #   5/6 人桌同花(5) > 葫蘆(6)。2026-09-16 踩過：這一行用裸數字，
+            #   「中葫蘆、尾同花」在 5/6 人桌是合法排法卻被先剪掉，AI 根本看不到。
+            if cat_strength(mid_cat) > cat_strength(bot_cat):
                 continue  # taxonomy: mid must not outrank bot
 
             mid_set = set(mid_cards)
@@ -1651,7 +1655,7 @@ def enumerate_arrangements(handstrs: list) -> list:
 
             hm_tmp  = Hand5(mid5); hm_tmp.score_hand()
             mid_cat = _norm_cat(hm_tmp.handtype_val)
-            if mid_cat > bot_cat or mid_cat not in valid_mids:
+            if cat_strength(mid_cat) > cat_strength(bot_cat) or mid_cat not in valid_mids:
                 continue
 
             key = (tuple(sorted(top_cards)),

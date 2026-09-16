@@ -1,6 +1,11 @@
 import itertools
 from .cards import Card, HandCat, HandName, HandScor, SpecialHand, convert_cardnum
 from .hist import Hist_Cards, Hist_Cards13
+from .rules import flush_beats_fullhouse
+
+# 5/6 人桌的同花底分：要壓過葫蘆（150+三條點數，最高 164）、又低於鐵支（(170+2)×4=688）。
+# 170 + 最大牌(≈7~14.14) ∈ [177, 185)，兩邊都有餘裕。
+FLUSH_BASE_5P6P = 170
 
 
 class Hand(list):
@@ -149,7 +154,10 @@ class Hand5(Hand):
             self.score = self._check_full_house()
         elif cat == 5:
             ss = self._check_highcard()
-            self.score = HandScor[cat] + ss
+            # ★ 5/6 人桌同花 > 葫蘆（決策委員會 2026-09-16）。只改分數不改 handtype_val——
+            #   數值 5 是牌型的身分，到處被當 key 用。
+            base = FLUSH_BASE_5P6P if flush_beats_fullhouse() else HandScor[cat]
+            self.score = base + ss
         elif cat == 4:
             self.score = self._check_straight()
         elif cat == 3:

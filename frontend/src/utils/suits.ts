@@ -3,13 +3,17 @@
  *
  * 5 人桌多一副黑桃、6 人桌再多一副紅心（見 backend/game/cards.py）。
  * 第二副牌在牌面上**形狀相同、顏色不同**：
- *   第二副黑桃 = 藍色的 ♠   第二副紅心 = 綠色的 ♥
+ *   第二副黑桃 = 藍色的 ♠（算黑國）   第二副紅心 = 橘色的 ♥（算紅國）
  *
- * ★ 顏色取自**四色牌（four-colour deck）**的慣例（♠黑 ♥紅 ♦藍 ♣綠）——線上撲克的標準選項，
- *   對色覺不同的人也友善。TunaPoker 的第一版 PlayingCard 就是這一組。
- *   ⚠ 第二副紅心一開始用橘色，2026-09-16 Gary 實測退回：橘在色輪上貼著紅，
- *   小字級時兩者只剩明度差，牌桌上分不出來。綠與紅是對立色，一眼就開。
- *   （TunaPoker 那組是深色桌面用的 emerald-400；這裡是白底牌面，取深一階的 emerald-600。）
+ * ★ 配色的來回（2026-09-16 同一天）：
+ *   1. 橘 orange-500 ＋ 紅 red-600 —— Gary 實測分不出來：兩者明度幾乎一樣（53% vs 51%），
+ *      只剩 25° 的色相差，牌面那個字級看不出。
+ *   2. 綠 emerald-600（四色牌慣例）—— 分得開，但決策委員會（主委 Jack）裁示
+ *      第二副紅心要「算紅國」，全紅/全黑報到才成立；綠色的心很難讓人當成紅的。
+ *   3. **現行**：愛馬仕橘 #F37021 ＋ 更深更純的紅 #D00000 ——
+ *      色相差拉到 ~23°，**明度差拉到 ~13 個百分點**（41% vs 54%），
+ *      兩個方向同時拉開才分得清，而橘仍屬暖色，「紅國」說得通。
+ *   ⚠ 紅色一改，4 人桌的 ♥ ♦ 也一起變深——這是刻意的，同一種紅不能有兩個色號。
  *
  * ★ 後端傳過來的顯示字串用**空心**字元當識別（♤ / ♡），前端負責把它畫成
  *   「實心的 ♠／♥ ＋ 另一個顏色」。這樣做的理由：
@@ -23,7 +27,7 @@
 
 export interface SuitFace {
   glyph: string      // 實際**畫出來**的符號（藍桃也是 ♠，只是顏色不同）
-  wire:  string      // 後端 Card.show() 送過來的符號（藍桃是 ♤、綠心是 ♡）
+  wire:  string      // 後端 Card.show() 送過來的符號（藍桃是 ♤、橘心是 ♡）
   text: string       // 文字顏色 class
   border: string     // 外框顏色 class
   label: string      // 說明用名稱
@@ -35,23 +39,23 @@ export interface SuitFace {
 //    畫出來變成「♠undefined」。凡是要跟後端字串比對的地方一律用 wire。
 const BLACK:  SuitFace = { glyph: '♠', wire: '♠', text: 'text-gray-900',   border: 'border-gray-400',   label: '黑桃' }
 const CLUB:   SuitFace = { glyph: '♣', wire: '♣', text: 'text-gray-900',   border: 'border-gray-400',   label: '梅花' }
-const HEART:  SuitFace = { glyph: '♥', wire: '♥', text: 'text-red-600',    border: 'border-red-300',    label: '紅心' }
-const DIAM:   SuitFace = { glyph: '♦', wire: '♦', text: 'text-red-600',    border: 'border-red-300',    label: '方塊' }
+const HEART:  SuitFace = { glyph: '♥', wire: '♥', text: 'text-[#D00000]',  border: 'border-red-300',    label: '紅心' }
+const DIAM:   SuitFace = { glyph: '♦', wire: '♦', text: 'text-[#D00000]',  border: 'border-red-300',    label: '方塊' }
 const BLUE:   SuitFace = { glyph: '♠', wire: '♤', text: 'text-sky-600',     border: 'border-sky-300',     label: '藍桃' }
-const GREEN:  SuitFace = { glyph: '♥', wire: '♡', text: 'text-emerald-600', border: 'border-emerald-300', label: '綠心' }
+const ORANGE: SuitFace = { glyph: '♥', wire: '♡', text: 'text-[#F37021]',  border: 'border-orange-300', label: '橘心' }
 
 /** 後端顯示字元 → 畫法 */
 const BY_GLYPH: Record<string, SuitFace> = {
   '♠': BLACK, '♣': CLUB, '♥': HEART, '♦': DIAM,
   '♤': BLUE,        // 第二副黑桃
-  '♡': GREEN,       // 第二副紅心
+  '♡': ORANGE,      // 第二副紅心
 }
 
 /** cardstr 的花色字母 → 畫法 */
 const BY_CODE: Record<string, SuitFace> = {
   S: BLACK, C: CLUB, H: HEART, D: DIAM,
   X: BLUE,          // 第二副黑桃
-  Y: GREEN,         // 第二副紅心
+  Y: ORANGE,        // 第二副紅心
 }
 
 export const fromGlyph = (g: string): SuitFace => BY_GLYPH[g] ?? BLACK

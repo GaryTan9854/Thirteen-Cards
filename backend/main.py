@@ -136,6 +136,13 @@ class ArrangeRequest(BaseModel):
 
 @app.post("/api/game/arrange")
 def arrange_hand(req: ArrangeRequest):
+    from game.rules import table
+    from game.game import players_of_hand
+    with table(req.players or players_of_hand(req.hand)):
+        return _arrange_hand(req)
+
+
+def _arrange_hand(req: ArrangeRequest):
     """
     Arrange a single hand using the requested strategy.
     Returns top/mid/bot card lists + descriptions.
@@ -257,10 +264,18 @@ def arrange_hand(req: ArrangeRequest):
 # ── Manual arrange info ───────────────────────────────
 class ManualInfoRequest(BaseModel):
     hand: List[str]   # 13 cardstrs
+    players: Optional[int] = None   # 4/5/6；沒給就從牌面反推
 
 
 @app.post("/api/manual/arrange_info")
 def manual_arrange_info(req: ManualInfoRequest):
+    from game.rules import table
+    from game.game import players_of_hand
+    with table(req.players or players_of_hand(req.hand)):
+        return _manual_arrange_info(req)
+
+
+def _manual_arrange_info(req: ManualInfoRequest):
     """
     Return hand statistics + enumerated arrangement groups for manual arrange UI.
 
@@ -611,6 +626,11 @@ def manual_arrange_info(req: ManualInfoRequest):
     _CAT = {"亂":0,"對":1,"兩對":2,"三條":3,"順":4,"同花":5,
             "葫蘆":6,"鐵支":7,"同花順":8,"同花次大順":8,"同花大順":8,
             "鋼支":9}
+    # ★ 5/6 人桌同花 > 葫蘆（決策委員會 2026-09-16）。這張表同時決定面板排序與
+    #   下面的 Rule C/D 支配判斷——兩者要跟 pool 那邊（cat_strength）同一個順序。
+    from game.rules import flush_beats_fullhouse
+    if flush_beats_fullhouse():
+        _CAT = {**_CAT, "同花": 6.5}
     _TOP_CAT = {"亂":0,"對":1,"三條":3}
 
     def _group_sort_key(g):
@@ -784,15 +804,21 @@ class ScoreRowsRequest(BaseModel):
     top: list
     mid: list
     bot: list
+    players: Optional[int] = None   # 4/5/6；倒水判定依人數（5/6 人桌同花 > 葫蘆）
 
 
 @app.post("/api/manual/score_rows")
 def score_rows(req: ScoreRowsRequest):
     """Score three rows and report validity (尾 ≥ 中 ≥ 頭)."""
     from game.hands import Hand3, Hand5
-    h3 = Hand3(req.top);  h3.score_hand()
-    hm = Hand5(req.mid);  hm.score_hand()
-    hb = Hand5(req.bot);  hb.score_hand()
+    from game.rules import table
+    from game.game import players_of_hand
+    # ★ 5/6 人桌「中墩葫蘆、尾墩同花」是合法的，4 人桌是倒水——這裡算錯，
+    #   玩家送出合法的牌會被擋，或送出倒水的牌被放行。
+    with table(req.players or players_of_hand(list(req.top) + list(req.mid) + list(req.bot))):
+        h3 = Hand3(req.top);  h3.score_hand()
+        hm = Hand5(req.mid);  hm.score_hand()
+        hb = Hand5(req.bot);  hb.score_hand()
     return {
         "top_score":  h3.score,
         "mid_score":  hm.score,
@@ -812,10 +838,18 @@ class SwapTopMidRequest(BaseModel):
     top_cards: list
     mid_cards: list
     bot_cards: list
+    players: Optional[int] = None
 
 
 @app.post("/api/manual/swap_top_mid")
 def swap_top_mid(req: SwapTopMidRequest):
+    from game.rules import table
+    from game.game import players_of_hand
+    with table(req.players or players_of_hand(list(req.top_cards) + list(req.mid_cards) + list(req.bot_cards))):
+        return _swap_top_mid(req)
+
+
+def _swap_top_mid(req: SwapTopMidRequest):
     """
     Given the current top (3 cards) and mid (5 cards), enumerate all valid
     (top3, mid5) re-splits of the 8-card pool that match the "other side" of the

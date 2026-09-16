@@ -135,8 +135,8 @@ export default function RulesPage() {
                 ['同花大順', '10JQKA 同花'],
                 ['同花次大順', 'A2345 同花順'],
                 ['鐵支', '四條'],
-                ['葫蘆', '三條 + 對子'],
-                ['同花', '五張同花色'],
+                ['葫蘆', '三條 + 對子（5/6 人桌輸給同花）'],
+                ['同花', '五張同花色（5/6 人桌大過葫蘆）'],
                 ['順子', '五張連號'],
                 ['三條', '三張相同點數'],
                 ['兩對', '兩組對子'],
@@ -203,6 +203,7 @@ export default function RulesPage() {
           <section className="space-y-1">
             <h2 className="text-base font-bold text-yellow-300">543 十三支賽制說明</h2>
             <div className="text-xs text-gray-500 space-y-0.5">
+              <div>20260916 委員會修訂（5／6 人玩法）</div>
               <div>20260519 委員會修訂</div>
               <div>20240526 委員會修訂</div>
             </div>
@@ -256,7 +257,8 @@ export default function RulesPage() {
 
           <section className="space-y-2">
             <h3 className="font-bold text-gray-200">5 人／6 人玩法</h3>
-            <div className="bg-gray-800/60 rounded-lg px-4 py-3 space-y-2 text-xs text-gray-300">
+            <div className="text-[11px] text-gray-500">決策委員會 2026-09-16 裁決（主委 Jack）</div>
+            <div className="bg-gray-800/60 rounded-lg px-4 py-3 space-y-2.5 text-xs text-gray-300">
               <div>
                 <span className="text-yellow-300 font-semibold">牌組：</span>
                 5 人多一副黑桃（65 張）、6 人再多一副紅心（78 張）。13 × 人數 剛好發完，每人仍是 13 張。
@@ -264,22 +266,53 @@ export default function RulesPage() {
               <div>
                 <span className="text-yellow-300 font-semibold">認牌：</span>
                 第二副的花色<b>形狀一樣、顏色不同</b>——第二副黑桃畫成
-                <span className="text-sky-500 font-bold"> 藍色 ♠</span>、第二副紅心畫成
-                <span className="text-emerald-600 font-bold"> 綠色 ♥</span>。顏色取自四色牌的慣例，不另外發明新符號——為的是讓你一眼還認得出是桃是心。
+                <span className="text-sky-600 font-bold bg-white rounded px-1 mx-0.5">♠ 藍色</span>、第二副紅心畫成
+                <span className="text-[#F37021] font-bold bg-white rounded px-1 mx-0.5">♥ 橘色</span>
+                （原本的紅心是 <span className="text-[#D00000] font-bold bg-white rounded px-1 mx-0.5">♥ 紅色</span>）。
+                不另外發明新符號，是為了讓你一眼還認得出是桃是心。
+              </div>
+              <div>
+                <span className="text-yellow-300 font-semibold">紅國／黑國：</span>
+                藍桃算<b>黑國</b>、橘心算<b>紅國</b>。所以全黑、全紅、全黑一點紅……這些報到照樣成立。
               </div>
               <div>
                 <span className="text-yellow-300 font-semibold">同花：</span>
-                藍桃與黑桃是<b>兩個不同花色</b>，不能湊在一起算同花或同花順。綠心與紅心同理。
+                藍桃與黑桃是<b>兩個不同花色</b>，不能湊在一起算同花或同花順。橘心與紅心同理。
               </div>
               <div>
                 <span className="text-yellow-300 font-semibold">鋼支：</span>
-                每個點數變成 5–6 張，於是出現五張同點的「鋼支」，比同花大順還大。
-                （相對「鐵支」＝四張同點。）
+                每個點數變成 5–6 張，於是出現五張同點的「鋼支」（相對「鐵支」＝四張同點）。
+                <b>鋼支比同花順大</b>——6 人桌實際上同花順還更少見，但鋼支一律最大。
               </div>
-              <div className="text-gray-500">
-                ⚠ 多一副牌會讓對子／三條／鐵支全面變常見，同花反而<b>變稀有</b>
-                （5 人桌同花比葫蘆稀有 2.4 倍）。牌型大小順序仍照傳統不變，
-                所以 5/6 人桌的同花是「看起來大、其實會輸給葫蘆」的陷阱牌——排牌時要留意。
+              <div>
+                <span className="text-yellow-300 font-semibold">牌型大小（只改一格）：</span>
+                <div className="mt-1.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  <div className="bg-gray-900/60 rounded px-2 py-1.5">
+                    <div className="text-gray-400 mb-0.5">4 人桌（傳統）</div>
+                    <div className="font-mono">順 &lt; <b className="text-yellow-300">同花 &lt; 葫蘆</b> &lt; 鐵支 &lt; 同花順</div>
+                  </div>
+                  <div className="bg-gray-900/60 rounded px-2 py-1.5">
+                    <div className="text-gray-400 mb-0.5">5／6 人桌</div>
+                    <div className="font-mono">順 &lt; <b className="text-yellow-300">葫蘆 &lt; 同花</b> &lt; 鐵支 &lt; 同花順 &lt; 鋼支</div>
+                  </div>
+                </div>
+                <div className="mt-1.5 text-gray-400">
+                  為什麼：多一副牌 ⇒ 每個點數多一張，對子、三條、葫蘆、鐵支<b>全都變容易</b>；
+                  同花卻因為 13 張牌攤在 5–6 個花色裡而<b>變難</b>。實際打 1000 局量出來，中/尾墩出現率
+                  5 人桌 葫蘆 17.1%、同花 7.4%；6 人桌 葫蘆 18.5%、同花 3.7%——同花明確比葫蘆稀有，所以升上去。
+                  6 人桌的同花（3.7%）與鐵支（3.6%）幾乎一樣，順序維持鐵支較大。
+                </div>
+                <div className="mt-1 text-gray-400">
+                  因此 5/6 人桌「中墩葫蘆、尾墩同花」是合法排法，不算倒水。
+                </div>
+              </div>
+              <div>
+                <span className="text-yellow-300 font-semibold">打槍：</span>
+                打槍 N 家 → 該家分數 ×(N+1)。5 人桌全壘打（打 4 家）×5、6 人桌全壘打（打 5 家）×6。
+              </div>
+              <div>
+                <span className="text-yellow-300 font-semibold">鋼支計分：</span>
+                尾墩 −10、中墩 −20；恰好五張 5 再 ×2（尾 −20、中 −40）。
               </div>
             </div>
           </section>
@@ -328,6 +361,11 @@ export default function RulesPage() {
               <div>
                 <span className="text-gray-400">20260519</span>：申訴局完成後若仍平手則繼續加局；
                 新最輸者同樣享有申訴權。
+              </div>
+              <div>
+                <span className="text-gray-400">20260916</span>（主委 Jack）：新增 5 人／6 人玩法——
+                5 人加一副黑桃（藍，算黑國）、6 人再加一副紅心（橘，算紅國）；新增牌型「鋼支」（五張同點）大過同花順；
+                5/6 人桌同花大過葫蘆（鐵支 &gt; 同花 &gt; 葫蘆）；打槍 N 家 ×(N+1)。
               </div>
             </div>
           </section>

@@ -264,3 +264,98 @@ def test_room_player_count_changes_keep_names_unique():
         r.set_player_count(n)
         assert len(r.ai_names) == n - 1
         assert len(set(r.ai_names)) == n - 1
+
+
+# ── 決策委員會 2026-09-16：5/6 人桌 鐵支 > 同花 > 葫蘆 ─────────────────────────
+
+from game.rules import table, table_players, cat_strength
+
+
+def _ladder_scores(players):
+    with table(players):
+        straight  = h5('06C', '07D', '08H', '09S', '10C')
+        fullhouse = h5('14C', '14D', '14H', '13S', '13C')    # 最大的葫蘆 A 葫蘆
+        flush     = h5('02S', '03S', '04S', '05S', '07S')    # 最小的同花 7 高
+        quads     = h5('02C', '02D', '02H', '02S', '03C')    # 最小的鐵支
+        return straight.score, fullhouse.score, flush.score, quads.score
+
+
+def test_four_player_keeps_traditional_order():
+    st, fh, fl, q = _ladder_scores(4)
+    assert st < fl < fh < q, "4 人桌必須維持傳統：順 < 同花 < 葫蘆 < 鐵支"
+
+
+@pytest.mark.parametrize("n", (5, 6))
+def test_five_six_player_flush_beats_fullhouse(n):
+    """最小的同花也要贏最大的葫蘆；最大的同花仍輸最小的鐵支。"""
+    st, fh, fl, q = _ladder_scores(n)
+    assert st < fh < fl < q, f"{n} 人桌應為：順 < 葫蘆 < 同花 < 鐵支"
+    with table(n):
+        biggest_flush = h5('10S', '12S', '13S', '14S', '09S')   # A-K-Q-10-9 同花（非順）
+        smallest_quads = h5('02C', '02D', '02H', '02S', '03C')
+        assert biggest_flush.score < smallest_quads.score
+
+
+def test_table_context_restores_and_isolates_threads():
+    """ContextVar 必須離開就還原，而且兩條執行緒各算各的——
+    否則 6 人桌的排序會漏到同時在算分的 4 人桌，安靜地判錯輸贏。"""
+    import threading
+    assert table_players() == 4
+    with table(6):
+        assert table_players() == 6
+    assert table_players() == 4
+
+    results = {}
+    barrier = threading.Barrier(2)
+
+    def run(n):
+        with table(n):
+            barrier.wait()                # 兩桌同時在 table() 裡
+            fh = h5('14C', '14D', '14H', '13S', '13C').score
+            fl = h5('02S', '03S', '04S', '05S', '07S').score
+            results[n] = fl > fh
+    ts = [threading.Thread(target=run, args=(k,)) for k in (4, 6)]
+    for t in ts: t.start()
+    for t in ts: t.join()
+    assert results == {4: False, 6: True}
+
+
+@pytest.mark.parametrize("n", (5, 6))
+def test_lookup_ranks_follow_table_order(n):
+    """AI 靠位階表挑排法——表的順序沒跟著換，AI 會把同花當成比葫蘆弱的牌來排。"""
+    from game.hand_lookup import rank5_mid, rank5_bot
+    fh = h5('14C', '14D', '14H', '13S', '13C')
+    fl = h5('02S', '03S', '04S', '05S', '07S')
+    q  = h5('02C', '02D', '02H', '02S', '03C')
+    assert rank5_mid(fl) < rank5_mid(fh)          # 4 人桌（預設）
+    with table(n):
+        assert rank5_mid(fh) < rank5_mid(fl) < rank5_mid(q)
+        assert rank5_bot(fh) < rank5_bot(fl) < rank5_bot(q)
+    assert cat_strength(5) < cat_strength(6)
+    with table(n):
+        assert cat_strength(6) < cat_strength(5) < cat_strength(7)
+
+
+@pytest.mark.parametrize("n,valid", [(4, False), (5, True), (6, True)])
+def test_score_rows_foul_rule_follows_table(n, valid):
+    """中墩葫蘆、尾墩同花：4 人桌是倒水，5/6 人桌合法。手動排牌面板靠這個端點擋人。"""
+    from fastapi.testclient import TestClient
+    import main
+    c = TestClient(main.app)
+    body = {"top": ['02D', '04H', '06C'],
+            "mid": ['14C', '14D', '14H', '13S', '13C'],
+            "bot": ['03S', '05S', '08S', '09S', '11S'],
+            "players": n}
+    assert c.post('/api/manual/score_rows', json=body).json()["mid_bot_ok"] is valid
+
+
+@pytest.mark.parametrize("n,expect", [(4, False), (5, True), (6, True)])
+def test_enumerator_offers_fullhouse_mid_flush_bot(n, expect):
+    """回歸：enumerate_arrangements 原本用 HandCat 裸數字剪枝（mid_cat > bot_cat），
+    5/6 人桌合法的「中葫蘆、尾同花」在算分之前就被剪掉，AI 永遠選不到。"""
+    from game import arrange as A
+    hand = ['02S', '05S', '08S', '10S', '12S', '13C', '13D', '13H', '03C', '03D', '04H', '07C', '09D']
+    with table(n):
+        types = {(b.handtype, c.handtype) for a, b, c in A.enumerate_arrangements(hand)}
+    assert (('葫蘆', '同花') in types) is expect
+    assert (('同花', '葫蘆') in types) is (not expect)

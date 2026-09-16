@@ -11,14 +11,14 @@ import { useCardStyle } from '../utils/cardStyle'
 import { fromCode, SUIT_ORDER } from '../utils/suits'
 
 // ─── Card helpers ─────────────────────────────────────────────────────────────
-// 花色的畫法（含 5/6 人桌的藍桃 X／綠心 Y）一律問 utils/suits.ts，不要在這裡另開一份。
+// 花色的畫法（含 5/6 人桌的藍桃 X／橘心 Y）一律問 utils/suits.ts，不要在這裡另開一份。
 const RANK_STR: Record<number, string>  = {
   2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',
   11:'J',12:'Q',13:'K',14:'A',
 }
 
 function cardShow(cs: string)  { return fromCode(cs[2]).glyph + RANK_STR[parseInt(cs.slice(0,2))] }
-/** 後端 Card.show() 會送出的字串（藍桃 ♤ / 綠心 ♡）。★ 要跟後端回傳的牌比對時用這個，
+/** 後端 Card.show() 會送出的字串（藍桃 ♤ / 橘心 ♡）。★ 要跟後端回傳的牌比對時用這個，
  *  不要用 cardShow——畫面故意把 ♤ 畫成 ♠，拿去對表就一張都對不上。 */
 function cardWire(cs: string)  { return fromCode(cs[2]).wire  + RANK_STR[parseInt(cs.slice(0,2))] }
 function cardRank(cs: string)  { return parseInt(cs.slice(0,2)) }
@@ -366,7 +366,7 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
       }
     }
     Promise.all([
-      fetchJson('/api/manual/arrange_info', { hand }),
+      fetchJson('/api/manual/arrange_info', { hand, players }),
       fetchJson('/api/game/arrange', { hand, strategy: strategy ?? 'rulealpha', players }).catch(() => null),
     ])
     .then(([data, rbData]:[ArrangeInfo, any])=>{
@@ -426,7 +426,9 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
     if (a.top.length!==3 || a.mid.length!==5 || a.bot.length!==5) return
     fetch('/api/manual/score_rows', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({top:a.top, mid:a.mid, bot:a.bot}),
+      // ★ players 一定要帶：5/6 人桌「中葫蘆、尾同花」合法、4 人桌是倒水。
+      //   後端雖能從花色反推，但沒拿到藍桃的 5 人手牌（約 3%）會被誤判成 4 人桌。
+      body: JSON.stringify({top:a.top, mid:a.mid, bot:a.bot, players}),
     }).then(r=>r.json()).then(d=>{
       setTopMidOk(d.top_mid_ok)
       setMidBotOk(d.mid_bot_ok)
