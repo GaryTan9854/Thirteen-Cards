@@ -63,6 +63,7 @@ def analyze_inventory(handstrs: list) -> dict:
     cnt = {r: len(cs) for r, cs in by_rank.items()}
     all_ranks = set(cnt)
 
+    quints = sorted([r for r, c in cnt.items() if c >= 5], reverse=True)   # 鋼支（5/6 人桌才有）
     quads = sorted([r for r, c in cnt.items() if c >= 4], reverse=True)
     trips = sorted([r for r, c in cnt.items() if c >= 3], reverse=True)
     pairs = sorted([r for r, c in cnt.items() if c >= 2], reverse=True)
@@ -92,7 +93,7 @@ def analyze_inventory(handstrs: list) -> dict:
                             sorted([cs for cs in scards if int(cs[:2]) in ace_low],
                                    key=lambda x: -int(x[:2]))))
 
-    return dict(quads=quads, trips=trips, pairs=pairs,
+    return dict(quints=quints, quads=quads, trips=trips, pairs=pairs,
                 flush_suits=flush_suits, straights=straights, sf_list=sf_list,
                 by_rank=by_rank)
 
@@ -122,6 +123,13 @@ def generate_5card_options(available: list) -> list:
     cnt       = {r: len(cs) for r, cs in by_rank.items()}
     all_ranks = set(cnt)
     options: list = []
+
+    # ── 鋼支 QT（5/6 人桌）──────────────────────────────────────────────
+    # 五張同點就是一手完整的牌，沒有 kicker，也沒有花色選擇（6 張時取前 5 張，
+    # 花色對鋼支的大小完全無影響）。放在最前面＝牌型頂點。
+    for r, c in cnt.items():
+        if c >= 5:
+            options.append(by_rank[r][:5])
 
     # ── 同花順 L ─────────────────────────────────────────────────────────
     for suit, scards in by_suit.items():
@@ -720,8 +728,8 @@ def _ra3_filtered_pool(handstrs: list) -> list:
     # If A wins exactly 1 pile that IS a monster AND all piles B wins are non-monster
     # → B is dominated.  Keeps the pool consistent with the UI display panel.
     _TOP_MON = {3}           # 三條 (原子頭) in top = monster
-    _MID_MON = {7, 8}        # 鐵支 / 同花順 in mid = monster
-    _BOT_MON = {7, 8}        # 鐵支 / 同花順 in bot = monster
+    _MID_MON = {7, 8, 11}    # 鐵支 / 同花順 / 鋼支 in mid = monster
+    _BOT_MON = {7, 8, 11}    # 鐵支 / 同花順 / 鋼支 in bot = monster
 
     rc_ok = list(final) if final else list(score_ok)
     cats_all = [(_c3(t[0].handtype_val), _c5(t[1].handtype_val), _c5(t[2].handtype_val))

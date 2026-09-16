@@ -1,6 +1,7 @@
 # ThirteenCards — CLAUDE.md
 
-十三支 (Chinese Poker / Big Two Variant) 平台，**543 規則**（Jack/Glory/Gary 自訂，含 25 種報到牌型）。**當前版本 v2.13.0**（連線✅＋現場直播✅ via visadelab online kit）。
+十三支 (Chinese Poker / Big Two Variant) 平台，**543 規則**（Jack/Glory/Gary 自訂，含 25 種報到牌型）。
+**4 / 5 / 6 人桌**（2026-09-16 起；5 人多一副黑桃、6 人再多一副紅心）。
 > A2345 = **次大順**（僅次於 10JQKA，非最小）。排牌心法（大神實證）：**尾順→偏縮、尾同花→偏推**。
 
 > Recent session 詳情 → `SESSION_HANDOFF.md`
@@ -21,12 +22,13 @@ backend/
   game/
     cards.py       # Card, HandCat, HandName, HandScor, SpecialHand, SpecialChargeByName
     hands.py       # Hand, Hand3, Hand5, Hand13
-    hist.py        # Hist_Cards13 (special hand detection)
+    hist.py        # Hist_Cards13 (special hand detection) + has_fivekind (鋼支)
     arrange.py     # 排牌演算法（RA / RA2 / RA3 / RA4 / ML）
     game.py        # GameState、compete()、compute_dynamic_attitude()、_arrange 派發
     evaluate.py    # 勝負評估 + best_arrangement_mc (monte carlo)
     hand_lookup.py # 查表 + 攻擊閾值 _ATK_RANK3/5M/5B + eval_attack()
   ml/              # ScoringNet (93-dim → μ/σ)
+  tests/           # pytest（37 綠）—— 計分/牌型/牌組/降級/房間座位
 
 frontend/src/
   App.tsx                    # Router + 頂部導覽
@@ -41,31 +43,103 @@ frontend/src/
     TournamentPanel.tsx      # 累積比分（dedup initial）
     GameResultDisplay.tsx    # 本局結算
     BeautyAvatar.tsx         # 美女頭像
+    TableRing.tsx            # 環形牌桌（4/5/6 席；幾何抄 TunaPoker PokerTable.seatPos）
+  utils/suits.ts             # ★ 花色的單一真實來源（glyph 畫面用 / wire 對後端字串用）
 ```
 
+## 測試
+```bash
+cd backend && ./venv_train/bin/python -m pytest tests -q     # 37 綠
+```
+`backend/tests/test_engine.py` 守的是**算錯分不會拋例外**的那一類 bug：牌型階梯、
+543 加倍規律、打槍倍率、整局零和、不倒水、三種牌組的牌數與唯一性、ML 降級、房間座位。
+改任何計分或牌型的東西，先讓它紅，再讓它綠。
+
 ## 遊戲規則
-- 4 人，每人 13 張牌
+- **4 / 5 / 6 人**，每人 13 張牌
 - 頭墩(3) + 中墩(5) + 尾墩(5)；牌力 尾≥中≥頭（否則倒水犯規）
-- 每墩各自與其他 3 人比較（9 場 pairwise，每勝/敗 ±1）
-- 打槍（單人 3-0 sweep）= 該局 ×2；累積 2 槍 ×1.5；3 槍（全壘打）×2
+- 每墩各自與其他每一家比較（4人 6 場 pairwise、5人 10 場、6人 15 場；每勝/敗 ±1）
+- 打槍（對某家 3-0 sweep）→ 該家的分數 ×2；打 N 家 ×(N+1)，見下方「打槍倍率」
 
 ### 牌型分類（HandCat）
 - **3 張頭墩**：亂(0) 對(1) 三條(3)
-- **5 張中/尾墩**：散(0) 對(1) 兩對(2) 三條(3) 順(4) 同花(5) 葫蘆(6) 鐵支(7) 同花順(8) 同花次大順(9) 同花大順(10)
+- **5 張中/尾墩**：散(0) 對(1) 兩對(2) 三條(3) 順(4) 同花(5) 葫蘆(6) 鐵支(7) 同花順(8) 同花次大順(9) 同花大順(10) **鋼支(11)**
+- **鋼支＝五張同點**，大過同花大順，是牌型的頂點。只有 5/6 人桌才可能出現（每點 5–6 張）。
 
 ### 怪物（monster）加分（compete() 中）
+★★ **加倍的是「點數 3 的三條、點數 4 的鐵支、點數 5 的鋼支」——這就是「543」這個名字的由來。**
+（2026-09-16 更正：這份文件原本寫成「A3條 ×6」「A鐵 ×16」，是錯的。
+程式碼一直是 `6 if p_whowin == 3` 與 `16 if p_whowin == 4`，`p[0]` 存的是點數不是 A。
+`RulesPage.tsx` 的說明頁一直都寫對：「若恰好四張相同，則再 ×2」。）
+
 | 位置 | 牌型 | 倍率 |
 |---|---|---|
-| 頭 | 三條（原子頭） | ×3（A3條 ×6） |
+| 頭 | 三條（原子頭） | ×3（**3** 的三條 ×6） |
 | 中 | 葫蘆 | ×2 |
-| 中 | 鐵支 | ×8（A鐵 ×16） |
+| 中 | 鐵支 | ×8（**4** 鐵支 ×16） |
 | 中 | 同花順 | ×10 |
 | 中 | 同花次大順 | ×12 |
 | 中 | 同花大順 | ×14 |
-| 尾 | 鐵支 | ×4（A鐵 ×8） |
+| 中 | **鋼支** | **×20（5 鋼支 ×40）** |
+| 尾 | 鐵支 | ×4（**4** 鐵支 ×8） |
 | 尾 | 同花順 | ×5 |
 | 尾 | 同花次大順 | ×6 |
 | 尾 | 同花大順 | ×7 |
+| 尾 | **鋼支** | **×10（5 鋼支 ×20）** |
+
+### 打槍倍率（Gary 2026-09-16 定式）
+**打槍 N 家 → 該家的分數 ×(N+1)。** 三種人數同一條式子：
+4 人桌 1/2/3 槍 = ×2/×3/×4（與改版前的數字逐一相同）、5 人桌全壘打 ×5、6 人桌全壘打 ×6。
+程式在 `game.py: gun_multiplier()`；`compete()` 內部對 3-0 橫掃已先乘 ×2，故它只回 (N+1)/2。
+
+## 5 / 6 人玩法（2026-09-16）
+
+| 人數 | 牌組 | 花色 |
+|---|---|---|
+| 4 | 52 張 | C D H S |
+| 5 | 65 張 | ＋ **X**＝第二副黑桃（畫成**藍色** ♠） |
+| 6 | 78 張 | ＋ **Y**＝第二副紅心（畫成**橘色** ♥） |
+
+13 × 人數 剛好發完，每人仍是 13 張。
+
+- ★★ **第二副牌一定要有自己的花色代碼**，不能是重複的 cardstr——
+  `hands.py: arr_allcomb13()` 用 `set(hand) - set(i)` 做扣除，兩張一模一樣的 `"14S"`
+  會被**默默吃掉一張**，不報錯只算錯。
+- ★★ **藍桃與黑桃是兩個不同花色，不能湊同花**（Gary 2026-09-16 裁示）。
+  合併的話 5 人桌有 26 張黑桃可湊同花，整個牌型階梯會塌。
+- ★★ **顯示字元與畫出來的字元是兩件事**：後端 `Card.show()` 送 **空心**的 ♤ / ♡
+  （字串分得出來），前端 `utils/suits.ts` 把它畫成**實心的 ♠ / ♥ ＋ 另一個顏色**
+  （形狀認得出來）。**凡是要跟後端字串比對的地方一律用 `wire`，不要用 `glyph`** ——
+  2026-09-16 踩過：`ManualArrange` 的 `makeShowToCs` 拿畫面字串對表，X/Y 的牌全部對不上，
+  畫出來變成「♠undefined」。
+- ★ 顏色語意跟著母花色：藍桃仍算「黑」、橘心仍算「紅」（全黑/全紅等報到用）。
+  ⚠ 副作用：5 人桌黑 39 張／紅 26 張，**全黑**從 1/61,055 變成 **1/2,022**、
+  **全紅**變成 1/1,578,858（幾乎絕跡）。6 人桌 39/39 自動恢復平衡（全黑 1/27,147）。
+  要不要為 5 人桌重新定價這幾個報到，尚未決定。
+- ★★ **多一副牌會讓同花變稀有、葫蘆變普通**（每點多一張 ⇒ 對子/三條/鐵支全面變常見；
+  同花卻因為 13 張攤在 5–6 個花色而變難）。5 張牌的實際機率：
+
+  | 牌型 | 4 花 | 5 花 | 6 花 |
+  |---|---|---|---|
+  | 鋼支 | — | 1/635,376 | 1/270,655 |
+  | 同花順 | 1/64,974 | 1/165,198 | 1/351,852 |
+  | 鐵支 | 1/4,165 | 1/2,118 | 1/1,504 |
+  | **同花** | 1/509 | **1/1,294** | **1/2,755** |
+  | **葫蘆** | 1/694 | **1/529** | **1/451** |
+  | 順 | 1/255 | 1/265 | 1/272 |
+
+  **Gary 2026-09-16 裁示：牌型大小順序維持傳統不動**（十三支是民間牌戲，順序是肌肉記憶；
+  A2345＝次大順本來也不是照機率定的）。代價是 5/6 人桌的同花成了
+  「看起來大、其實會輸給葫蘆」的陷阱牌。
+- ★★ **5/6 人桌沒有「大神／傳奇」**：`features.py` 的編碼是 **4 花色 × 13 點數 = 52 維**
+  三進位＋4 維花色直方圖，**花色數寫死 4**。5/6 人桌的維度是 65/78，DistNet 的權重完全不能用。
+  `game.py: downgrade_strategy()` 會把所有 ML 策略降級成 `rulealpha4`，
+  **前端 `OnlinePage.effectiveStrategy()` 也降一次**——不然畫面與戰績會標「大神(ml_dist)」而實際跑的是別人，
+  那是一個**看不見的謊**。`features.py` 遇到 X/Y 會拋 ValueError 而不是 KeyError（大聲失敗）。
+- ⚠ **位階表還沒為新牌組重建**：`data/hand_ranks.db` 的 455/7462/5305 是用 52 張牌窮舉的。
+  5/6 人桌目前沿用同一份（順序正確、百分位近似）。鋼支走 `hand_lookup._quint_rank()`
+  發表外名次（pct 會略大於 1.0，那正是「強過表上任何一手」的意思）。
+  要精確就得用 `data/build_win_rates.py` 加花色數參數各產一份。
 
 ## 特殊牌型 (報到) — 6/9/12/18/39/45/100 分
 詳見 `cards.py: SpecialChargeByName`（25 種）。偵測優先序：100→45→39→18→12→9→6→normal。
@@ -105,13 +179,13 @@ _ATK_RANK5B = 3707  # bot ≥ 69.9%（sweep 不敏感，維持）
    - **Step 3**: Score-level Pareto
    - **Step 4**: ~~Category Pareto~~（已移除，會誤殺同 category 強 pile）
    - **Step 5**: Rule C + Rule D
-3. **C0a 怪物尾墩**：pool 含鐵支(7)/同花順(8) → 取 score_defensive 最高，跳過 attitude 邏輯
+3. **C0a 怪物尾墩**：pool 含鐵支(7)/同花順(8)/鋼支(11，靠 `min(ht,8)` 併入) → 取 score_defensive 最高，跳過 attitude 邏輯
 4. **Attitude 決策**：`best_def vs best_att`，`bot_edge = ±0.3`
 
 ### Dominance Rules
 - **Rule C**：i 剛好贏 1 pile 且該 pile 是怪物，j 贏的 pile 全非怪物 → j dominated
 - **Rule D**：i 的 top 是三條（原子頭），j 無任何怪物 → j dominated（原子頭 ×3 + ~100% top 勝率壓倒非怪物 mid/bot 優勢）
-- `_TOP_MON = {3}` (三條)，`_MID_MON = _BOT_MON = {7, 8}` (鐵支/同花順)
+- `_TOP_MON = {3}` (三條)，`_MID_MON = _BOT_MON = {7, 8, 11}` (鐵支/同花順/鋼支)
 - **顯示面板** (`main.py: manual_arrange_info`) 與 pool 用相同規則，保證 UI 一致
 
 ### Dynamic Attitude — RA4 不墊底式（`compute_dynamic_attitude` + 前端 `computeAttitude`，2026-06-15 改）
@@ -219,6 +293,9 @@ else:            att = -min(1,(g-K*rl)/(K*rl)) # 安穩領先 → 守（鎖局�
 - 本質：技術差真實（大神≫老仙≫初階），但報到放大運氣 → 「技術+顯著運氣，像撲克」。
 
 ### 待辦
+- [ ] **5/6 人桌的位階表**：`build_win_rates.py` 加花色數參數，產 `hand_ranks_5.db` / `_6.db`（含鋼支列）
+- [ ] **5/6 人桌的 DistNet**：各自重收資料重訓（特徵維度 65/78），大神/傳奇才能回到 5/6 人桌
+- [ ] 5/6 人桌的連線對戰實測（引擎與房間已支援，但只跑過單機）
 - [x] 階段 a ATK 閾值 sweep → 360/4350/3707
 - [x] ML 第一期 DistNet 上線（+0.85/副 vs RA3）
 - [x] 階段 b attitude → 實證無效，否決

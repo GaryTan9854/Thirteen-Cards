@@ -30,24 +30,26 @@ def _arrange_opponent(cards: list) -> Hand13:
     return h
 
 
-def mc_score_arrangement(my_hand13: Hand13, n_sims: int = 200) -> float:
+def mc_score_arrangement(my_hand13: Hand13, n_sims: int = 200, players: int = 4) -> float:
     """
     Estimate expected score of a FIXED arrangement via Monte Carlo.
 
     my_hand13 must already be arranged (htop/hmid/hbot set, or specialhand != 'normal').
 
+    players=5/6 時牌組與對手數都會跟著變（65/78 張、4/5 個對手）。
     Returns average score across n_sims random opponent deals.
     """
     my_cardstrs = set(my_hand13.handlist)
-    all_deck = Deck()
+    all_deck = Deck(players)
     remaining_pool = [c for c in all_deck if c.cardstr() not in my_cardstrs]
+    n_opp = players - 1
 
     total = 0.0
     for _ in range(n_sims):
         remaining = remaining_pool[:]
         random.shuffle(remaining)
 
-        opp_hands = [remaining[:13], remaining[13:26], remaining[26:39]]
+        opp_hands = [remaining[i * 13:(i + 1) * 13] for i in range(n_opp)]
         opp_arranged = [_arrange_opponent(h) for h in opp_hands]
 
         score = 0
@@ -59,7 +61,7 @@ def mc_score_arrangement(my_hand13: Hand13, n_sims: int = 200) -> float:
     return total / n_sims
 
 
-def best_arrangement_mc(cards: list, top_k: int = 20, n_sims: int = 200) -> dict:
+def best_arrangement_mc(cards: list, top_k: int = 20, n_sims: int = 200, players: int = 4) -> dict:
     """
     Find the best [3,5,5] arrangement for `cards` using Monte Carlo evaluation.
 

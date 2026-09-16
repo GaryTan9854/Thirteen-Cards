@@ -70,13 +70,15 @@ export function buildSpecialTTS(players: any[]): { baodao: string[]; monsters: s
       }
     }
     if (p.mid) {
-      if      (p.mid.hand_type === '鐵支') monsters.push(`${name}，中墩鐵支！${p.mid.description}！`)
+      if      (p.mid.hand_type === '鋼支') monsters.push(`${name}，中墩鋼支！${p.mid.description}！`)
+      else if (p.mid.hand_type === '鐵支') monsters.push(`${name}，中墩鐵支！${p.mid.description}！`)
       else if (p.mid.hand_type === '葫蘆') monsters.push(`${name}，中墩葫蘆！${p.mid.description}！`)
       else if (['同花順', '同花次大順', '同花大順'].includes(p.mid.hand_type))
         monsters.push(`${name}，中墩同花順！${p.mid.description}！`)
     }
     if (p.bot) {
-      if      (p.bot.hand_type === '鐵支') monsters.push(`${name}，尾墩鐵支！${p.bot.description}！`)
+      if      (p.bot.hand_type === '鋼支') monsters.push(`${name}，尾墩鋼支！${p.bot.description}！`)
+      else if (p.bot.hand_type === '鐵支') monsters.push(`${name}，尾墩鐵支！${p.bot.description}！`)
       else if (['同花順', '同花次大順', '同花大順'].includes(p.bot.hand_type))
         monsters.push(`${name}，尾墩同花順！${p.bot.description}！`)
     }

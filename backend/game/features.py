@@ -33,9 +33,20 @@ _BOT_TYPE_MAP  = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4,        # 散牌~同花順
 # ── 工具 ──────────────────────────────────────────────────────────────────────
 
 def _card_pos(cs: str) -> tuple[int, int]:
-    """'07H' → (suit_row=2, rank_col=5)"""
+    """'07H' → (suit_row=2, rank_col=5)
+
+    ★ 這個編碼器是 **4 花色 × 13 點數 = 52 維**寫死的，只服務 4 人桌。
+      5/6 人桌的 X（第二副黑桃）／Y（第二副紅心）在這裡沒有位置——
+      維度對不上，DistNet 的權重就不能用。呼叫端（game.py 的
+      downgrade_strategy）本來就會先把 ML 策略降級掉，所以正常情況走不到這裡；
+      走到了就是有人開了新的入口忘了降級，要**大聲**失敗而不是 KeyError。
+    """
     rank = int(cs[:2])          # 2–14
     suit = cs[2]                # C/D/H/S
+    if suit not in _SUITS:
+        raise ValueError(
+            f"features.encode 只支援 4 花色（52 張）的牌組，收到花色 {suit!r}（{cs}）。"
+            f"5/6 人桌必須先經過 game.downgrade_strategy 降級成規則型 AI。")
     return _SUITS[suit], rank - 2   # rank 2→col 0, A→col 12
 
 

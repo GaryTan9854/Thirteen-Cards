@@ -1,37 +1,36 @@
 import { useCardStyle } from '../utils/cardStyle'
+import { fromGlyph } from '../utils/suits'
 
 interface Props {
-  card: string   // format: "♥A", "♠K", "♦10", "♣2" …
+  card: string   // format: "♥A", "♠K", "♦10", "♣2"；5/6 人桌另有 "♤A"(藍桃) "♡A"(橘心)
 }
 
 export default function CardChip({ card }: Props) {
   const style = useCardStyle()
-  const suit  = card[0]
+  const face  = fromGlyph(card[0])
+  const suit  = face.glyph            // ♤/♡ 一律畫成實心的 ♠/♥，靠顏色區分
   const rank  = card.slice(1)
-  const isRed = suit === '♥' || suit === '♦'
+  const shown = suit + rank
 
   // ── v3: v1 base + uniform grey frame + text +10 % (三版) ──
   if (style === 'v3') {
-    const textCol = isRed ? 'text-red-600' : 'text-gray-900'
     return (
       <span className={`inline-flex items-center justify-center w-11 h-16 rounded-lg border-2
                         border-gray-300 bg-white text-base font-bold shadow-sm select-none
-                        flex-shrink-0 ${textCol}`}>
-        {card}
+                        flex-shrink-0 ${face.text}`}>
+        {shown}
       </span>
     )
   }
 
-  const color = isRed
-    ? 'border-red-300 bg-white text-red-600'
-    : 'border-gray-400 bg-white text-gray-900'
+  const color = `${face.border} bg-white ${face.text}`
 
   // ── v1: plain text centred (初版) ──
   if (style === 'v1') {
     return (
       <span className={`inline-flex items-center justify-center w-11 h-16 rounded-lg border-2
                         text-sm font-bold shadow-sm select-none flex-shrink-0 ${color}`}>
-        {card}
+        {shown}
       </span>
     )
   }

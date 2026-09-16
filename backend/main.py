@@ -1,4 +1,4 @@
-from fastapi import FastAPI, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, BackgroundTasks, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,7 +7,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import os
 
-from game.game import play_one_game
+from game.game import play_one_game, downgrade_strategy
 from game.hands import Hand13
 from online.ws_manager import ConnectionManager
 from online.room import room, Phase
@@ -69,7 +69,8 @@ def health():
     return {"status": "ok", "app": "ThirteenCards", "version": APP_VERSION, "build": APP_BUILD}
 
 
-# ── Game: play a full 4-player game ──────────────────
+# ── Game: play a full game (4 / 5 / 6 players) ───────────────────────────────
+# 5 人桌多一副黑桃（65 張）、6 人桌再多一副紅心（78 張）——見 game/cards.py。
 class ManualOverride(BaseModel):
     player: int
     top:    List[str]
@@ -79,27 +80,43 @@ class ManualOverride(BaseModel):
 
 class PlayRequest(BaseModel):
     player_names: Optional[List[str]]       = None
-    strategies:   Optional[List[str]]       = None   # list of 4 strategy strings
-    pre_dealt:    Optional[List[List[str]]] = None   # [[cardstrs]*13]*4
+    strategies:   Optional[List[str]]       = None   # one strategy string per seat
+    pre_dealt:    Optional[List[List[str]]] = None   # [[cardstrs]*13]*players
     overrides:    Optional[List[ManualOverride]] = None  # manual arrangements
     ai_attitudes: Optional[List[float]]     = None   # per-seat dynamic attitude [-1, 1]
-    cum_scores:   Optional[List[float]]     = None   # 4 座目前累積分（傳說 不墊底決策用）
+    cum_scores:   Optional[List[float]]     = None   # 各座目前累積分（傳說 不墊底決策用）
     rounds_left:  Optional[int]             = None   # 含本局的剩餘局數（傳說 不墊底決策用）
+    players:      Optional[int]             = None   # 4 / 5 / 6（預設 4）
+
+
+class DealRequest(BaseModel):
+    players: Optional[int] = None   # 4 / 5 / 6（預設 4）
 
 
 @app.post("/api/game/deal")
-def game_deal():
-    """Deal 4 hands and return as cardstr lists (for manual-arrange flow)."""
-    from game.game import deal_game
-    hands = deal_game()
-    return {"hands": hands}
+def game_deal(req: DealRequest = None):
+    """Deal one hand per player and return as cardstr lists (for manual-arrange flow)."""
+    from game.game import deal_game, DEFAULT_PLAYERS, SUPPORTED_PLAYERS
+    n = (req.players if req and req.players else DEFAULT_PLAYERS)
+    if n not in SUPPORTED_PLAYERS:
+        raise HTTPException(status_code=400, detail=f"players 只能是 {SUPPORTED_PLAYERS}")
+    return {"hands": deal_game(n), "players": n}
 
 
 @app.post("/api/game/play")
 def game_play(req: PlayRequest = None):
-    from game.game import play_one_game as _play
-    names   = req.player_names if req and req.player_names and len(req.player_names) == 4 else None
-    strats  = req.strategies   if req and req.strategies   and len(req.strategies)   == 4 else None
+    from game.game import play_one_game as _play, DEFAULT_AI_NAMES, DEFAULT_PLAYERS, SUPPORTED_PLAYERS
+    # 人數來源優先序：明講的 players > 名單長度 > 已發的牌數 > 預設 4
+    n = (req.players if req and req.players else
+         len(req.player_names) if req and req.player_names else
+         len(req.pre_dealt) if req and req.pre_dealt else
+         DEFAULT_PLAYERS)
+    if n not in SUPPORTED_PLAYERS:
+        raise HTTPException(status_code=400, detail=f"players 只能是 {SUPPORTED_PLAYERS}")
+    names   = req.player_names if req and req.player_names and len(req.player_names) == n else DEFAULT_AI_NAMES[:n]
+    strats  = req.strategies   if req and req.strategies   and len(req.strategies)   == n else None
+    if strats:
+        strats = [downgrade_strategy(x, n) for x in strats]
     pre     = req.pre_dealt    if req else None
     ovs     = [o.dict() for o in req.overrides] if req and req.overrides else None
     atts    = req.ai_attitudes if req else None
@@ -114,6 +131,7 @@ def game_play(req: PlayRequest = None):
 class ArrangeRequest(BaseModel):
     hand: List[str]                          # 13 cardstrs e.g. ["02C","05H",...]
     strategy: Optional[str] = "rule_base"  # rule_base | monte_carlo | ml | ml_aggressive | ml_conservative
+    players: Optional[int] = None          # 4/5/6；沒給就從牌面的花色反推
 
 
 @app.post("/api/game/arrange")
@@ -124,6 +142,13 @@ def arrange_hand(req: ArrangeRequest):
     """
     from game.hands import Hand13, Hand3, Hand5
     from game.cards import SpecialHand
+    from game.game import players_of_hand
+
+    # ★ 5/6 人桌沒有能用的 ML 權重（DistNet 特徵寫死 4 花色）。
+    #   這裡跟 /api/game/play 走同一條降級，否則手動排牌面板按「AI 建議」
+    #   會 500——2026-09-16 實測撞到（KeyError: 'Y'）。
+    req.strategy = downgrade_strategy(req.strategy or 'rule_base',
+                                      req.players or players_of_hand(req.hand))
 
     h13 = Hand13(req.hand)
     sp = h13.chk_special()
@@ -584,7 +609,8 @@ def manual_arrange_info(req: ManualInfoRequest):
 
     # Sort groups by (bot_cat, mid_cat, top_cat) descending — matches 102-type taxonomy order
     _CAT = {"亂":0,"對":1,"兩對":2,"三條":3,"順":4,"同花":5,
-            "葫蘆":6,"鐵支":7,"同花順":8,"同花次大順":8,"同花大順":8}
+            "葫蘆":6,"鐵支":7,"同花順":8,"同花次大順":8,"同花大順":8,
+            "鋼支":9}
     _TOP_CAT = {"亂":0,"對":1,"三條":3}
 
     def _group_sort_key(g):
@@ -665,8 +691,8 @@ def manual_arrange_info(req: ManualInfoRequest):
     # (e.g. 亂·同花·葫蘆 vs 對·三條·同花 where top pair quality matters in practice).
 
     _TOP_MONSTER = {'三條'}
-    _MID_MONSTER = {'鐵支', '同花順', '同花次大順', '同花大順'}
-    _BOT_MONSTER = {'鐵支', '同花順', '同花次大順', '同花大順'}
+    _MID_MONSTER = {'鐵支', '同花順', '同花次大順', '同花大順', '鋼支'}
+    _BOT_MONSTER = {'鐵支', '同花順', '同花次大順', '同花大順', '鋼支'}
 
     def _is_monster(row: str, position: str) -> bool:
         if position == 'top': return row in _TOP_MONSTER
@@ -749,7 +775,8 @@ def manual_arrange_info(req: ManualInfoRequest):
 
 def _row_label(ht: int) -> str:
     labels = {0:"亂",1:"對",2:"兩對",3:"三條",4:"順",5:"同花",
-              6:"葫蘆",7:"鐵支",8:"同花順",9:"同花次大順",10:"同花大順"}
+              6:"葫蘆",7:"鐵支",8:"同花順",9:"同花次大順",10:"同花大順",
+              11:"鋼支"}
     return labels.get(ht, str(ht))
 
 
@@ -926,23 +953,28 @@ async def ws_endpoint(player_name: str, websocket: WebSocket):
             elif t == "game_config":
                 if room.host != player_name:
                     continue
+                from online.room import SUPPORTED_PLAYERS as _SP
+                _n = int(data.get("n_players", room.n_players))
+                room.set_player_count(_n if _n in _SP else 4)
+                _ai_slots = room.n_players - 1
                 room.rounds_normal = int(data.get("rounds_normal", 16))
                 room.rounds_appeal = int(data.get("rounds_appeal",  4))
                 room.time_limit    = int(data.get("time_limit",     30))
                 _valid_ai = {"rulealpha", "rulealpha2", "rulealpha_aggressive", "rulealpha_conservative",
                              "monte_carlo", "ml", "ml_aggressive", "ml_conservative", "random"}
                 raw_strats = data.get("seat_strategies")
-                if isinstance(raw_strats, list) and len(raw_strats) == 4:
+                if isinstance(raw_strats, list) and len(raw_strats) == room.n_players:
                     # seat_strategies[0] = player's own preference (ignored server-side)
-                    # seat_strategies[1:4] = AI slot strategies
-                    room.ai_strategies = [s if s in _valid_ai else "rulealpha" for s in raw_strats[1:4]]
+                    # seat_strategies[1:] = AI slot strategies
+                    room.ai_strategies = [s if s in _valid_ai else "rulealpha"
+                                          for s in raw_strats[1:room.n_players]]
                 else:
                     legacy = data.get("ai_strategy", "rulealpha")
                     s = legacy if legacy in _valid_ai else "rulealpha"
-                    room.ai_strategies = [s] * 3
+                    room.ai_strategies = [s] * _ai_slots
                 from online.room import BEAUTIES
                 raw_names = data.get("ai_names", [])
-                if (isinstance(raw_names, list) and len(raw_names) == 3
+                if (isinstance(raw_names, list) and len(raw_names) == _ai_slots
                         and all(n in BEAUTIES for n in raw_names)):
                     room.ai_names = raw_names
                 invite_list        = [p for p in data.get("invite_players", [])

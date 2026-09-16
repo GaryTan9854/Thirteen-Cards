@@ -128,7 +128,9 @@ class Hand5(Hand):
 
     def score_hand(self):
         cat = self.handtype_val
-        if cat > 8:
+        if cat == 11:
+            self.score = self._check_five_of_a_kind()
+        elif cat > 8:
             if cat == 9:
                 self.p[0] = 1
                 self.p[1] = 5
@@ -159,6 +161,14 @@ class Hand5(Hand):
         elif cat == 0:
             self.score = self._check_highcard()
         return [self.score, self.handtype, self.handtype_val]
+
+    def _check_five_of_a_kind(self):
+        """鋼支。倍率 ×10 比照尾墩怪物表，讓它的 score 穩定壓過同花大順(1400)。
+        5 點鋼支的加倍在 compete() 裡處理（同 4 鐵支／3 三條的做法）。"""
+        five = self.numbers[0]
+        self.p[0] = five
+        self.p[1] = five
+        return (HandScor[11] + five) * 10
 
     def _check_four_of_a_kind(self):
         four = card = 0
@@ -271,6 +281,8 @@ class Hand5(Hand):
             trips = [c for c in self if c.value == self.p[0]]
             pairs = [c for c in self if c.value == self.p[1]]
             return trips + pairs
+        elif ht == "鋼支":
+            return list(self)          # 五張同點，順序無意義
         elif ht == "鐵支":
             quads = [c for c in self if c.value == self.p[0]]
             rest  = [c for c in self if c.value != self.p[0]]
@@ -288,6 +300,8 @@ class Hand5(Hand):
             return f"{self.p[0]} 同花順"
         elif hh == "同花":
             return "同花 [" + " ".join(convert_cardnum(v) for v in self.p) + "]"
+        elif hh == "鋼支":
+            return convert_cardnum(self.p[0]) + " 鋼支"
         elif hh == "鐵支":
             return convert_cardnum(self.p[0]) + " 鐵支"
         elif hh == "葫蘆":

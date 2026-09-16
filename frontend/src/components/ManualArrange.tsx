@@ -8,16 +8,19 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useCardStyle } from '../utils/cardStyle'
+import { fromCode, SUIT_ORDER } from '../utils/suits'
 
 // ─── Card helpers ─────────────────────────────────────────────────────────────
-
-const SUIT_SYM: Record<string, string> = { H: '♥', D: '♦', S: '♠', C: '♣' }
+// 花色的畫法（含 5/6 人桌的藍桃 X／橘心 Y）一律問 utils/suits.ts，不要在這裡另開一份。
 const RANK_STR: Record<number, string>  = {
   2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',
   11:'J',12:'Q',13:'K',14:'A',
 }
 
-function cardShow(cs: string)  { return SUIT_SYM[cs[2]] + RANK_STR[parseInt(cs.slice(0,2))] }
+function cardShow(cs: string)  { return fromCode(cs[2]).glyph + RANK_STR[parseInt(cs.slice(0,2))] }
+/** 後端 Card.show() 會送出的字串（藍桃 ♤ / 橘心 ♡）。★ 要跟後端回傳的牌比對時用這個，
+ *  不要用 cardShow——畫面故意把 ♤ 畫成 ♠，拿去對表就一張都對不上。 */
+function cardWire(cs: string)  { return fromCode(cs[2]).wire  + RANK_STR[parseInt(cs.slice(0,2))] }
 function cardRank(cs: string)  { return parseInt(cs.slice(0,2)) }
 function cardSuit(cs: string)  { return cs[2] }
 
@@ -32,7 +35,6 @@ const SORT_LABEL: Record<SortMode,string> = {
   A2:   'A→2(A低)',
   suit: '依同花(♠♥♦♣)',
 }
-const SUIT_ORDER: Record<string,number> = { S:0, H:1, C:2, D:3 }  // black-red-black-red alternating
 
 function sortCards(cards: string[], mode: SortMode): string[] {
   return [...cards].sort((a,b) => {
@@ -58,15 +60,13 @@ function sortCards(cards: string[], mode: SortMode): string[] {
 
 // ─── CardTile ─────────────────────────────────────────────────────────────────
 
-const isRedSuit = (cs: string) => cs[2] === 'H' || cs[2] === 'D'
-
 function CardTile({ cs, size='md' }: { cs:string; size?:'xs'|'sm'|'md'|'lg' }) {
   const style = useCardStyle()
   const box   = size==='lg' ? 'w-14 h-20' : size==='md' ? 'w-11 h-16' : size==='sm' ? 'w-9 h-12' : 'w-6 h-9'
 
   // ── v3: v1 base + uniform grey frame + text +10 % (三版) ──
   if (style === 'v3') {
-    const textCol = isRedSuit(cs) ? 'text-red-600' : 'text-gray-900'
+    const textCol = fromCode(cs[2]).text
     // v1 sizes were base/sm/xs/[10px]; +10 % → bump one step where natural
     const ft = size==='lg' ? 'text-[18px]' : size==='md' ? 'text-[16px]' : size==='sm' ? 'text-[13px]' : 'text-[11px]'
     return (
@@ -78,9 +78,7 @@ function CardTile({ cs, size='md' }: { cs:string; size?:'xs'|'sm'|'md'|'lg' }) {
     )
   }
 
-  const color = isRedSuit(cs)
-    ? 'border-red-300 bg-white text-red-600'
-    : 'border-gray-400 bg-white text-gray-900'
+  const color = `${fromCode(cs[2]).border} bg-white ${fromCode(cs[2]).text}`
 
   // ── v1: plain centred (初版) ──
   if (style === 'v1') {
@@ -94,7 +92,7 @@ function CardTile({ cs, size='md' }: { cs:string; size?:'xs'|'sm'|'md'|'lg' }) {
   }
 
   // ── v2: corners + small centre (二版) ──
-  const suit = SUIT_SYM[cs[2]]
+  const suit = fromCode(cs[2]).glyph
   const rank = RANK_STR[parseInt(cs.slice(0,2))]
   const rkf  = size==='lg' ? 'text-[17px]' : size==='md' ? 'text-[14px]' : size==='sm' ? 'text-[12px]' : 'text-[9px]'
   const stf  = size==='lg' ? 'text-[18px]' : size==='md' ? 'text-[14px]' : size==='sm' ? 'text-[12px]' : 'text-[9px]'
@@ -287,6 +285,7 @@ interface Props {
   cumScores?:      number[]  // all 4 cumulative scores so far
   isGary?:         boolean   // enables autopilot toggle
   strategy?:       string    // player's configured AI strategy — used as the default arrangement
+  players?:        number    // 桌子人數 4/5/6（讓後端知道要用哪一副牌的策略；沒給就由牌面反推）
   attDebug?:       { att: number; gp: number; pos: number } | null  // Gary-only attitude debug
 }
 
@@ -294,7 +293,7 @@ function scoreColor(n: number) {
   return n > 0 ? 'text-yellow-300' : n < 0 ? 'text-red-400' : 'text-gray-400'
 }
 
-export default function ManualArrange({ hand, onConfirm, onLeave, countdown, submittedCount, totalPlayers,
+export default function ManualArrange({ hand, onConfirm, onLeave, countdown, submittedCount, totalPlayers, players,
   roundLabel, playerNames, cumScores, isGary, strategy, attDebug }: Props) {
 
   const isDesktop = useMemo(() => window.innerWidth >= 640, [])
@@ -324,8 +323,12 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
   const [arr,      setArr]          = useState<{top:string[];mid:string[];bot:string[]}>({top:[],mid:[],bot:[]})
 
   // Helper to convert show-format cards back to cardstrs using hand
+  /** 後端回傳的顯示字串 → 我們手上的 cardstr。
+   *  兩種鍵都放進去（wire 是後端實際會送的，show 是萬一哪天改回同符號的保險）。 */
   function makeShowToCs(h: string[]) {
-    return Object.fromEntries(h.map(cs=>[cardShow(cs), cs]))
+    const m: Record<string, string> = {}
+    for (const cs of h) { m[cardWire(cs)] = cs; m[cardShow(cs)] = cs }
+    return m
   }
   function applyModelData(d: any, h: string[]) {
     if(d.top && d.mid && d.bot){
@@ -364,7 +367,7 @@ export default function ManualArrange({ hand, onConfirm, onLeave, countdown, sub
     }
     Promise.all([
       fetchJson('/api/manual/arrange_info', { hand }),
-      fetchJson('/api/game/arrange', { hand, strategy: strategy ?? 'rulealpha' }).catch(() => null),
+      fetchJson('/api/game/arrange', { hand, strategy: strategy ?? 'rulealpha', players }).catch(() => null),
     ])
     .then(([data, rbData]:[ArrangeInfo, any])=>{
       if (cancelled) return

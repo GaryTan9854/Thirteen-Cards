@@ -69,7 +69,11 @@ def compete(h1, h2):
 
     # mid bonuses
     i = 1
-    if h1.hmid.handtype == "葫蘆" or h2.hmid.handtype == "葫蘆":
+    if h1.hmid.handtype == "鋼支" or h2.hmid.handtype == "鋼支":
+        # 543 規律：三條3 ×2、鐵支4 ×2、鋼支5 ×2（點數等於墩名的那一張加倍）
+        p_whowin = h1.hmid.p[0] if res[i] > 0 else h2.hmid.p[0]
+        res[i] = res[i] * (40 if p_whowin == 5 else 20)
+    elif h1.hmid.handtype == "葫蘆" or h2.hmid.handtype == "葫蘆":
         res[i] = res[i] * 2
     elif h1.hmid.handtype == "鐵支" or h2.hmid.handtype == "鐵支":
         p_whowin = h1.hmid.p[0] if res[i] > 0 else h2.hmid.p[0]
@@ -83,7 +87,10 @@ def compete(h1, h2):
 
     # bot bonuses
     i = 2
-    if h1.hbot.handtype == "鐵支" or h2.hbot.handtype == "鐵支":
+    if h1.hbot.handtype == "鋼支" or h2.hbot.handtype == "鋼支":
+        p_whowin = h1.hbot.p[0] if res[i] > 0 else h2.hbot.p[0]
+        res[i] = res[i] * (20 if p_whowin == 5 else 10)
+    elif h1.hbot.handtype == "鐵支" or h2.hbot.handtype == "鐵支":
         p_whowin = h1.hbot.p[0] if res[i] > 0 else h2.hbot.p[0]
         res[i] = res[i] * (8 if p_whowin == 4 else 4)
     elif h1.hbot.handtype == "同花順" or h2.hbot.handtype == "同花順":
@@ -269,10 +276,59 @@ def _arrange(hand_cards, strategy: str, attitude_override: float = None,
     return h
 
 
-def deal_game() -> list:
-    """Deal 4 hands and return them as list of cardstr lists (not Card objects)."""
-    deck = Deck()
-    raw = deck.distribute()   # list of 4 Card-object lists
+# ── 打槍倍率（Gary 2026-09-16 定式）──────────────────────────────────────────
+# 原始分＝三墩各贏 1 分。打槍 N 家 → 該對的分數 ×(N+1)。
+#   4 人桌：1 槍 ×2、2 槍 ×3、3 槍（全壘打）×4  ← 與改版前的數字逐一相同
+#   5 人桌：再多一級 4 槍（全壘打）×5
+#   6 人桌：再多一級 5 槍（全壘打）×6
+# compete() 內部對 3-0 橫掃已先乘了 ×2，所以這裡只補剩下的 (N+1)/2。
+DEFAULT_PLAYERS    = 4
+SUPPORTED_PLAYERS  = (4, 5, 6)
+DEFAULT_AI_NAMES   = ["Glory", "Jack", "Ian", "Gary", "Tao", "Golden"]
+
+
+# ★★ DistNet / ScoringNet 的特徵是 4×13=52 維三進位＋4 維花色直方圖（features.py），
+#    **花色數寫死 4**。5/6 人桌是 65/78 張、5/6 個花色，維度對不上，權重完全不能用。
+#    在這裡明確降級成規則型，而不是讓它在推論時才炸掉或安靜地吃到垃圾特徵。
+#    要讓「大神／傳奇」回到 5/6 人桌，必須各自重收資料重訓（見 CLAUDE.md 待辦）。
+_ML_STRATEGIES = {'ml', 'ml_neutral', 'ml_aggressive', 'ml_conservative',
+                  'ml_dist', 'ml_dist_aggressive', 'ml_dist_conservative', 'ml2'}
+
+
+def players_of_hand(handstrs) -> int:
+    """從牌面反推這是幾人桌的牌組：出現 Y（第二副紅心）＝6 人、X（第二副黑桃）＝5 人。
+
+    ★ 只能「往上」推不能「往下」保證——6 人桌的某一手可能剛好一張 X/Y 都沒有，
+      那就會被當成 4 人桌。這對排牌影響有限（位階表本來就是近似），
+      但足以擋掉 features.py 遇到未知花色直接 KeyError 的那條路。
+      有明確人數可傳時一律傳，不要依賴這個推論。
+    """
+    suits = {cs[2] for cs in handstrs if len(cs) >= 3}
+    if 'Y' in suits:
+        return 6
+    if 'X' in suits:
+        return 5
+    return DEFAULT_PLAYERS
+
+
+def downgrade_strategy(strategy: str, players: int) -> str:
+    """5/6 人桌把 ML 策略降級為 rulealpha4（動態 attitude 的規則型，最接近的替代品）。"""
+    if players != DEFAULT_PLAYERS and strategy in _ML_STRATEGIES:
+        return 'rulealpha4'
+    return strategy
+
+
+def gun_multiplier(gun_count: int) -> float:
+    """打 N 家 → ×(N+1)；compete() 已乘 ×2，故回傳剩下的 (N+1)/2。"""
+    if gun_count <= 0:
+        return 1.0
+    return (gun_count + 1) / 2.0
+
+
+def deal_game(players: int = DEFAULT_PLAYERS) -> list:
+    """Deal `players` hands and return them as list of cardstr lists (not Card objects)."""
+    deck = Deck(players)
+    raw = deck.distribute()   # list of `players` Card-object lists
     return [[c.cardstr() for c in hand] for hand in raw]
 
 
@@ -289,11 +345,14 @@ def play_one_game(player_names=None, strategies=None,
                     RuleAlpha/RuleAlpha3 strategies (dynamic game-state attitude).
     """
     if player_names is None:
-        player_names = ["Glory", "Jack", "Ian", "Gary"]
+        player_names = DEFAULT_AI_NAMES[:(len(pre_dealt) if pre_dealt else DEFAULT_PLAYERS)]
+    n_players = len(player_names)
+    if n_players not in SUPPORTED_PLAYERS:
+        raise ValueError(f"不支援的人數：{n_players}（只有 4/5/6）")
     if strategies is None:
-        strategies = ['rule_base'] * 4
+        strategies = ['rule_base'] * n_players
 
-    myDeck = Deck()
+    myDeck = Deck(n_players)
     if pre_dealt:
         # Convert cardstr lists back to Card-object lists
         hands = [[c for c in Hand13(h)] for h in pre_dealt]
@@ -310,7 +369,8 @@ def play_one_game(player_names=None, strategies=None,
             override_map[ov['player']] = ov
 
     for idx, name in enumerate(player_names):
-        strategy = strategies[idx] if idx < len(strategies) else 'rule_base'
+        strategy = downgrade_strategy(
+            strategies[idx] if idx < len(strategies) else 'rule_base', n_players)
         h13 = Hand13(hands[idx])
         sp = h13.chk_special()
         h13.specialhand = sp
@@ -394,9 +454,8 @@ def play_one_game(player_names=None, strategies=None,
             }
         players_data.append(player_info)
 
-    # Battle
-    combos = list(itertools.combinations(range(4), 2))
-    res_matrix = [[0] * 5 for _ in range(4)]
+    # Battle — 每兩家比一次（4人 6 場、5人 10 場、6人 15 場）
+    combos = list(itertools.combinations(range(n_players), 2))
     battles = []
 
     gun_counts = {name: 0 for name in player_names}
@@ -405,8 +464,8 @@ def play_one_game(player_names=None, strategies=None,
     # 中墩/尾墩 三條 is a normal hand with no special scoring.
     # 葫蘆 bonus only applies to 中墩 (×2); 尾墩 葫蘆 has no bonus.
     TOP_MONSTERS = {'三條'}
-    MID_MONSTERS = {'葫蘆', '鐵支', '同花順', '同花次大順', '同花大順'}
-    BOT_MONSTERS = {'鐵支', '同花順', '同花次大順', '同花大順'}
+    MID_MONSTERS = {'葫蘆', '鐵支', '同花順', '同花次大順', '同花大順', '鋼支'}
+    BOT_MONSTERS = {'鐵支', '同花順', '同花次大順', '同花大順', '鋼支'}
 
     for i, j in combos:
         res = compete(hand13_list[i], hand13_list[j])
@@ -465,10 +524,8 @@ def play_one_game(player_names=None, strategies=None,
     for i, j in combos:
         res = compete(hand13_list[i], hand13_list[j])
         n1, n2 = player_names[i], player_names[j]
-        g1 = gun_counts[n1]
-        g2 = gun_counts[n2]
-        mul1 = 2 if g1 == 3 else (1.5 if g1 == 2 else 1)
-        mul2 = 2 if g2 == 3 else (1.5 if g2 == 2 else 1)
+        mul1 = gun_multiplier(gun_counts[n1])
+        mul2 = gun_multiplier(gun_counts[n2])
         mul = mul1 if res[4] == 1 else (mul2 if res[4] == -1 else 1)
         pts = res[3] * mul
         final_scores[n1] += pts

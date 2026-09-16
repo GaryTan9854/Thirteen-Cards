@@ -19,6 +19,9 @@ from typing import Dict, List, Optional
 
 BEAUTIES = ['西施', '王昭君', '貂蟬', '楊貴妃', '妹喜', '妲己', '褒姒', '驪姬']
 
+DEFAULT_PLAYERS   = 4
+SUPPORTED_PLAYERS = (4, 5, 6)
+
 
 class Phase:
     LOBBY          = "lobby"
@@ -42,6 +45,7 @@ class Room:
         self.host          = None                # type: Optional[str]
         self.players       = []                  # type: List[str]
         self.seats         = {}                  # type: Dict[str, int]
+        self.n_players     = DEFAULT_PLAYERS     # type: int  4 / 5 / 6
         self.rounds_normal = 16                  # type: int
         self.rounds_appeal = 4                   # type: int
         self.time_limit    = 30                  # type: int
@@ -62,18 +66,32 @@ class Room:
         self.appeal_played      = 0              # type: int  rounds played in this appeal
         self.is_tiebreaking     = False          # type: bool
 
-        self.ai_strategies = ["rulealpha"] * 3    # type: List[str]  per AI slot (order = seat order)
-        self.ai_names      = random.sample(BEAUTIES, 3)  # type: List[str]
+        # AI 席次＝人數 − 1（房主一定佔一席）。改人數時一定要跟著重算，
+        # 否則 seat_names() 會在最後一席掉到 "AI-5" 這種占位名字。
+        self.ai_strategies = ["rulealpha"] * (DEFAULT_PLAYERS - 1)   # type: List[str]
+        self.ai_names      = random.sample(BEAUTIES, DEFAULT_PLAYERS - 1)  # type: List[str]
         self._timer:        Optional[asyncio.Task] = None
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
+    def set_player_count(self, n: int) -> None:
+        """改桌子人數。AI 名單與策略一併重算——這兩份長度必須永遠是 n−1。"""
+        if n not in SUPPORTED_PLAYERS:
+            raise ValueError(f"不支援的人數：{n}")
+        self.n_players = n
+        need = n - 1
+        base = self.ai_strategies[0] if self.ai_strategies else "rulealpha"
+        self.ai_strategies = (self.ai_strategies + [base] * need)[:need]
+        keep = [x for x in self.ai_names if x in BEAUTIES][:need]
+        pool = [b for b in BEAUTIES if b not in keep]
+        self.ai_names = keep + random.sample(pool, need - len(keep))
+
     def seat_names(self) -> List[str]:
-        """Names in seat order 0–3; unfilled seats use configured beauty names."""
+        """Names in seat order 0..n_players−1; unfilled seats use configured beauty names."""
         human_seats = set(self.seats.values())
         ai_idx = 0
         names = []
-        for seat in range(4):
+        for seat in range(self.n_players):
             if seat in human_seats:
                 names.append("?")          # filled in below
             else:
@@ -92,7 +110,7 @@ class Room:
         return self.appeal_generation > 0
 
     def assign_seats(self) -> None:
-        pool = list(range(4))
+        pool = list(range(self.n_players))
         random.shuffle(pool)
         for i, p in enumerate(self.players):
             self.seats[p] = pool[i]
@@ -103,6 +121,7 @@ class Room:
             "host":               self.host,
             "players":            self.players,
             "seats":              self.seats,
+            "n_players":          self.n_players,
             "rounds_normal":      self.rounds_normal,
             "rounds_appeal":      self.rounds_appeal,
             "time_limit":         self.time_limit,
@@ -133,7 +152,7 @@ class Room:
         self.arrangements = {}
         self.phase = Phase.PLAYING
 
-        hands = deal_game()          # list[list[cardstr]], indexed by seat
+        hands = deal_game(self.n_players)   # list[list[cardstr]], indexed by seat
         self.pre_dealt = hands
 
         # Each human player gets only their own hand
@@ -226,7 +245,7 @@ class Room:
         self.multiplier = self.multiplier + 1 if is_boring else 1
 
         # Running totals & lowest seat
-        totals           = [sum(r[i] for r in self.history) for i in range(4)]
+        totals           = [sum(r[i] for r in self.history) for i in range(self.n_players)]
         min_score        = min(totals)
         has_tie          = totals.count(min_score) > 1
         current_low_seat = totals.index(min_score)

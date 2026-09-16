@@ -89,6 +89,8 @@ rsync -az -e "ssh $SSH_OPTS" \
   --exclude '*.pyc' \
   --exclude '.env' \
   --exclude 'venv/' \
+  --exclude 'venv_train/' \
+  --exclude '.pytest_cache/' \
   --exclude 'node_modules/' \
   --exclude 'dist/' \
   --exclude 'backend/static/' \

@@ -74,6 +74,10 @@ def _key3(h) -> str:
 
 def _key5(h) -> str:
     ht, p, nn = h.handtype_val, h.p, h.numbers
+    if ht == 11:
+        # 鋼支只在 5/6 人桌出現，不在 52 張牌算出來的位階表裡。
+        # 它是牌型頂點，所以給一個表外的 key，名次由 _quint_rank() 發。
+        return f"11:{p[0] if p[0] else nn[0]}"
     if ht >= 8:
         high = 5 if (p[0] == 1 or (14 in nn and min(nn) == 2)) else (p[1] if p[1] else max(nn))
         return f"8:{high}"
@@ -105,13 +109,30 @@ def _key5(h) -> str:
 
 # ── 名次查詢 ──────────────────────────────────────────────────────────────────
 
+def _quint_rank(h, total: int) -> int | None:
+    """鋼支的名次：排在整張表之上（total + 點數）。
+    ★ 位階表是用 52 張牌窮舉出來的，鋼支不在裡面，不能硬塞進既有名次。
+      給表外名次的好處是 4 人桌的每一個既有名次完全不動。
+      代價是 pct 會略大於 1.0——那正是「強過表上任何一手」的意思，
+      下游只拿它來比大小與加總，argmax 不受影響。"""
+    if h.handtype_val != 11:
+        return None
+    return total + (h.p[0] if h.p[0] else h.numbers[0])
+
+
 def rank3(h) -> int:
     return _D3.get(_key3(h), 1)
 
 def rank5_mid(h) -> int:
+    q = _quint_rank(h, _TOT5M)
+    if q is not None:
+        return q
     return _D5M.get(_key5(h), 1)
 
 def rank5_bot(h) -> int | None:
+    q = _quint_rank(h, _TOT5B)
+    if q is not None:
+        return q
     return _D5B.get(_key5(h))
 
 
@@ -136,10 +157,14 @@ def winrate3(h) -> float:
 
 def winrate5_mid(h) -> float:
     """中墩：能打敗 C(52,5) 中多少比例的手牌。"""
+    if h.handtype_val == 11:
+        return 1.0
     return _WR5M.get(_key5(h), 0.0)
 
 def winrate5_bot(h) -> float:
     """尾墩：能打敗 C(52,5) 中多少比例的手牌（包含低於門檻的弱牌）。"""
+    if h.handtype_val == 11:
+        return 1.0
     return _WR5B.get(_key5(h), 0.0)
 
 

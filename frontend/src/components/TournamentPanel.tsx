@@ -21,8 +21,15 @@ function scoreColor(n: number) {
   return n > 0 ? 'text-yellow-300' : n < 0 ? 'text-red-400' : 'text-gray-400'
 }
 function fmt(n: number) { return (n > 0 ? '+' : '') + n }
-function computeTotals(history: number[][]): number[] {
-  return history.reduce((acc, row) => acc.map((s, i) => s + (row[i] ?? 0)), [0, 0, 0, 0])
+/** ★ 種子長度一定要跟著人數走。寫死 [0,0,0,0] 的話 5/6 人局的最後一兩席
+ *  會拿到 undefined，畫面上直接印出 "UNDEFINED"（2026-09-16 實測撞到）。 */
+function computeTotals(history: number[][], seats?: number): number[] {
+  // ★ 長度同時看「人數」與「歷史列的最大寬度」，並且擋掉 NaN/負數——
+  //   Array(NaN) 會直接 throw RangeError 讓整個面板白畫面（2026-09-16 撞到）。
+  const n = Math.max(1, Number.isFinite(seats) ? (seats as number) : 0,
+                     ...history.map(r => r.length))
+  return history.reduce((acc, row) => acc.map((s, i) => s + (row[i] ?? 0)),
+                        Array(n).fill(0) as number[])
 }
 function lowestIdx(totals: number[]): number {
   return totals.reduce((mi, s, i) => s < totals[mi] ? i : mi, 0)
@@ -51,7 +58,7 @@ export default function TournamentPanel({
   const [historyView,  setHistoryView]  = useState<0 | 1 | 2>(0)
   const [pressedBadge, setPressedBadge] = useState<{r: number; j: number} | null>(null)
 
-  const totalScores  = useMemo(() => computeTotals(history), [history])
+  const totalScores  = useMemo(() => computeTotals(history, names.length), [history, names.length])
   const lowestPlayer = lowestIdx(totalScores)
   const winnerIdx    = totalScores.indexOf(Math.max(...totalScores))
   const roundCount   = history.length
@@ -61,8 +68,8 @@ export default function TournamentPanel({
   // ── HistoryPanel ──────────────────────────────────────────────────────────
   const SPLIT = 10
   const runningTotals = useMemo(
-    () => history.map((_, i) => computeTotals(history.slice(0, i + 1))),
-    [history]
+    () => history.map((_, i) => computeTotals(history.slice(0, i + 1), names.length)),
+    [history, names.length]
   )
   const displayRows = historyView === 2 ? runningTotals : history
   const leftRounds  = displayRows.slice(0, SPLIT)
@@ -207,10 +214,12 @@ export default function TournamentPanel({
       {/* ── 累積比分 ── */}
       <div className="bg-slate-800 rounded-2xl p-4 shadow-inner">
         <div className="text-[17px] text-sky-400 mb-2 font-semibold text-center">累積比分</div>
-        <div className="grid grid-cols-4 gap-3">
+        {/* 欄數依人數：6 人排 3×2 比 4+2 好看，5 人一列排得下 */}
+        <div className="grid gap-3"
+             style={{ gridTemplateColumns: `repeat(${names.length === 6 ? 3 : Math.max(names.length, 1)}, minmax(0, 1fr))` }}>
           {names.map((name, i) => (
             <div key={name} className="relative flex flex-col items-center gap-1">
-              <BeautyAvatar name={name} size={104} idx={i} isMe={myName ? name === myName : false} />
+              <BeautyAvatar name={name} size={names.length > 4 ? 84 : 104} idx={i} isMe={myName ? name === myName : false} />
               <span className="text-[15px] text-sky-300 truncate max-w-full">{name}</span>
               {/* 累積分 — double-underline when currently lowest */}
               <span className={`text-2xl font-bold font-cinzel ${scoreColor(totalScores[i])} ${

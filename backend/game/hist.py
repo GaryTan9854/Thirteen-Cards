@@ -44,6 +44,10 @@ class Hist_Cards(dict):
     def has_fourkind(self):
         return self.check_sets(4)
 
+    def has_fivekind(self):
+        """鋼支＝五張同點。只有 5/6 人桌（每點 5–6 張）才可能成立。"""
+        return self.check_sets(5)
+
     def has_fullhouse(self):
         return self.check_sets2(3, 2)
 
@@ -64,6 +68,10 @@ class Hist_Cards(dict):
         return 0
 
     def hand_category(self, is_flush=0):
+        # 鋼支最先判——五張同點必然是五種不同花色，不可能同時是同花，
+        # 但先判它可以讓「牌型的頂點」這件事在程式裡看得出來。
+        if self.has_fivekind():
+            return HandCat["鋼支"]
         if is_flush:
             ss = self.chk_straight()
             if ss == 0:

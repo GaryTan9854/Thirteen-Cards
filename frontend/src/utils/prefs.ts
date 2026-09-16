@@ -12,6 +12,7 @@ export interface UserSettings {
   cfgDifficulty?:    string
   cfgAutoReshuffle?: boolean
   cfgQuickStart?:    boolean
+  cfgPlayers?:       number      // 桌子人數 4 / 5 / 6
   diffV2?:           boolean
 }
 

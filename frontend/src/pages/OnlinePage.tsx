@@ -27,6 +27,7 @@ import AvatarPicker from '../components/AvatarPicker'
 import LiveStream from '../components/LiveStream'
 import type { RtcPayload } from '../utils/voicechat'
 import { fetchPrefs, savePrefs, setLocalAvatar } from '../utils/prefs'
+import TableRing, { RingSeat } from '../components/TableRing'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,7 @@ interface RoomSnapshot {
   host:               string | null
   players:            string[]
   seats:              Record<string, number>
+  n_players?:         number      // 桌子人數 4/5/6（舊版 server 沒有這個欄位 → 當 4）
   rounds_normal:      number
   rounds_appeal:      number
   time_limit:         number
@@ -421,10 +423,12 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
   )
 }
 
-function randomBeauties(): string[] {
+/** 抽 n 個 AI 名字。★ 刻意不給預設值——預設 3 就是 2026-09-16
+ *  「選了 6 人、進設定畫面卻變回 4 人」那個 bug 的成因。 */
+function randomBeauties(n: number): string[] {
   const pool = [...BEAUTIES]
   const out: string[] = []
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < n; i++) {
     const idx = Math.floor(Math.random() * pool.length)
     out.push(pool.splice(idx, 1)[0])
   }
@@ -513,6 +517,17 @@ const DIFFICULTY_OPTIONS: { value: string; label: string; sub: string; tint: str
   { value: 'expert',       label: '傳奇', sub: '牌道至境，不可言說',           tint: 'text-fuchsia-300' },
 ]
 const DEFAULT_DIFFICULTY = 'advanced'
+
+// ★ 與 backend game/game.py 的 downgrade_strategy 成對：5/6 人桌沒有能用的 ML 權重
+//   （DistNet 的特徵寫死 4 花色）。前端也要降一次——否則畫面與戰績會標「大神(ml_dist)」，
+//   而實際跑的是 rulealpha4。那是一個**看不見的謊**，比功能少一個還糟。
+const ML_STRATEGIES = new Set([
+  'ml', 'ml_neutral', 'ml_aggressive', 'ml_conservative',
+  'ml_dist', 'ml_dist_aggressive', 'ml_dist_conservative', 'ml2',
+])
+function effectiveStrategy(s: string, players: number): string {
+  return players !== 4 && ML_STRATEGIES.has(s) ? 'rulealpha4' : s
+}
 // 傳奇(ml2) attitude 旋鈕——目標：min P(成為嚴格最後一名)。參數待 match_sim 微調。
 const NOTLAST_SAFE_BASE     = 6    // 「完全安全」所需的領先 = BASE × √(剩餘局數)
 const NOTLAST_GP_POW        = 1    // 賽程進度權重指數
@@ -520,6 +535,49 @@ const NOTLAST_AMP_BASE      = 0.4  // 攻/守基礎強度
 const NOTLAST_AMP_GP        = 0.4  // 賽程加成（終盤更用力）
 const NOTLAST_DEFICIT_BOOST = 0.3  // 落後越深，攻越猛
 const NOTLAST_K             = 10   // RA4 守的觸發斜率：領先最後一名 > K×剩餘局數 才轉守（待 match_sim 校準）
+
+// ── 桌子人數選擇 ─────────────────────────────────────────────────────────────
+// 5 人＝多一副黑桃（藍色 ♠）、6 人＝再多一副紅心（橘色 ♥）。
+// 副標直接把「多了什麼牌」講出來——玩家第一次看到藍色黑桃時才不會愣住。
+const PLAYER_COUNT_OPTIONS: { value: number; label: string; sub: string }[] = [
+  { value: 4, label: '4 人', sub: '52 張·標準' },
+  { value: 5, label: '5 人', sub: '65 張·＋藍桃' },
+  { value: 6, label: '6 人', sub: '78 張·＋橘心' },
+]
+
+function PlayerCountSelect({ value, onChange, accent = 'sky', disabled = false }:
+  { value: number; onChange: (n: number) => void; accent?: 'sky' | 'yellow'; disabled?: boolean }) {
+  const onCls = accent === 'yellow'
+    ? 'bg-yellow-400 border-yellow-400 text-gray-900'
+    : 'bg-sky-500 border-sky-400 text-white'
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {PLAYER_COUNT_OPTIONS.map(o => (
+        <button key={o.value} type="button" disabled={disabled}
+          onClick={() => !disabled && onChange(o.value)}
+          className={`flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg border text-xs font-semibold transition
+            ${disabled ? 'bg-slate-800/40 border-slate-700 text-gray-600 cursor-not-allowed'
+              : value === o.value ? onCls
+              : 'bg-slate-700 border-slate-600 text-gray-100 hover:border-sky-400'}`}>
+          <span className="text-base">{o.label}</span>
+          <span className={`text-[11px] font-normal ${value === o.value ? 'opacity-80' : 'text-gray-400'}`}>{o.sub}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// 5/6 人桌的 AI 只有規則型可用（DistNet 的特徵寫死 4 花色，見 game/game.py
+// downgrade_strategy）。這行字是為了不讓「選了大神卻不是大神」變成一個看不見的謊。
+function MlUnavailableNote({ players }: { players: number }) {
+  if (players === 4) return null
+  return (
+    <div className="text-[11px] text-amber-300/90 leading-snug">
+      ⚠ {players} 人桌的「大神／傳奇」尚未訓練（牌組變了，舊模型的特徵對不上），
+      這一桌會自動用「老仙」的規則型 AI 代打。
+    </div>
+  )
+}
 
 function DifficultySelect({ value, onChange, accent = 'sky' }:
   { value: string; onChange: (v: string) => void; accent?: 'sky' | 'yellow' | 'orange' }) {
@@ -614,6 +672,11 @@ export default function OnlinePage() {
   const _savedSettings = (() => {
     try { return JSON.parse(localStorage.getItem(`tc_settings_${localStorage.getItem('tc_player')}`) || '{}') } catch { return {} }
   })()
+  // ── 桌子人數（Gary 2026-09-16 新增 5/6 人玩法）──────────────────────────────
+  // 5 人＝多一副黑桃（65 張）、6 人＝再多一副紅心（78 張）；13×人數 剛好發完。
+  // ★ 人數是**這一桌的設定**，不是個人偏好：連線時由房主決定，其他人跟著走。
+  const [cfgPlayers,      setCfgPlayers]      = useState<number>(_savedSettings.cfgPlayers  ?? 4)
+  const aiSlots = cfgPlayers - 1          // AI（或受邀者）席位數，永遠是人數 − 1
   const [cfgNormal,       setCfgNormal]       = useState<number>(_savedSettings.cfgNormal    ?? 4)
   const [cfgAppeal,       setCfgAppeal]       = useState<number>(_savedSettings.cfgAppeal    ?? 1)
   const [cfgTimeLimit,    setCfgTimeLimit]    = useState(30)
@@ -625,13 +688,31 @@ export default function OnlinePage() {
     ?? DEFAULT_DIFFICULTY
   const [cfgDifficulty,   setCfgDifficulty]   = useState<string>(_savedDifficulty)
   const [cfgStrategies,   setCfgStrategies]   = useState<string[]>(
-    Array(4).fill(DIFFICULTY_TO_STRATEGY[_savedDifficulty] ?? DIFFICULTY_TO_STRATEGY[DEFAULT_DIFFICULTY]))
-  // 切換難易度：更新顯示 + 把四個座位策略一次設定
+    Array(_savedSettings.cfgPlayers ?? 4).fill(
+      DIFFICULTY_TO_STRATEGY[_savedDifficulty] ?? DIFFICULTY_TO_STRATEGY[DEFAULT_DIFFICULTY]))
+  // 切換難易度：更新顯示 + 把所有座位策略一次設定
   const applyDifficulty = (d: string) => {
     setCfgDifficulty(d)
-    setCfgStrategies(Array(4).fill(DIFFICULTY_TO_STRATEGY[d] ?? DIFFICULTY_TO_STRATEGY[DEFAULT_DIFFICULTY]))
+    setCfgStrategies(Array(cfgPlayers).fill(DIFFICULTY_TO_STRATEGY[d] ?? DIFFICULTY_TO_STRATEGY[DEFAULT_DIFFICULTY]))
   }
-  const [cfgAiNames,      setCfgAiNames]      = useState<string[]>(() => randomBeauties())
+  const [cfgAiNames,      setCfgAiNames]      = useState<string[]>(() => randomBeauties((_savedSettings.cfgPlayers ?? 4) - 1))
+  // 改人數時，AI 名單／策略／受邀名單三份長度都要跟著改——
+  // 只改一份的話最後一席會是 undefined，送到後端就變成少一個人的局。
+  const changePlayerCount = (n: number) => {
+    setCfgPlayers(n)
+    const slots = n - 1
+    setCfgAiNames(prev => {
+      const keep = prev.slice(0, slots)
+      if (keep.length === slots) return keep
+      const pool = BEAUTIES.filter(b => !keep.includes(b))
+      return [...keep, ...pool.slice(0, slots - keep.length)]
+    })
+    setCfgStrategies(prev => {
+      const base = prev[0] ?? DIFFICULTY_TO_STRATEGY[DEFAULT_DIFFICULTY]
+      return Array(n).fill(0).map((_, i) => prev[i] ?? base)
+    })
+    setCfgInvitees(prev => prev.slice(0, slots))
+  }
   const [cfgAutoReshuffle, setCfgAutoReshuffle] = useState<boolean>(() => _savedSettings.cfgAutoReshuffle ?? false)
   const [cfgQuickStart,   setCfgQuickStart]   = useState<boolean>(() => _savedSettings.cfgQuickStart ?? false)
   const [cfgStepByStep,   setCfgStepByStep]   = useState(false)
@@ -659,9 +740,9 @@ export default function OnlinePage() {
 
   // ── Badge extraction (per-seat) ──
   const TOP_M = new Set(['三條'])
-  const MID_M = new Set(['葫蘆','鐵支','同花順','同花次大順','同花大順'])
-  const BOT_M = new Set(['鐵支','同花順','同花次大順','同花大順'])
-  const ML: Record<string,string> = {'三條':'原子頭','葫蘆':'葫蘆','鐵支':'鐵支','同花順':'同花順','同花次大順':'次大順','同花大順':'大順'}
+  const MID_M = new Set(['葫蘆','鐵支','同花順','同花次大順','同花大順','鋼支'])
+  const BOT_M = new Set(['鐵支','同花順','同花次大順','同花大順','鋼支'])
+  const ML: Record<string,string> = {'三條':'原子頭','葫蘆':'葫蘆','鐵支':'鐵支','同花順':'同花順','同花次大順':'次大順','同花大順':'大順','鋼支':'鋼支'}
 
   function extractRoundBadges(result: any): string[][] {
     const players: any[] = result.players ?? []
@@ -719,11 +800,20 @@ export default function OnlinePage() {
       if (cancelled) return
       const s = p?.settings
       if (s) {
+        // ★ 人數要**先**套用：applyDifficulty 會依人數配出策略陣列，
+        //   順序顛倒的話 5/6 人桌會拿到只有 4 格的策略陣列。
+        if (typeof s.cfgPlayers === 'number' && [4, 5, 6].includes(s.cfgPlayers))
+          changePlayerCount(s.cfgPlayers)
         if (typeof s.cfgNormal === 'number')        setCfgNormal(s.cfgNormal)
         if (typeof s.cfgAppeal === 'number')        setCfgAppeal(s.cfgAppeal)
         if (typeof s.cfgAutoReshuffle === 'boolean') setCfgAutoReshuffle(s.cfgAutoReshuffle)
         if (typeof s.cfgQuickStart === 'boolean')   setCfgQuickStart(s.cfgQuickStart)
-        if (s.diffV2 && s.cfgDifficulty)            applyDifficulty(s.cfgDifficulty)
+        if (s.diffV2 && s.cfgDifficulty) {
+          const n = (typeof s.cfgPlayers === 'number' && [4, 5, 6].includes(s.cfgPlayers)) ? s.cfgPlayers : cfgPlayers
+          setCfgDifficulty(s.cfgDifficulty)
+          setCfgStrategies(Array(n).fill(
+            DIFFICULTY_TO_STRATEGY[s.cfgDifficulty] ?? DIFFICULTY_TO_STRATEGY[DEFAULT_DIFFICULTY]))
+        }
       }
       // Avatar: only adopt the server copy when this device has none locally.
       const localAvatar = localStorage.getItem(`tc_avatar_${player}`)
@@ -734,7 +824,7 @@ export default function OnlinePage() {
       // Seed the server from this device when it has nothing yet, so existing
       // local avatar/settings propagate to other devices without re-entering.
       if (!p?.settings) {
-        savePrefs(player, { settings: { cfgNormal, cfgAppeal, cfgDifficulty, cfgAutoReshuffle, cfgQuickStart, diffV2: true } })
+        savePrefs(player, { settings: { cfgNormal, cfgAppeal, cfgDifficulty, cfgAutoReshuffle, cfgQuickStart, cfgPlayers, diffV2: true } })
       }
       if (!p?.avatar && localAvatar) {
         savePrefs(player, { avatar: localAvatar })
@@ -748,10 +838,10 @@ export default function OnlinePage() {
   // (cross-device) whenever they change.
   useEffect(() => {
     if (!player) return
-    const settings = { cfgNormal, cfgAppeal, cfgDifficulty, cfgAutoReshuffle, cfgQuickStart, diffV2: true }
+    const settings = { cfgNormal, cfgAppeal, cfgDifficulty, cfgAutoReshuffle, cfgQuickStart, cfgPlayers, diffV2: true }
     localStorage.setItem(`tc_settings_${player}`, JSON.stringify({ ...settings, cfgStrategies }))
     if (prefsReadyRef.current) savePrefs(player, { settings })
-  }, [player, cfgNormal, cfgAppeal, cfgStrategies, cfgDifficulty, cfgAutoReshuffle, cfgQuickStart])
+  }, [player, cfgNormal, cfgAppeal, cfgStrategies, cfgDifficulty, cfgAutoReshuffle, cfgQuickStart, cfgPlayers])
   const ttsGenRef          = useRef(0)
   const soloPhaseRef       = useRef<string>('lobby')
   const soloAppealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -772,10 +862,10 @@ export default function OnlinePage() {
   function enterSoloSetup() {
     if (!soloGameJustEnded) {
       // First time or after going home — randomize AI names
-      setCfgAiNames(randomBeauties())
+      setCfgAiNames(randomBeauties(aiSlots))
     } else {
       // Game just ended; auto-reshuffle if user opted in
-      if (cfgAutoReshuffle) setCfgAiNames(randomBeauties())
+      if (cfgAutoReshuffle) setCfgAiNames(randomBeauties(aiSlots))
       setSoloGameJustEnded(false)
     }
     setSoloSetupMode(true)
@@ -783,7 +873,7 @@ export default function OnlinePage() {
 
   // ── Randomize AI players manually ──────────────────────────────────────────
   function randomizeAiPlayers() {
-    setCfgAiNames(randomBeauties())
+    setCfgAiNames(randomBeauties(aiSlots))
   }
 
   // ── Leave / ESC navigation ────────────────────────────────────────────────
@@ -927,6 +1017,9 @@ export default function OnlinePage() {
 
       case 'room_update':
         setRoom(msg.room ?? null)
+        // ★ 人數是**房主決定的桌子設定**，不是個人偏好：訪客一律跟著房間走，
+        //   不然訪客的畫面會照自己上次的 4 人版面畫一張 6 人的桌子。
+        if (msg.room?.n_players) setCfgPlayers(msg.room.n_players)
         if (msg.room) restoreFromSnapshot(msg.room)
         break
 
@@ -1295,7 +1388,9 @@ export default function OnlinePage() {
       drawnOrder: cfg.drawnOrder,
       roundsNormal:    cfg.roundsNormal,
       roundsAppeal:    cfg.roundsAppeal,
-      strategies:      cfg.strategies,
+      // 降級在**存進狀態時**做一次，之後的比賽請求、畫面標籤、戰績紀錄
+      // 全都吃同一份，不會出現「顯示的模型」與「實際跑的模型」對不上。
+      strategies:      cfg.strategies.map(x => effectiveStrategy(x, seatNames.length)),
       multiplier:      1,
       currentRound:    0,
       appealGeneration: 0,
@@ -1377,7 +1472,12 @@ export default function OnlinePage() {
       const ctrl = new AbortController()
       const tid  = setTimeout(() => ctrl.abort(), 30000)
       try {
-        const r  = await fetch('/api/game/deal', { method: 'POST', signal: ctrl.signal })
+        const r  = await fetch('/api/game/deal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: ctrl.signal,
+          body: JSON.stringify({ players: state.seatNames.length }),
+        })
         clearTimeout(tid)
         hands = (await r.json()).hands
       } catch {
@@ -1819,6 +1919,28 @@ export default function OnlinePage() {
   const effAppealGen     = soloActive ? (soloStateRef.current?.appealGeneration ?? 0)        : (room?.appeal_generation ?? 0)
   const effAppealRounds  = soloActive ? (soloStateRef.current?.roundsAppeal  ?? cfgAppeal)   : (room?.rounds_appeal  ?? cfgAppeal)
 
+  // ── 環形牌桌的席位資料（4/5/6 人共用同一份推導）─────────────────────────────
+  // ★ 一份推導餵所有桌面畫面。solo 與連線各寫一份的話，5/6 人局遲早會在某個
+  //   畫面上少畫一席（打三國踩過同型的坑：同一件事有兩個真相）。
+  const effSeatNames: string[] = soloActive
+    ? (soloStateRef.current?.seatNames ?? [])
+    : (room?.seat_names ?? [])
+  const effHistory: number[][] = soloActive
+    ? (soloStateRef.current?.history ?? [])
+    : (room?.history ?? [])
+  const effMySeat = soloActive ? 0 : (_mySeat ?? 0)
+  const effHumans = new Set<string>(soloActive ? [player ?? ''] : (room?.players ?? []))
+
+  const ringSeats: RingSeat[] = effSeatNames.map((name, i) => ({
+    name,
+    seat:      i,
+    isMe:      i === effMySeat,
+    isHuman:   effHumans.has(name),
+    // AI 沒有「送出」這件事，牌一發出去就等於排好了；人才需要等。
+    submitted: !effHumans.has(name) || submittedList.includes(name) || (i === effMySeat && submitted),
+    score:     effHistory.reduce((acc, row) => acc + (row[i] ?? 0), 0),
+  }))
+
 
   // ── ESC / logo-click navigation ────────────────────────────────────────────
   // Game is "in progress" when a round cycle has started and not yet finished
@@ -2062,6 +2184,7 @@ export default function OnlinePage() {
           cumScores={arrangeSeats.length > 0 ? arrangeCumScores : undefined}
           isGary={isGary}
           strategy={cfgStrategies[0] ?? 'rulealpha'}
+          players={effSeatNames.length || cfgPlayers}
           attDebug={isGary && debugAtt.length > 0 ? debugAtt[0] : null}
         />,
         document.body
@@ -2397,10 +2520,17 @@ export default function OnlinePage() {
           ))}
         </div>
 
+        {/* 人數設定 */}
+        <div className="space-y-2">
+          <div className="text-sm text-gray-400">人數</div>
+          <PlayerCountSelect value={cfgPlayers} onChange={changePlayerCount} accent="sky" />
+        </div>
+
         {/* 難易度設定 */}
         <div className="space-y-2">
           <div className="text-sm text-gray-400">難易度</div>
           <DifficultySelect value={cfgDifficulty} onChange={applyDifficulty} accent="sky" />
+          <MlUnavailableNote players={cfgPlayers} />
         </div>
 
         {/* 各座玩家選擇 */}
@@ -2417,7 +2547,8 @@ export default function OnlinePage() {
               </button>
             </div>
           </div>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid gap-2 grid-cols-3"
+               style={{ gridTemplateColumns: `repeat(${Math.min(cfgPlayers, 4)}, minmax(0, 1fr))` }}>
             {/* 你 */}
             <div className="space-y-1.5">
               <div className="text-xs text-gray-500">你</div>
@@ -2515,7 +2646,7 @@ export default function OnlinePage() {
     const cfg = pendingSoloConfig
     if (!cfg) return null
     const allNames = [player!, ...cfg.aiNames]
-    const hasDrawn = soloDrawnSeats.length === 4
+    const hasDrawn = soloDrawnSeats.length === allNames.length
 
     return (
       <div className="relative bg-slate-800/30 rounded-xl p-6 space-y-5 text-center">
@@ -2596,22 +2727,29 @@ export default function OnlinePage() {
   function renderPhase() {
     if (submitted && phase === 'playing') {
       return (
-        <div className="bg-slate-800/30 rounded-xl p-8 text-center space-y-3">
-          <div className="text-4xl">✅</div>
-          <div className="text-xl font-bold text-sky-400">已送出排法</div>
-          {soloActive ? (
-            <div className="text-sm text-gray-400">計算中…</div>
-          ) : (
-            <div className="text-sm text-gray-400">
-              等待其他玩家… ({submittedList.length}/{room?.players.length ?? 1})
-            </div>
-          )}
-          {countdown !== null && (
-            <div className={`text-3xl font-bold tabular-nums
-              ${countdown <= 5 ? 'text-red-400 animate-pulse' : 'text-yellow-300'}`}>
-              ⏱ {countdown}s
-            </div>
-          )}
+        <div className="bg-slate-800/30 rounded-xl p-2 sm:p-4">
+          <TableRing
+            seats={ringSeats} mySeat={effMySeat}
+            center={
+              <>
+                <div className="text-3xl">✅</div>
+                <div className="text-base font-bold text-sky-300">已送出排法</div>
+                {soloActive ? (
+                  <div className="text-xs text-gray-300">計算中…</div>
+                ) : (
+                  <div className="text-xs text-gray-300">
+                    等待其他玩家… ({submittedList.length}/{room?.players.length ?? 1})
+                  </div>
+                )}
+                {countdown !== null && (
+                  <div className={`text-2xl font-bold tabular-nums
+                    ${countdown <= 5 ? 'text-red-400 animate-pulse' : 'text-yellow-300'}`}>
+                    ⏱ {countdown}s
+                  </div>
+                )}
+              </>
+            }
+          />
         </div>
       )
     }
@@ -2633,7 +2771,7 @@ export default function OnlinePage() {
 
   function renderLobby() {
     // AI-3 slot → show the logged-in player's name
-    const rawNames  = room?.seat_names ?? cfgAiNames.concat([player ?? '']).slice(0, 4)
+    const rawNames  = room?.seat_names ?? cfgAiNames.concat([player ?? '']).slice(0, cfgPlayers)
     const seatNames = rawNames.map((n: string) => /^AI-\d+$/.test(n) ? (player ?? n) : n)
     const history   = room?.history ?? []
     const rm        = room?.round_multipliers ?? roundMultipliers
@@ -2696,12 +2834,13 @@ export default function OnlinePage() {
     const others = onlinePlayers.filter(p => p !== player)
     const toggleInvite = (p: string) =>
       setCfgInvitees(prev =>
-        prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p].slice(0, 3)
+        prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p].slice(0, aiSlots)
       )
 
     // Determine per-slot display: slot 1/2/3 = invited player or AI
-    const slotLabels = [0, 1, 2].map(i => cfgInvitees[i] ?? cfgAiNames[i] ?? `AI ${i + 1}`)
-    const slotIsHuman = [0, 1, 2].map(i => !!cfgInvitees[i])
+    const slotIdx     = Array.from({ length: aiSlots }, (_, i) => i)
+    const slotLabels  = slotIdx.map(i => cfgInvitees[i] ?? cfgAiNames[i] ?? `AI ${i + 1}`)
+    const slotIsHuman = slotIdx.map(i => !!cfgInvitees[i])
 
     return (
       <div className="bg-slate-800/30 rounded-xl p-6 space-y-5">
@@ -2724,16 +2863,24 @@ export default function OnlinePage() {
           ))}
         </div>
 
+        {/* 人數設定 */}
+        <div className="space-y-2">
+          <div className="text-sm text-gray-400">人數</div>
+          <PlayerCountSelect value={cfgPlayers} onChange={changePlayerCount} accent="sky" />
+        </div>
+
         {/* 難易度設定 */}
         <div className="space-y-2">
           <div className="text-sm text-gray-400">難易度</div>
           <DifficultySelect value={cfgDifficulty} onChange={applyDifficulty} accent="sky" />
+          <MlUnavailableNote players={cfgPlayers} />
         </div>
 
         {/* 各座玩家選擇 */}
         <div className="space-y-2">
           <div className="text-sm text-gray-400">玩家</div>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid gap-2 grid-cols-3"
+               style={{ gridTemplateColumns: `repeat(${Math.min(cfgPlayers, 4)}, minmax(0, 1fr))` }}>
             {/* 你 */}
             <div className="space-y-1.5">
               <div className="text-xs text-gray-500">你</div>
@@ -2784,7 +2931,7 @@ export default function OnlinePage() {
           </div>
           {others.length > 0 && (
             <div className="flex flex-wrap gap-2">
-              {others.slice(0, 3).map(p => (
+              {others.slice(0, aiSlots).map(p => (
                 <button key={p}
                   onClick={() => toggleInvite(p)}
                   className={`px-4 py-2 rounded-full border text-sm font-medium transition
@@ -2836,6 +2983,7 @@ export default function OnlinePage() {
                 time_limit:     cfgTimeLimit,
                 invite_players: cfgInvitees,
                 seat_strategies: cfgStrategies,
+                n_players:      cfgPlayers,
                 ai_names:       cfgAiNames,
               })
             }
@@ -2934,23 +3082,30 @@ export default function OnlinePage() {
   function renderSpectator() {
     const currentRound = soloActive ? (soloStateRef.current?.currentRound ?? 1) : (room?.current_round ?? 1)
     return (
-      <div className="bg-slate-800/30 rounded-xl p-8 text-center space-y-4">
-        <div className="text-sm text-gray-500">
-          第 {currentRound}/{effRoundsNormal} 局
-          {effInAppeal ? ' 【申訴局】' : ''}
-          {(nextMultiplier > 1) && (
-            <span className="ml-2 text-orange-400 font-bold">× {nextMultiplier}</span>
-          )}
-        </div>
-        {countdown !== null && (
-          <div className={`text-5xl font-bold tabular-nums
-            ${countdown <= 5 ? 'text-red-400 animate-pulse' : 'text-yellow-300'}`}>
-            {countdown}
-          </div>
-        )}
-        <div className="text-sm text-gray-400">
-          已送出：{submittedList.length}/{soloActive ? 1 : (room?.players.length ?? 1)}
-        </div>
+      <div className="bg-slate-800/30 rounded-xl p-2 sm:p-4">
+        <TableRing
+          seats={ringSeats} mySeat={effMySeat}
+          center={
+            <>
+              <div className="text-xs text-gray-300">
+                第 {currentRound}/{effRoundsNormal} 局
+                {effInAppeal ? ' 【申訴局】' : ''}
+                {(nextMultiplier > 1) && (
+                  <span className="ml-2 text-orange-400 font-bold">× {nextMultiplier}</span>
+                )}
+              </div>
+              {countdown !== null && (
+                <div className={`text-4xl font-bold tabular-nums
+                  ${countdown <= 5 ? 'text-red-400 animate-pulse' : 'text-yellow-300'}`}>
+                  {countdown}
+                </div>
+              )}
+              <div className="text-xs text-gray-400">
+                已送出：{submittedList.length}/{soloActive ? 1 : (room?.players.length ?? 1)}
+              </div>
+            </>
+          }
+        />
       </div>
     )
   }

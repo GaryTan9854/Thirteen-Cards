@@ -17,6 +17,7 @@ const TOP_MONSTER_SHORT: Record<string, string> = {
   '三條': '原子頭 3',
 }
 const MID_MONSTER_SHORT: Record<string, string> = {
+  '鋼支':      '鋼支 20',
   '葫蘆':      '葫蘆 2',
   '鐵支':      '鐵支 8',
   '同花順':    '同花順 10',
@@ -24,6 +25,7 @@ const MID_MONSTER_SHORT: Record<string, string> = {
   '同花大順':  '大順 14',
 }
 const BOT_MONSTER_SHORT: Record<string, string> = {
+  '鋼支':      '鋼支 10',
   '鐵支':      '鐵支',
   '同花順':    '同花順 5',
   '同花次大順':'次大順 6',

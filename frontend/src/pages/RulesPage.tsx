@@ -131,7 +131,8 @@ export default function RulesPage() {
             <h3 className="font-bold text-gray-200">牌型強弱（5張）</h3>
             <div className="grid grid-cols-2 gap-1 text-xs">
               {[
-                ['同花大順', '最高，10JQKA 同花'],
+                ['鋼支', '最高，五張同點（只有 5/6 人桌才有）'],
+                ['同花大順', '10JQKA 同花'],
                 ['同花次大順', 'A2345 同花順'],
                 ['鐵支', '四條'],
                 ['葫蘆', '三條 + 對子'],
@@ -225,6 +226,8 @@ export default function RulesPage() {
                 { name: '相公',          desc: '排牌不符合尾≥中≥頭，犯規每人扣 −6 分' },
                 { name: '衝三（頭墩三條）', desc: '輸者各 −3 分；若恰好三張 3，則再 ×2（即 −6）' },
                 { name: '中墩葫蘆',      desc: '輸者此墩各 −2 分' },
+                { name: '尾墩鋼支',      desc: '輸者此墩各 −10 分；若恰好五張 5，則再 ×2（即 −20）' },
+                { name: '中墩鋼支',      desc: '輸者此墩各 −10×2＝−20 分；五張 5 則 −40' },
                 { name: '尾墩鐵支',      desc: '輸者此墩各 −4 分；若恰好四張相同，則再 ×2（即 −8）' },
                 { name: '尾墩同花順',    desc: '順 −5、次大順（A2345）−6、大順（10JQKA）−7' },
                 { name: '中墩鐵支',      desc: '輸者此墩各 −4×2＝−8 分' },
@@ -243,7 +246,41 @@ export default function RulesPage() {
             <div className="bg-gray-800/60 rounded-lg px-4 py-3 space-y-1.5 text-sm">
               <div className="flex gap-2"><span className="text-red-400 font-bold w-24">打槍</span><span>輸家輸分 = 三墩輸分合計 × 2</span></div>
               <div className="flex gap-2"><span className="text-orange-400 font-bold w-24">打槍兩家</span><span>輸家輸分 = 三墩輸分合計 × 3</span></div>
-              <div className="flex gap-2"><span className="text-yellow-400 font-bold w-24">全壘打</span><span>輸家輸分 = 三墩輸分合計 × 4</span></div>
+              <div className="flex gap-2"><span className="text-yellow-400 font-bold w-24">打槍三家</span><span>輸家輸分 = 三墩輸分合計 × 4</span></div>
+              <div className="flex gap-2"><span className="text-yellow-400 font-bold w-24">全壘打</span><span>打槍<b>全部</b>對手：4 人桌 ×4、5 人桌 ×5、6 人桌 ×6</span></div>
+              <div className="text-xs text-gray-500 pt-1">
+                一句話：打槍 N 家 → 該家的分數 ×(N+1)。三種人數同一條式子。
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="font-bold text-gray-200">5 人／6 人玩法</h3>
+            <div className="bg-gray-800/60 rounded-lg px-4 py-3 space-y-2 text-xs text-gray-300">
+              <div>
+                <span className="text-yellow-300 font-semibold">牌組：</span>
+                5 人多一副黑桃（65 張）、6 人再多一副紅心（78 張）。13 × 人數 剛好發完，每人仍是 13 張。
+              </div>
+              <div>
+                <span className="text-yellow-300 font-semibold">認牌：</span>
+                第二副的花色<b>形狀一樣、顏色不同</b>——第二副黑桃畫成
+                <span className="text-sky-500 font-bold"> 藍色 ♠</span>、第二副紅心畫成
+                <span className="text-orange-500 font-bold"> 橘色 ♥</span>。不另外發明新符號，是為了讓你一眼還認得出是桃是心。
+              </div>
+              <div>
+                <span className="text-yellow-300 font-semibold">同花：</span>
+                藍桃與黑桃是<b>兩個不同花色</b>，不能湊在一起算同花或同花順。橘心與紅心同理。
+              </div>
+              <div>
+                <span className="text-yellow-300 font-semibold">鋼支：</span>
+                每個點數變成 5–6 張，於是出現五張同點的「鋼支」，比同花大順還大。
+                （相對「鐵支」＝四張同點。）
+              </div>
+              <div className="text-gray-500">
+                ⚠ 多一副牌會讓對子／三條／鐵支全面變常見，同花反而<b>變稀有</b>
+                （5 人桌同花比葫蘆稀有 2.4 倍）。牌型大小順序仍照傳統不變，
+                所以 5/6 人桌的同花是「看起來大、其實會輸給葫蘆」的陷阱牌——排牌時要留意。
+              </div>
             </div>
           </section>
 
