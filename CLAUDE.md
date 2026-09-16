@@ -234,6 +234,18 @@ else:            att = -min(1,(g-K*rl)/(K*rl)) # 安穩領先 → 守（鎖局�
 
 ## 前端
 
+### ★★ 手機首頁「咬住」（2026-09-16 修）
+首頁輪播**刻意**填滿「輪播頂端 → 畫面底」、按鈕疊在輪播底部、`touchAction:none`（整頁不捲）。
+這個設計**只在高度量得準時成立**；量錯一點，按鈕就掉到螢幕外、又捲不下去。三個成因都要守：
+- **任何東西都不能把頁面撐得比螢幕寬。** header 第一列在 Gary 登入時多一顆 portal 進來的 ⚙重置，
+  375px 螢幕上長到 431px → 手機瀏覽器縮放版面 → 輪播量到的高度對不上畫面。
+  根容器加了 `overflow-x-clip`（不用 hidden，免得產生捲動容器）當保險，header 本身也改到放得下：
+  手機字標疊成兩行（THIRTEEN／CARDS v版本）、⚙重置 手機只留齒輪。
+  ⚠ **往 header 的 `#live-slot`／`#tournament-header-slot` portal 東西前，先在 360px 量一次**。
+- 高度用 `visualViewport.height`（看得到的那塊）不用 `innerHeight`，並監聽 visualViewport resize；首幀後再量一次。
+- 輪播的 `marginBottom:-24px` 抵銷 `<main>` 的 `py-6`——多那 24px 頁面就比螢幕高，而觸控被輪播吃掉。
+- 桌機分頁列改到 **lg（1024px）** 才出現：整排實測要 ~776px，原本 sm（640px）就切，平板上一樣撐寬。
+
 ### Solo Mode (OnlinePage.tsx)
 - `soloActive`, `soloSetupMode`, `soloGameJustEnded` state
 - 不用 WebSocket；直接呼叫 `/api/game/play` with overrides

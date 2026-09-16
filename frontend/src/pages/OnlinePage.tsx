@@ -170,10 +170,14 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
 
       // availH: exact visible space from carousel top to viewport bottom.
       // Buttons are overlaid on the carousel on all screen sizes.
+      // ★ 用 visualViewport（真正看得到的那一塊）而不是 innerHeight：
+      //   iOS 的網址列收合、或頁面被撐寬而縮放時，innerHeight 會比畫面大，
+      //   按鈕就被算到螢幕外面——而輪播設了 touchAction:none，使用者捲不下去。
       if (el) {
-        const top  = el.getBoundingClientRect().top
+        const top  = el.getBoundingClientRect().top + (window.visualViewport?.offsetTop ?? 0)
+        const visH = window.visualViewport?.height ?? window.innerHeight
         if (top >= 0) {
-          setAvailH(window.innerHeight - top)
+          setAvailH(Math.max(240, Math.floor(visH - top)))
         }
       }
 
@@ -188,8 +192,16 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
       }
     }
     measure()
+    // header 的字型載入、第二列換行都會在第一幀之後才定案 → 下一幀再量一次
+    const raf1 = requestAnimationFrame(() => measure())
+    const vv = window.visualViewport
     window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
+    vv?.addEventListener('resize', measure)
+    return () => {
+      cancelAnimationFrame(raf1)
+      window.removeEventListener('resize', measure)
+      vv?.removeEventListener('resize', measure)
+    }
   }, [N])
 
   // Normalization helper — reads colsRef so it's always current without stale closures
@@ -313,7 +325,9 @@ function BeautyCarousel({ player, onEnterRoom, onSolo }: {
          style={{
            // availH measured dynamically: fixes iOS address-bar + 2-row mobile header
            height: availH > 0 ? `${availH}px` : 'calc(100dvh - 80px)',
-           marginTop: '-24px', marginBottom: '0',
+           // 上下都抵銷 <main> 的 py-6：高度已經精確填到畫面底，
+           // 多留那 24px 會讓整頁比螢幕高一點點，而輪播吃掉觸控 → 捲不到、看起來「咬住」。
+           marginTop: '-24px', marginBottom: '-24px',
            marginLeft: '-16px', marginRight: '-16px',
            cursor: 'grab', touchAction: 'none', userSelect: 'none',
          }}
@@ -2370,9 +2384,9 @@ export default function OnlinePage() {
                 return slot ? createPortal(
                   <button
                     onClick={async () => { await fetch('/api/online/reset', { method: 'POST' }) }}
-                    className="text-xs text-gray-400 hover:text-red-400 px-2 py-1 rounded hover:bg-slate-700 transition"
+                    className="text-xs text-gray-400 hover:text-red-400 px-1.5 sm:px-2 py-1 rounded hover:bg-slate-700 transition whitespace-nowrap"
                     title="強制重置房間（Gary 限定）">
-                    ⚙ 重置
+                    ⚙<span className="hidden sm:inline"> 重置</span>
                   </button>,
                   slot
                 ) : null

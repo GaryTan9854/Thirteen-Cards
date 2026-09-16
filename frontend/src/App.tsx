@@ -86,29 +86,47 @@ function AppInner() {
   ]
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex flex-col">
+    /* ★ overflow-x-clip：任何東西超出螢幕寬度都不能把整頁撐寬。
+       撐寬的後果不是「多一條橫向捲軸」而已——手機瀏覽器會縮放版面，
+       首頁輪播量到的高度就跟畫面對不上，按鈕掉到螢幕外、輪播又吃掉觸控，整頁「咬住」。
+       （2026-09-16：Gary 登入時多一顆 ⚙ 重置，header 第一列 431px > 375px，就是這樣卡住的。）
+       用 clip 不用 hidden：clip 不會產生新的捲動容器，不影響裡面的 sticky。 */
+    <div className="min-h-screen bg-slate-900 text-white flex flex-col overflow-x-clip">
       {/* ── Header (desktop: single row; mobile: two rows) ── */}
       <header className="bg-slate-800 shadow shrink-0">
         {/* Row 1: Logo + Player + Logout */}
-        <div className="flex items-center justify-between px-4 py-2.5 sm:px-6">
+        <div className="flex items-center justify-between gap-2 px-3 py-2.5 sm:px-6">
           {/* Logo — click to go home */}
           <button
             onClick={() => {
               setTab('online')
               window.dispatchEvent(new CustomEvent('tc-go-home'))
             }}
-            className="flex items-baseline gap-2 hover:opacity-80 transition-opacity active:scale-95"
+            className="flex items-baseline gap-2 min-w-0 shrink sm:shrink-0 hover:opacity-80 transition-opacity active:scale-95"
           >
-            <h1 className="text-lg font-bold tracking-wide leading-none font-cinzel flex items-center gap-1.5">
-              <CardFanLogo size={22} /> <span className="text-orange-500">Thirteen</span> <span className="text-sky-400">Cards</span>
+            {/* ★ 手機把字標疊成兩行（THIRTEEN／CARDS v版本）：雙色字標與左上版本號都保留，
+                 寬度從 173px 降到 ~110px。單行的話 Gary 登入且 ⚙重置、📡直播都出現時，
+                 360px 螢幕上右邊的 🎵🔇 會直接蓋在「CARDS」上（2026-09-16 實測）。 */}
+            <h1 className="font-bold tracking-wide leading-none font-cinzel flex items-center gap-1.5 whitespace-nowrap">
+              <CardFanLogo size={22} />
+              <span className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-1.5 text-[15px] sm:text-lg">
+                <span className="text-orange-500">Thirteen</span>
+                <span className="flex items-baseline gap-1.5">
+                  <span className="text-sky-400">Cards</span>
+                  {version && (
+                    <span className="sm:hidden text-[10px] font-normal font-sans tracking-normal text-sky-400">v{version}</span>
+                  )}
+                </span>
+              </span>
             </h1>
             {version && (
-              <span className="text-xs font-normal text-sky-400 leading-none">v{version}</span>
+              <span className="hidden sm:inline text-xs font-normal text-sky-400 leading-none">v{version}</span>
             )}
           </button>
 
-          {/* Desktop tabs (hidden on small screens — shown below on mobile) */}
-          <div className="hidden sm:flex bg-slate-700 rounded-xl p-1 gap-1">
+          {/* Desktop tabs — ★ 1024px（lg）以上才放得下整排（實測需要 ~776px 的列寬）。
+              原本 640px（sm）就切過來，平板上標籤被擠成直排、右邊 Gary/登出 被推出畫面。 */}
+          <div className="hidden lg:flex bg-slate-700 rounded-xl p-1 gap-1">
             <a href="https://543.visadelab.xyz" title="回 543 遊戲大廳"
               className="px-3 py-1.5 rounded-lg text-sm font-semibold transition text-sky-300 hover:text-white"
               style={{ textDecoration: 'none' }}>
@@ -129,9 +147,9 @@ function AppInner() {
           </div>
 
           {/* Sound toggles + player chip + logout */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <SoundToggles />
-            <span className={`font-bold px-3 py-1 rounded-full text-sm
+            <span className={`font-bold px-2 sm:px-3 py-1 rounded-full text-sm max-w-[6rem] truncate
               ${isGary
                 ? 'bg-yellow-400 text-gray-900'
                 : 'bg-slate-600 text-sky-100'}`}>
@@ -152,7 +170,7 @@ function AppInner() {
         </div>
 
         {/* Row 2: Mobile tab bar */}
-        <div className="flex sm:hidden bg-slate-700/60 border-t border-slate-600/40 overflow-x-auto">
+        <div className="flex lg:hidden bg-slate-700/60 border-t border-slate-600/40 overflow-x-auto">
           <a href="https://543.visadelab.xyz"
             className="flex-1 min-w-[4rem] py-2 text-xs font-semibold transition flex flex-col items-center gap-0.5 shrink-0 text-sky-400 hover:text-white"
             style={{ textDecoration: 'none' }}>
