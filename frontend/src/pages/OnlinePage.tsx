@@ -537,12 +537,12 @@ const NOTLAST_DEFICIT_BOOST = 0.3  // 落後越深，攻越猛
 const NOTLAST_K             = 10   // RA4 守的觸發斜率：領先最後一名 > K×剩餘局數 才轉守（待 match_sim 校準）
 
 // ── 桌子人數選擇 ─────────────────────────────────────────────────────────────
-// 5 人＝多一副黑桃（藍色 ♠）、6 人＝再多一副紅心（橘色 ♥）。
+// 5 人＝多一副黑桃（藍色 ♠）、6 人＝再多一副紅心（綠色 ♥）。
 // 副標直接把「多了什麼牌」講出來——玩家第一次看到藍色黑桃時才不會愣住。
 const PLAYER_COUNT_OPTIONS: { value: number; label: string; sub: string }[] = [
   { value: 4, label: '4 人', sub: '52 張·標準' },
   { value: 5, label: '5 人', sub: '65 張·＋藍桃' },
-  { value: 6, label: '6 人', sub: '78 張·＋橘心' },
+  { value: 6, label: '6 人', sub: '78 張·＋綠心' },
 ]
 
 function PlayerCountSelect({ value, onChange, accent = 'sky', disabled = false }:

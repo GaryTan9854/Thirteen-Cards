@@ -2,7 +2,7 @@ import { useCardStyle } from '../utils/cardStyle'
 import { fromGlyph } from '../utils/suits'
 
 interface Props {
-  card: string   // format: "♥A", "♠K", "♦10", "♣2"；5/6 人桌另有 "♤A"(藍桃) "♡A"(橘心)
+  card: string   // format: "♥A", "♠K", "♦10", "♣2"；5/6 人桌另有 "♤A"(藍桃) "♡A"(綠心)
 }
 
 export default function CardChip({ card }: Props) {

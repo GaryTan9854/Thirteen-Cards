@@ -265,11 +265,11 @@ export default function RulesPage() {
                 <span className="text-yellow-300 font-semibold">認牌：</span>
                 第二副的花色<b>形狀一樣、顏色不同</b>——第二副黑桃畫成
                 <span className="text-sky-500 font-bold"> 藍色 ♠</span>、第二副紅心畫成
-                <span className="text-orange-500 font-bold"> 橘色 ♥</span>。不另外發明新符號，是為了讓你一眼還認得出是桃是心。
+                <span className="text-emerald-600 font-bold"> 綠色 ♥</span>。顏色取自四色牌的慣例，不另外發明新符號——為的是讓你一眼還認得出是桃是心。
               </div>
               <div>
                 <span className="text-yellow-300 font-semibold">同花：</span>
-                藍桃與黑桃是<b>兩個不同花色</b>，不能湊在一起算同花或同花順。橘心與紅心同理。
+                藍桃與黑桃是<b>兩個不同花色</b>，不能湊在一起算同花或同花順。綠心與紅心同理。
               </div>
               <div>
                 <span className="text-yellow-300 font-semibold">鋼支：</span>
