@@ -1,6 +1,58 @@
 #!/bin/bash
 set -e
 
+# >>> TUNA-VERIFY
+# ★ 同源區塊，**勿手改**。來源：~/Documents/deploy-verify.sh（改完跑 sync-deploy-verify.sh）
+# 用法：tuna_verify <ssh目標> <port> <期望版本|空字串> [對外hostname]
+tuna_verify() {
+  local target="$1" port="$2" want="$3" host="${4:-}" h got pub i tries=15
+  # ★★ **一定要重試**（2026-09-28 當天就踩到）：uvicorn／node 在 `pm2 restart` 之後
+  #   要幾秒才聽得到 port，檢查一插進去就打會拿到空回應 ⇒ 對一次**成功**的部署喊失敗
+  #   （Sanguo／Xiyou／FourColors 三支同時中）。**會喊狼來了的檢查，跟不會失敗的檢查一樣沒人信。**
+  #   重試也順便涵蓋「舊行程還在、回的是舊版本」那幾秒。最多等約 30 秒。
+  for ((i = 1; i <= tries; i++)); do
+    h=$(ssh ${SSH_OPTS:-} "$target" "curl -s -m 5 http://127.0.0.1:$port/api/health" 2>/dev/null || true)
+    got=$(printf '%s' "$h" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
+    case "$h" in
+      *'"status":"ok"'*)
+        if [ -z "$want" ] || [ "$got" = "$want" ]; then break; fi ;;
+    esac
+    if [ "$i" -lt "$tries" ]; then
+      [ "$i" = 3 ] && echo "   （還在起來，繼續等…）"
+      sleep 2
+    fi
+  done
+  if [ -z "$h" ]; then
+    echo "   ❌ 等了約 30 秒，MBP 上 127.0.0.1:$port/api/health 還是沒有回應 —— app 沒有起來"
+    return 1
+  fi
+  echo "   本機：$h"
+  case "$h" in
+    *'"status":"ok"'*) ;;
+    *) echo "   ❌ health 沒有回 status:ok"; return 1 ;;
+  esac
+  if [ -n "$want" ]; then
+    if [ -z "$got" ]; then
+      echo "   ❌ health 沒有 version 欄位，無法確認跑的是新版（期望 v$want）"
+      return 1
+    fi
+    if [ "$got" != "$want" ]; then
+      echo "   ❌ 等了約 30 秒，線上還是 v$got 不是 v$want —— 舊行程還佔著，這次部署沒有生效"
+      return 1
+    fi
+  fi
+  [ -n "$host" ] || return 0
+  pub=$(curl -s -m 12 -L "https://$host/api/health" 2>/dev/null || true)
+  case "$pub" in
+    *'"status":"ok"'*) echo "   對外：通（這站不需登入）" ;;
+    *cloudflareaccess*|*"<html"*|*"<!DOCTYPE"*|*"Sign in"*|*"login"*)
+      echo "   對外：Cloudflare Access 擋著，回的是登入頁（預期行為，不算失敗）" ;;
+    "") echo "   對外：連不上（tunnel／DNS 待確認；本機已經驗過了，不影響成敗）" ;;
+    *) echo "   對外：回了不是 health 的東西 → $(printf '%s' "$pub" | head -c 60)" ;;
+  esac
+}
+# <<< TUNA-VERIFY
+
 # ThirteenCards Deploy Script
 # Usage:
 #   ./deploy.sh                      — full deploy (rsync + remote build + pm2 restart)
@@ -149,5 +201,8 @@ ssh $SSH_OPTS $REMOTE_USER@$REMOTE_HOST "
 # deploy 前的回滾保護留在 MBP 本機，見下。
 # MBP 本機已在部署前留了 5 份輪替快照（見上面的 BACKUP_DIR），回滾夠用。
 
+echo ""
+echo "🩺 驗證線上跑的真的是新版（判成敗只認 MBP 本機 loopback）"
+tuna_verify "$REMOTE_USER@$REMOTE_HOST" 3013 "$NEXT_VER" "thirteencards.visadelab.xyz" || exit 1
 echo ""
 echo "✅ Deploy complete → ThirteenCards v$NEXT_VER → https://thirteencards.visadelab.xyz"
